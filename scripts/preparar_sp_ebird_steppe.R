@@ -1,8 +1,8 @@
-#load packages
+# load packages
 library(raster)
 library(ggplot2)
 library(ggmap)
-#library(ggsn)
+#library(ggsn) # no longer available
 library(viridisLite)
 library(auk)
 library(lubridate)
@@ -10,8 +10,8 @@ library(sf)
 library(gridExtra)
 library(tidyverse)
 library(grid)
-#library(velox) #mal
-#library(MODIS) #mal
+#library(velox) # no longer available
+#library(MODIS) # no longer available
 library(dggridR)
 library(unmarked)
 library(ebirdst)
@@ -29,30 +29,38 @@ library(pander)
 select <- dplyr::select
 filter <- dplyr::filter
 
-# create a new folder: "Data" within your working directory where we'll store data and save files
-data_dir <- "./data/steppe_species"
+# create a new folder: "data" within your working directory where we'll store data and save files
+data_dir <- "./data/"
 if (!dir.exists(data_dir)) {
   dir.create(data_dir)
 }
 
-auk_set_awk_path()
-ebd <- auk_ebd("./data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt")
-#read in eBird data downloaded from eBird as a text (.txt) file
-ebd <- auk_ebd("data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt", 
-               file_sampling = "./data/ebird_raw_mar2024/ebd_sampling_relMar-2024/ebd_sampling_relMar-2024.txt")
+#auk_set_awk_path()
+ebd <- auk_ebd("./raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt")
+# read in eBird data downloaded from eBird as a text (.txt) file
+ebd <- auk_ebd("/raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt", 
+               file_sampling = "./raw_data/ebird_raw_mar2024/ebd_sampling_relMar-2024/ebd_sampling_relMar-2024.txt")
 
-
+# define a list of the studied species and their abbreviated names
 especies <- list(
-  c("Circus pygargus", "cirpyg"),
-  c("Chersophilus duponti", "chedup"),
-  c("Otis tarda", "otttar"),
-  c("Falco naumanni", "falnau"),
-  c("Pterocles alchata", "ptealc"),
-  c("Pterocles orientalis", "pteori"),
-  c("Tetrax tetrax", "tettet")
+  c("Chersophilus duponti", "chedup"),   # Alondra ricotí
+  c("Circus pygargus", "cirpyg"),        # Aguilucho cenizo
+  c("Falco naumanni", "falnau"),         # Cernícalo primilla
+  c("Otis tarda", "ottard"),             # Avutarda euroasiática
+  c("Pterocles alchata", "ptealc"),      # Ganga ibérica
+  c("Pterocles orientalis", "pteori"),   # Ganga ortega
+  c("Tetrax tetrax", "tettet")           # Sisón común
 )
 
+# loop over each species to filter their own data
 for (i in seq_along(especies)) {
+  
+  # create a new folder: "data/especies_name_abbreviated" for each species
+  data_dir <- paste0("./data/", especies[[i]][2])
+  if (!dir.exists(data_dir)) {
+    dir.create(data_dir)
+  }
+  # filter the data by species, country code, observation dates and observation protocols
   ebd_filters <- ebd %>% 
     auk_species(especies[[i]][1]) %>% 
     auk_country("ES") %>% 
@@ -60,13 +68,14 @@ for (i in seq_along(especies)) {
     auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
     auk_complete()
   
+  # filter the data and save it as a text file
   f_ebd <- file.path(data_dir, paste0("ebd_", especies[[i]][2], "_breeding.txt"))
   f_sampling <- file.path(data_dir, paste0("ebd_checklists_breeding_", especies[[i]][2], ".txt"))
-  
   if (!file.exists(f_ebd)) {
     auk_filter(ebd_filters, file = f_ebd, file_sampling = f_sampling)
   }
   
+  # add the sampling event data (SED) so we also have the non-detection data (sampled places with no detection of our species)
   ebd_zf <- auk_zerofill(f_ebd, f_sampling, collapse = TRUE)
   
   time_to_decimal <- function(x) {
@@ -90,6 +99,8 @@ for (i in seq_along(especies)) {
       day_of_year = yday(observation_date)
     )
   
+  # ebird recommends 6 hours and 10 km as the maximum duration and distance for a checklist
+  # but for now we'll use 5 hours and 5 km
   ebd_zf_filtered <- ebd_zf %>% 
     filter(
       duration_minutes <= 5 * 60,
@@ -98,6 +109,7 @@ for (i in seq_along(especies)) {
       number_observers <= 10
     )
   
+  # select the columns we want to keep
   ebird <- ebd_zf_filtered %>% 
     select(
       checklist_id, observer_id, sampling_event_identifier,
@@ -111,6 +123,8 @@ for (i in seq_along(especies)) {
       number_observers
     )
   
-  #csv2 separa por ; y csv por ,
-  write_csv2(ebird, paste0("./data/ebd_", especies[[i]][2], "_breeding_spain_zf.csv"), na = "")
+  # divide the table in two parts to avoid timing out while running Google Earth Engine
+  # csv separates by , and csv2 separates by ; 
+  write.csv(ebird[1:(nrow(ebird)/2), ], paste0("./data/", especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_zf_part1.csv"), na = "", row.names = FALSE)
+  write.csv(ebird[(nrow(ebird)/2 + 1):nrow(ebird), ], paste0("./data/", especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_zf_part2.csv"), na = "", row.names = FALSE)
 }
