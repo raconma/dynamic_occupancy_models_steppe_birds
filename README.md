@@ -1,1 +1,1 @@
-# dynamic_occupancy_models_steppe_birds
+# Dynamic occupancy models for steppe birds
