@@ -1,1 +1,1 @@
-https://drive.google.com/drive/folders/1SvpguPHx55HLtsOXoKXr-lxErkLVDFDC?usp=drive_link
+Data is so large (38GB aprox.) that we need to find another way of storing it.
