@@ -1,6 +1,6 @@
 # Dynamic occupancy models for steppe birds
 
-Just the quick first draft of the README.
+Just a quick first draft of the README.
 
 ## How to
 
