@@ -1,6 +1,5 @@
 // input
-var coords = ee.FeatureCollection('projects/ee-rcontr03/assets/ebd_tettet_breeding_spain_zf_part1');
-//var coords = ee.FeatureCollection('projects/ee-rcontr03/assets/ebd_tettet_breeding_spain_zf_part2');
+var coords = ee.FeatureCollection('projects/ee-rcontr03/assets/ebd_tettet_breeding_spain_zf_part2_landcover');
 
 Map.addLayer(coords, {color: 'green'}, 'Tetrax tetrax. Presence - Absence');
 Map.centerObject(coords, 11);
@@ -11,19 +10,18 @@ var time_end = '2023-07-30';
 
 // Import the MODIS NDVI and EVI image collection
 var ndviEviCollection = ee.ImageCollection("MODIS/061/MOD13A3").filterDate(time_start, time_end);
-
 var ndviEviSubset = ndviEviCollection.select(['NDVI', 'EVI']);
 
 // Import the TerraClimate image collection
 var temperatureCollection = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterDate(time_start, time_end);
-var temperatureSubset = temperatureCollection.select(['tmmn', 'tmmx']);
+var temperatureSubset = temperatureCollection.select(['tmmn', 'tmmx', 'pr']);
 
 // Map over the points, filter the collection for the date range of every point, and get the mean data for that point
 var pointstats = coords.map(function(point) {
   // Get the year from the point feature
   var year = ee.Number(point.get('year')).toInt();
   
-  // Define the date range from April 1st to July 30th of the given year
+  // Define the date range, our study season
   var dateRangeStart = ee.Date.fromYMD(year, 4, 1);
   var dateRangeEnd = ee.Date.fromYMD(year, 7, 30);
   
@@ -32,9 +30,9 @@ var pointstats = coords.map(function(point) {
   
   // Reduce the NDVI/EVI image to get the mean NDVI and EVI values for the point
   var ndviEviData = ndviEviImage.reduceRegion({
-    reducer: ee.Reducer.mean(),
+    reducer: ee.Reducer.mean(), // Use mean reducer to get the mean value at the point
     geometry: point.geometry(),
-    scale: 1, // Adjust the scale as per your requirement
+    scale: 1, // Point scale
     bestEffort: true
   });
   
@@ -43,9 +41,9 @@ var pointstats = coords.map(function(point) {
   
   // Reduce the temperature image to get the mean temperature values for the point
   var temperatureData = temperatureImage.reduceRegion({
-    reducer: ee.Reducer.mean(),
+    reducer: ee.Reducer.mean(), // Use mean reducer to get the mean value at the point
     geometry: point.geometry(),
-    scale: 1, // Adjust the scale as per your requirement
+    scale: 1, // Point scale
     bestEffort: true
   });
   
@@ -64,6 +62,6 @@ var pointstats = coords.map(function(point) {
 // Export the results to CSV
 Export.table.toDrive({
   collection: ee.FeatureCollection(pointstats),
-  description: 'pointstats',
+  description: 'ebd_tettet_breeding_spain_zf_part2_variables',
   fileFormat: 'CSV'
 });

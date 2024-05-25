@@ -1,4 +1,4 @@
-# define the list of the studied species and their abbreviated names
+# Define the list of the studied species and their abbreviated names
 especies <- list(
   #c("Chersophilus duponti", "chedup"),   # Alondra ricotí / Dupont’s Lark
   #c("Circus pygargus", "cirpyg"),        # Aguilucho cenizo / Montagu's Harrier
@@ -9,19 +9,19 @@ especies <- list(
   c("Tetrax tetrax", "tettet")            # Sisón común / Little Bustard
 )
 
-# loop over each species files to merge their two parts
+# Loop over each species files to merge their two parts
 for (i in seq_along(especies)) {
 
-  # read the two files that we want to merge
-  df1 <- read.csv(paste0("data/",especies[[i]][2],"/",especies[[i]][2],"_pointstats_1.csv"))
-  df2 <- read.csv(paste0("data/",especies[[i]][2],"/",especies[[i]][2],"_pointstats_2.csv"))
+  # Read the two files that we want to merge
+  df1 <- read.csv(paste0("data/",especies[[i]][2],"/ebd_",especies[[i]][2],"_breeding_spain_zf_part1_variables.csv"))
+  df2 <- read.csv(paste0("data/",especies[[i]][2],"/ebd_",especies[[i]][2],"_breeding_spain_zf_part2_variables.csv"))
   
-  # merge the two files
+  # Merge both files
   df_bind <- rbind(df1, df2)
   
-  # delete the last column ".geo", it is a GeoJSON point we won't need it
+  # Delete the last column named ".geo", it is a GeoJSON point we won't need it
   df_bind <- df_bind[, -ncol(df_bind)]
   
-  # save the merged file
+  # Save the merged file
   write.csv(df_bind, file = paste0("data/",especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_variables.csv"), row.names = FALSE)
 }
