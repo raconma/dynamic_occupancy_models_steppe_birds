@@ -6,7 +6,7 @@ Just a quick first draft of the README.
 
 Run preprare_sp_ebird_steppe.R to filter the raw data and get the information of our species, it will create two files. We are creating two files instead of just one so Google Earth Engine (GEE) doesn't time out while processing them.
 
-Now we will append the variables to our data. In this case minimum and maximum temperature and precipitation, NDVI, EVI and land cover.
+Now we will append the variables to our data. In this case minimum and maximum temperature and precipitation, NDVI, EVI, land cover, water bodies % and urban areas %.
 Go to [GEE code editor](https://code.earthengine.google.com/) and create four files:
 - 1_GEE_script_landcover_part1
 - 1_GEE_script_landcover_part2
