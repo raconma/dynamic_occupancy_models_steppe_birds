@@ -10,10 +10,14 @@ var time_start = '2010-01-01';
 var time_end = '2023-12-31';
 
 // Import the MODIS land cover image collection and filter by date
-var collection = ee.ImageCollection("MODIS/061/MCD12Q1").filterDate(time_start, time_end);
+var collection = ee.ImageCollection("MODIS/061/MCD12C1").filterDate(time_start, time_end);
 
-// Select the band from the collection
-var collectionSubset = collection.select(['LC_Prop1']);
+// Select the bands from the collection
+var collectionSubset = collection.select([
+  'Majority_Land_Cover_Type_1', // Majority Land Cover Type 1: Most likely IGBP class for each 0.05 degree pixel
+  'Land_Cover_Type_1_Percent_Class_0', // Percent cover of Water Bodies at each pixel
+  'Land_Cover_Type_1_Percent_Class_13' // Percent cover of Urban and Built-up Lands at each pixel
+  ]);
 
 // Function to process each point
 var pointstats = coords.map(function(point){
