@@ -30,16 +30,16 @@ select <- dplyr::select
 filter <- dplyr::filter
 
 # Create a new folder: "data" within your working directory where we'll store data and save files
-data_dir <- "./data/"
+data_dir <- "../data/"
 if (!dir.exists(data_dir)) {
   dir.create(data_dir)
 }
 
 #auk_set_awk_path()
-ebd <- auk_ebd("./raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt")
+ebd <- auk_ebd("../raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt")
 # Read the raw data downloaded from eBird
-ebd <- auk_ebd("./raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt", 
-               file_sampling = "./raw_data/ebird_raw_mar2024/ebd_sampling_relMar-2024/ebd_sampling_relMar-2024.txt")
+ebd <- auk_ebd("../raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt", 
+               file_sampling = "../raw_data/ebird_raw_mar2024/ebd_sampling_relMar-2024/ebd_sampling_relMar-2024.txt")
 
 # Define a list of the studied species and their abbreviated names
 especies <- list(
@@ -56,7 +56,7 @@ especies <- list(
 for (i in seq_along(especies)) {
   
   # Create a new folder: "data/especies_name_abbreviated" for each species
-  data_dir <- paste0("./data/", especies[[i]][2])
+  data_dir <- paste0("../data/", especies[[i]][2])
   if (!dir.exists(data_dir)) {
     dir.create(data_dir)
   }
@@ -126,6 +126,6 @@ for (i in seq_along(especies)) {
   
   # Divide the table in two parts to avoid timing out while running Google Earth Engine
   # csv separates by , and csv2 separates by ; 
-  write.csv(ebird[1:(nrow(ebird)/2), ], paste0("./data/", especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_zf_part1.csv"), na = "", row.names = FALSE)
-  write.csv(ebird[(nrow(ebird)/2 + 1):nrow(ebird), ], paste0("./data/", especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_zf_part2.csv"), na = "", row.names = FALSE)
+  write.csv(ebird[1:(nrow(ebird)/2), ], paste0("../data/", especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_zf_part1.csv"), na = "", row.names = FALSE)
+  write.csv(ebird[(nrow(ebird)/2 + 1):nrow(ebird), ], paste0("../data/", especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_zf_part2.csv"), na = "", row.names = FALSE)
 }
