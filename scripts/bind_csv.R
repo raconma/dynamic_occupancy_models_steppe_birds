@@ -20,8 +20,10 @@ for (i in seq_along(especies)) {
   df_bind <- rbind(df1, df2)
   
   # Delete the last column named ".geo", it is a GeoJSON point we won't need it
-  df_bind <- df_bind[, -ncol(df_bind)]
+  # Also delete system.index column
+  columns_to_remove <- c(".geo", "system.index")
+  df_bind <- df_bind[, !names(df_bind) %in% columns_to_remove]
   
   # Save the merged file
-  write.csv(df_bind, file = paste0("../data/",especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_variables.csv"), row.names = FALSE)
+  write.csv(df_bind, file = paste0("../data/",especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_variables.csv"), row.names = FALSE, quote=FALSE)
 }
