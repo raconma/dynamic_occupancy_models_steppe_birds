@@ -30,7 +30,7 @@ select <- dplyr::select
 filter <- dplyr::filter
 
 # Create a new folder: "data" within your working directory where we'll store data and save files
-data_dir <- "../data/"
+data_dir <- "../../data/"
 if (!dir.exists(data_dir)) {
   dir.create(data_dir)
 }
@@ -126,6 +126,6 @@ for (i in seq_along(especies)) {
   
   # Divide the table in two parts to avoid timing out while running Google Earth Engine
   # csv separates by , and csv2 separates by ; 
-  write.csv(ebird[1:(nrow(ebird)/2), ], paste0("../data/", especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_zf_part1.csv"), na = "", row.names = FALSE)
-  write.csv(ebird[(nrow(ebird)/2 + 1):nrow(ebird), ], paste0("../data/", especies[[i]][2],"/ebd_", especies[[i]][2], "_breeding_spain_zf_part2.csv"), na = "", row.names = FALSE)
+  write.csv(ebird[1:(nrow(ebird)/2), ], paste0("../../data/tettet/ebd_tette_breeding_spain_zf_part1.csv"), na = "", row.names = FALSE)
+  write.csv(ebird[(nrow(ebird)/2 + 1):nrow(ebird), ], paste0("../../data/tettet/ebd_tettet_breeding_spain_zf_part2.csv"), na = "", row.names = FALSE)
 }

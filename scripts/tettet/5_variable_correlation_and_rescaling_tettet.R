@@ -21,7 +21,7 @@ select <- dplyr::select
 filter <- dplyr::filter
 
 # load dataset
-occ <- read.csv("../data/tettet/occ_tettet_dynamic_wide_table.csv")
+occ <- read.csv("../../data/tettet/occ_tettet_dynamic_wide_table.csv")
 
 names(occ)
 
@@ -103,4 +103,4 @@ if(length(dup) > 0){
 
 
 # Save results
-write.csv(occ_wide_clean, "../data/tettet/occ_tettet_dynamic_wide_table_clean.csv", row.names = FALSE)
+write.csv(occ_wide_clean, "../../data/tettet/occ_tettet_dynamic_wide_table_clean.csv", row.names = FALSE)

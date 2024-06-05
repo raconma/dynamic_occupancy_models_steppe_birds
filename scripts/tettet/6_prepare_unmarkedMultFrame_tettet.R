@@ -20,11 +20,8 @@ sapply(package_vec, install.load.package)
 select <- dplyr::select
 filter <- dplyr::filter
 
-
-#################### SEGUIR CON EL 5 DE RAQUEL
-
 # load dataset
-occ_wide_clean <- read.csv("../data/tettet/occ_tettet_dynamic_wide_table_clean.csv")
+occ_wide_clean <- read.csv("../../data/tettet/occ_tettet_dynamic_wide_table_clean.csv")
 
 names(occ_wide_clean)
 

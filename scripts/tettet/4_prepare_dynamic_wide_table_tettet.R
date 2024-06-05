@@ -21,7 +21,7 @@ select <- dplyr::select
 filter <- dplyr::filter
 
 # load dataset
-occ_var <- read.csv("../data/tettet/ebd_tettet_breeding_spain_variables.csv")
+occ_var <- read.csv("../../data/tettet/ebd_tettet_breeding_spain_variables.csv")
 
 occ_var <- filter(occ_var) %>%
   drop_na(EVI,
@@ -391,4 +391,4 @@ cols <- sapply(occ_wide_total, is.logical) #Select columns that are logical (TRU
 occ_wide_total[,cols] <- lapply(occ_wide_total[,cols], as.numeric) # Transform to numeric; 1= TRUE, 0= FALSE.
 
 # Export the table as csv
-write.table(occ_wide_total, "../data/tettet/occ_tettet_dynamic_wide_table.csv", sep = ",", row.names = FALSE)
+write.table(occ_wide_total, "../../data/tettet/occ_tettet_dynamic_wide_table.csv", sep = ",", row.names = FALSE)
