@@ -42,13 +42,13 @@ ebd <- auk_ebd("../../raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt",
                file_sampling = "../../raw_data/ebird_raw_mar2024/ebd_sampling_relMar-2024/ebd_sampling_relMar-2024.txt")
 
 # Create a new folder: "data/especies_name_abbreviated" for each species
-data_dir <- "../data/tettet"
+data_dir <- "../../data/tettet"
 if (!dir.exists(data_dir)) {
   dir.create(data_dir)
 }
 # Filter the data by species, country code, observation dates and observation protocols
 ebd_filters <- ebd %>% 
-  auk_species("Tetrax tetrax") %>% 
+  auk_species("Pterocles orientalis") %>% 
   auk_country("ES") %>% 
   auk_date(date = c("*-04-01", "*-07-30")) %>% 
   auk_protocol(protocol = c("Stationary", "Traveling")) %>% 

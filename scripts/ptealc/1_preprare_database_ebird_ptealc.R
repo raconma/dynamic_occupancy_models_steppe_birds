@@ -42,21 +42,21 @@ ebd <- auk_ebd("../../raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt",
                file_sampling = "../../raw_data/ebird_raw_mar2024/ebd_sampling_relMar-2024/ebd_sampling_relMar-2024.txt")
 
 # Create a new folder: "data/especies_name_abbreviated" for each species
-data_dir <- "../data/tettet"
+data_dir <- "../data/ptealc"
 if (!dir.exists(data_dir)) {
   dir.create(data_dir)
 }
 # Filter the data by species, country code, observation dates and observation protocols
 ebd_filters <- ebd %>% 
-  auk_species("Tetrax tetrax") %>% 
+  auk_species("Pterocles alchata") %>% 
   auk_country("ES") %>% 
   auk_date(date = c("*-04-01", "*-07-30")) %>% 
   auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
   auk_complete()
 
 # Save the data as a text file
-f_ebd <- file.path(data_dir, "ebd_tettet_breeding.txt")
-f_sampling <- file.path(data_dir, "ebd_checklists_breeding_tettet.txt")
+f_ebd <- file.path(data_dir, "ebd_ptealc_breeding.txt")
+f_sampling <- file.path(data_dir, "ebd_checklists_breeding_ptealc.txt")
 if (!file.exists(f_ebd)) {
   auk_filter(ebd_filters, file = f_ebd, file_sampling = f_sampling)
 }
@@ -112,6 +112,6 @@ ebird <- ebd_zf_filtered %>%
 
 # Divide the table in two parts to avoid timing out while running Google Earth Engine
 # csv separates by , and csv2 separates by ; 
-write.csv(ebird[1:(nrow(ebird)/2), ], "../../data/tettet/ebd_tettet_breeding_spain_zf_part1.csv", na = "", row.names = FALSE)
-write.csv(ebird[(nrow(ebird)/2 + 1):nrow(ebird), ], "../../data/tettet/ebd_tettet_breeding_spain_zf_part2.csv", na = "", row.names = FALSE)
+write.csv(ebird[1:(nrow(ebird)/2), ], "../../data/ptealc/ebd_ptealc_breeding_spain_zf_part1.csv", na = "", row.names = FALSE)
+write.csv(ebird[(nrow(ebird)/2 + 1):nrow(ebird), ], "../../data/ptealc/ebd_ptealc_breeding_spain_zf_part2.csv", na = "", row.names = FALSE)
 
