@@ -1,8 +1,8 @@
 // Import the second part of the data
-var coords = ee.FeatureCollection('projects/ee-rcontr03/assets/ebd_tettet_breeding_spain_zf_part2');
+var coords = ee.FeatureCollection('projects/ee-rcontr03/assets/ebd_pteori_breeding_spain_zf_part2');
 
 // Visualize the data on the map
-Map.addLayer(coords, {color: 'green'}, 'Tetrax tetrax. Presence - Absence');
+Map.addLayer(coords, {color: 'green'}, 'Pterocles orientalis. Presence - Absence');
 Map.centerObject(coords, 11);
 
 // Define the time range for filtering the MODIS image collection
@@ -10,10 +10,10 @@ var time_start = '2010-01-01';
 var time_end = '2023-12-31';
 
 // Import the MODIS land cover image collection and filter by date
-var collection = ee.ImageCollection("MODIS/061/MCD12Q1").filterDate(time_start, time_end);
+var collection = ee.ImageCollection("MODIS/061/MCD12C1").filterDate(time_start, time_end);
 
 // Select the band from the collection
-var collectionSubset = collection.select(['LC_Prop1']);
+var collectionSubset = collection.select(['Majority_Land_Cover_Type_1','Land_Cover_Type_1_Percent_Class_0','Land_Cover_Type_1_Percent_Class_13']);
 
 // Function to process each point
 var pointstats = coords.map(function(point){
@@ -41,6 +41,6 @@ var pointstats = coords.map(function(point){
 // .toAsset to store it locally
 Export.table.toAsset({
   collection: pointstats,
-  assetId: 'projects/ee-rcontr03/assets/ebd_tettet_breeding_spain_zf_part2_landcover',
-  description: 'ebd_tettet_breeding_spain_zf_part1_landcover'
+  assetId: 'projects/ee-rcontr03/assets/ebd_pteori_breeding_spain_zf_part2_landcover',
+  description: 'ebd_pteori_breeding_spain_zf_part1_landcover'
 });
