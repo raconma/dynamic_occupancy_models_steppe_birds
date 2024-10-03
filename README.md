@@ -28,7 +28,7 @@ Now, we are ready to add the dynamic variables to our databases and that's what 
 
 For each speciesirst, we format the variables to use them in the unmarkedMultFrame. When the unmarkedMultFrame is created we can start designing the model. After obtaining the best model (with the AIC), we can analize the Goodness of Fit or how well the results fit the observations.
 
-Then we analize the response variables for the occupancy, colonization, extinction and detection, the initial occupancy maps, and the predicted mean occupancy, colonization and extinction.
+Then we analize the response variables for the occupancy, colonization, extinction and detection, the initial occupancy maps and the predicted mean occupancy, colonization and extinction.
 
 ### 5. Richness
 
