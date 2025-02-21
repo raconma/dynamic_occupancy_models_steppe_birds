@@ -1,19 +1,19 @@
 // Import the first part of the data
-var coords = ee.FeatureCollection('projects/ee-rcontr03/assets/cirpyg_occ_wide_latlong'); //cirpyg,falnau,otitar,ptealc,pteori,tettet
+var coords = ee.FeatureCollection('projects/ee-rcontr03/assets/otitar_occ_wide_latlong');
 
 // Visualize the data on the map
 Map.addLayer(coords, {color: 'green'}, 'Presence - Absence');
 Map.centerObject(coords, 11);
 
 // Define the time range for filtering the MODIS image collection (NDVI/EVI, Land Cover, and Temperature)
-var time_start_ndviEvi = '2017-05-01';
-var time_end_ndviEvi = '2022-07-31';
+var time_start_ndviEvi = '2017-04-01';
+var time_end_ndviEvi = '2022-06-30';
 
 var time_start_landCover = '2017-01-01';
 var time_end_landCover = '2022-12-31';
 
-var time_start_temperature = '2017-05-01';
-var time_end_temperature = '2022-07-31';
+var time_start_temperature = '2017-04-01';
+var time_end_temperature = '2022-06-30';
 
 // Import the MODIS NDVI and EVI image collection
 var ndviEviCollection = ee.ImageCollection("MODIS/061/MOD13A3").filterDate(time_start_ndviEvi, time_end_ndviEvi);
@@ -48,8 +48,8 @@ var processPoint = function(point) {
 
   years.forEach(function(year) {
     // NDVI/EVI Processing
-    var dateRangeStart_ndviEvi = ee.Date.fromYMD(year, 5, 1);
-    var dateRangeEnd_ndviEvi = ee.Date.fromYMD(year, 7, 31);
+    var dateRangeStart_ndviEvi = ee.Date.fromYMD(year, 4, 1);
+    var dateRangeEnd_ndviEvi = ee.Date.fromYMD(year, 6, 30);
     var ndviEviImage = ndviEviSubset.filterDate(dateRangeStart_ndviEvi, dateRangeEnd_ndviEvi).mean();
     var ndviEviData = ndviEviImage.reduceRegion({
       reducer: ee.Reducer.mean(),
@@ -70,8 +70,8 @@ var processPoint = function(point) {
     });
 
     // Temperature Processing
-    var dateRangeStart_temperature = ee.Date.fromYMD(year, 5, 1);
-    var dateRangeEnd_temperature = ee.Date.fromYMD(year, 7, 31);
+    var dateRangeStart_temperature = ee.Date.fromYMD(year, 4, 1);
+    var dateRangeEnd_temperature = ee.Date.fromYMD(year, 6, 30);
     var temperatureImage = temperatureSubset.filterDate(dateRangeStart_temperature, dateRangeEnd_temperature).mean();
     var temperatureData = temperatureImage.reduceRegion({
       reducer: ee.Reducer.mean(),
@@ -106,6 +106,6 @@ var pointstats = coords.map(processPoint);
 // Export the feature collection to CSV
 Export.table.toDrive({
   collection: pointstats,
-  description: 'cirpyg_dynamic_variables', //cirpyg,falnau,otitar,ptealc,pteori,tettet
+  description: 'otitar_dynamic_variables',
   fileFormat: 'CSV'
 });

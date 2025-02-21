@@ -70,18 +70,37 @@ write.csv(occ_species_observed, "../data/tettet/tettet_occ_species_observed.csv"
 
 
 ################################################################################
-##################         LOAD BIOCLIMATIC VARIABLES         ##################
+############        LOAD BIOCLIMATIC AND TOPOLOGIC VARIABLES       #############
 ################################################################################
 
 # Load the environmental variables
-variables <- stack("../data/environmental_data/environmental_data_occ/variables_spain.grd")
-names(variables)
+variables_environmental <- stack("../data/environmental_data/environmental_data_occ/variables_spain.grd")
+names(variables_environmental)
+
+# Load the orientation variable
+variables_aspect <- stack("../data/topology_data/topo_aspect.asc")
+names(variables_aspect)
+
+# Load the elevation variable
+variables_elev <- stack("../data/topology_data/topo_elev.asc")
+names(variables_elev)
+
+# Load the slope variable
+variables_slope <- stack("../data/topology_data/topo_slope.asc")
+names(variables_slope)
+
 
 # Extract the environmental variables at the site locations
 occ_var <- occ %>% 
-  cbind(as.data.frame(terra::extract(variables,
-                                     occ[, c("longitude", "latitude")],
-                                     cellnumbers=T )))
+  cbind(as.data.frame(terra::extract(variables_environmental, 
+                                     occ[, c("longitude", "latitude")], 
+                                     cellnumbers = TRUE))) %>%
+  cbind(as.data.frame(terra::extract(variables_aspect, 
+                                     occ[, c("longitude", "latitude")]))) %>%
+  cbind(as.data.frame(terra::extract(variables_elev, 
+                                     occ[, c("longitude", "latitude")]))) %>%
+  cbind(as.data.frame(terra::extract(variables_slope, 
+                                     occ[, c("longitude", "latitude")])))
 
 summary(occ_var) #check for NA in the environmental variables
 
@@ -96,7 +115,7 @@ n_distinct(occ_var$site)
 names(occ_var)
 
 # Check for correlation between variables
-var_cor <- cor(occ_var[, c(24:44)])
+var_cor <- cor(occ_var[, c(24:47)])
 var_dist <- abs(as.dist(var_cor))
 var_clust <- hclust(1-var_dist) #Cluster variables 
 # Plot correlation cluster 
@@ -105,11 +124,15 @@ plot(var_clust)
 names(occ_var)
 
 # Choose the variables to include in the model taking the correlation in account 
-occ_var_std <- occ_var %>% mutate_at(c("bio1", "tree_cover", "bio2", "grass_cover", "bio12"), ~(scale(.) %>% as.vector))
+occ_var_std <- occ_var %>% mutate_at(c("bio1", "tree_cover", "bio2", "grass_cover", "topo_aspect", "topo_elev"), ~(scale(.) %>% as.vector))
 
 # Check the mean and standard deviation of the variables
-mean(occ_var_std$tree_cover)
-sd(occ_var_std$tree_cover)
+mean(occ_var_std$topo_aspect)
+sd(occ_var_std$topo_aspect)
+
+mean(occ_var_std$topo_elev)
+sd(occ_var_std$topo_elev)
+
 
 
 ################################################################################
@@ -126,7 +149,7 @@ occ_wide.2017 <- format_unmarked_occu(occ_2017,
                                       site_covs = c("locality_id", "n_observations", "cells",
                                                     "latitude", "longitude", "bio1",
                                                     "tree_cover", "bio2",
-                                                    "grass_cover", "bio12"),
+                                                    "grass_cover", "topo_aspect", "topo_elev"),
                                       obs_covs = c("time_observations_started", 
                                                    "duration_minutes", 
                                                    "effort_distance_km", 
@@ -141,7 +164,7 @@ occ_wide.2018 <- format_unmarked_occu(occ_2018,
                                       site_covs = c("locality_id", "n_observations", "cells",
                                                     "latitude", "longitude", "bio1",
                                                     "tree_cover", "bio2",
-                                                    "grass_cover", "bio12"),
+                                                    "grass_cover", "topo_aspect", "topo_elev"),
                                       obs_covs = c("time_observations_started", 
                                                    "duration_minutes", 
                                                    "effort_distance_km", 
@@ -156,7 +179,7 @@ occ_wide.2019 <- format_unmarked_occu(occ_2019,
                                       site_covs = c("locality_id", "n_observations", "cells",
                                                     "latitude", "longitude", "bio1",
                                                     "tree_cover", "bio2",
-                                                    "grass_cover", "bio12"),
+                                                    "grass_cover", "topo_aspect", "topo_elev"),
                                       obs_covs = c("time_observations_started", 
                                                    "duration_minutes", 
                                                    "effort_distance_km", 
@@ -171,7 +194,7 @@ occ_wide.2020 <- format_unmarked_occu(occ_2020,
                                       site_covs = c("locality_id", "n_observations", "cells",
                                                     "latitude", "longitude", "bio1",
                                                     "tree_cover", "bio2",
-                                                    "grass_cover", "bio12"),
+                                                    "grass_cover", "topo_aspect", "topo_elev"),
                                       obs_covs = c("time_observations_started", 
                                                    "duration_minutes", 
                                                    "effort_distance_km", 
@@ -187,7 +210,7 @@ occ_wide.2021 <- format_unmarked_occu(occ_2021,
                                       site_covs = c("locality_id", "n_observations", "cells",
                                                     "latitude", "longitude", "bio1",
                                                     "tree_cover", "bio2",
-                                                    "grass_cover", "bio12"),
+                                                    "grass_cover", "topo_aspect", "topo_elev"),
                                       obs_covs = c("time_observations_started", 
                                                    "duration_minutes", 
                                                    "effort_distance_km", 
@@ -202,7 +225,7 @@ occ_wide.2022 <- format_unmarked_occu(occ_2022,
                                       site_covs = c("locality_id", "n_observations", "cells",
                                                     "latitude", "longitude", "bio1",
                                                     "tree_cover", "bio2",
-                                                    "grass_cover", "bio12"),
+                                                    "grass_cover", "topo_aspect", "topo_elev"),
                                       obs_covs = c("time_observations_started", 
                                                    "duration_minutes", 
                                                    "effort_distance_km", 
@@ -234,15 +257,16 @@ occ_wide[,cols] <- lapply(occ_wide[,cols], as.numeric) # Transform to numeric; 1
 
 occ_wide <- occ_wide %>% 
   rename( bio1 = bio1.2017, tree_cover = tree_cover.2017, bio2 = bio2.2017,
-          grass_cover = grass_cover.2017, bio12 = bio12.2017, cells = cells.2017,
-          latitude = latitude.2017, longitude = longitude.2017)
+          grass_cover = grass_cover.2017, topo_aspect = topo_aspect.2017, topo_elev = topo_elev.2017,
+          cells = cells.2017, latitude = latitude.2017, longitude = longitude.2017)
 
 occ_wide <- occ_wide %>% 
   mutate(bio1 = coalesce(bio1.2018, bio1.2019, bio1.2020, bio1.2021, bio1.2022),
          tree_cover = coalesce(tree_cover.2018, tree_cover.2019, tree_cover.2020, tree_cover.2021, tree_cover.2022),
          bio2 = coalesce(bio2.2018, bio2.2019, bio2.2020, bio2.2021, bio2.2022),
          grass_cover = coalesce(grass_cover.2018, grass_cover.2019, grass_cover.2020, grass_cover.2021, grass_cover.2022),
-         bio12 = coalesce(bio12.2018, bio12.2019, bio12.2020, bio12.2021, bio12.2022),
+         topo_aspect = coalesce(topo_aspect.2018, topo_aspect.2019, topo_aspect.2020, topo_aspect.2021, topo_aspect.2022),
+         topo_elev = coalesce(topo_elev.2018, topo_elev.2019, topo_elev.2020, topo_elev.2021, topo_elev.2022),
          cells = coalesce(cells.2018, cells.2019, cells.2020, cells.2021, cells.2022),
          latitude = coalesce(latitude.2018, latitude.2019, latitude.2020, latitude.2021, latitude.2022),
          longitude = coalesce(longitude.2018, longitude.2019, longitude.2020, longitude.2021, longitude.2022),
