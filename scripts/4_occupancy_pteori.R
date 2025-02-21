@@ -31,8 +31,6 @@ filter <- dplyr::filter
 
 theme_set(theme_bw())
 
-set.seed(1)
-
 ################################################################################
 ##################       PREPARE THE DATA FOR THE MODELS      ##################
 ################################################################################
@@ -42,17 +40,17 @@ occ_wide_clean <- read.csv("../data/pteori/pteori_occ_wide_dynamic.csv")
 names(occ_wide_clean)
 
 # Survey covariates
-duration <- as.matrix(occ_wide_clean[, c(32:41, 102:111, 172:181, 242:251, 312:321, 382:391)])
+duration <- as.matrix(occ_wide_clean[, c(33:42, 104:113, 175:184, 246:255, 317:326, 388:397)])
 head(duration) 
-effort <- as.matrix(occ_wide_clean[, c(42:51, 112:121, 182:191, 252:261, 322:331, 392:401)])
+effort <- as.matrix(occ_wide_clean[, c(43:52, 114:123, 185:194, 256:265, 327:336, 398:407)])
 head(effort)
-observers <- as.matrix(occ_wide_clean[, c(52:61, 122:131, 192:201, 262:271, 332:341, 402:411)])
+observers <- as.matrix(occ_wide_clean[, c(53:62, 124:133, 195:204, 266:275, 337:346, 408:417)])
 head(observers)
-time <- occ_wide_clean[, c(22:31, 92:101, 162:171, 232:241, 302:311, 372:381)]
+time <- occ_wide_clean[, c(23:32, 94:103, 165:174, 236:245, 307:316, 378:387)]
 head(time)
 
 # Observations / Detection histories
-detections <- occ_wide_clean[, c(2:11, 73:82, 143:152, 213:222, 283:292, 353:362)]
+detections <- occ_wide_clean[, c(2:11, 74:83, 145:154, 216:225, 287:296, 358:367)]
 names(detections)
 
 # convert all_star column to 1s and 0s
@@ -65,33 +63,33 @@ is.na(y.cross)
 y.cross[is.na(time) != is.na(y.cross)] <- NA
 
 # Site covariates
-siteCovs <- occ_wide_clean[, c(17:21)]
+siteCovs <- occ_wide_clean[, c(17:22)]
 head(siteCovs)
 
 # Yearly site covariates
-EVI <- occ_wide_clean[, c(422:427)]
+EVI <- occ_wide_clean[, c(428:433)]
 head(EVI)
-Land_Cover_Type_1_Percent_Class_0 <- occ_wide_clean[, c(428:433)]
+Land_Cover_Type_1_Percent_Class_0 <- occ_wide_clean[, c(434:439)]
 head(Land_Cover_Type_1_Percent_Class_0)
-Land_Cover_Type_1_Percent_Class_10 <- occ_wide_clean[, c(434:439)]
+Land_Cover_Type_1_Percent_Class_10 <- occ_wide_clean[, c(440:445)]
 head(Land_Cover_Type_1_Percent_Class_10)
-Land_Cover_Type_1_Percent_Class_12 <- occ_wide_clean[, c(440:445)]
+Land_Cover_Type_1_Percent_Class_12 <- occ_wide_clean[, c(446:451)]
 head(Land_Cover_Type_1_Percent_Class_12)
-Land_Cover_Type_1_Percent_Class_13 <- occ_wide_clean[, c(446:451)]
+Land_Cover_Type_1_Percent_Class_13 <- occ_wide_clean[, c(452:457)]
 head(Land_Cover_Type_1_Percent_Class_13)
-Land_Cover_Type_1_Percent_Class_14 <- occ_wide_clean[, c(452:457)]
+Land_Cover_Type_1_Percent_Class_14 <- occ_wide_clean[, c(458:463)]
 head(Land_Cover_Type_1_Percent_Class_14)
-Land_Cover_Type_1_Percent_Class_6 <- occ_wide_clean[, c(458:463)]
+Land_Cover_Type_1_Percent_Class_6 <- occ_wide_clean[, c(464:469)]
 head(Land_Cover_Type_1_Percent_Class_6)
-Land_Cover_Type_1_Percent_Class_7 <- occ_wide_clean[, c(464:469)]
+Land_Cover_Type_1_Percent_Class_7 <- occ_wide_clean[, c(470:475)]
 head(Land_Cover_Type_1_Percent_Class_7)
-NDVI <- occ_wide_clean[, c(476:481)]
+NDVI <- occ_wide_clean[, c(482:487)]
 head(NDVI)
-pr <- occ_wide_clean[, c(482:487)]
+pr <- occ_wide_clean[, c(488:493)]
 head(pr)
-tmmn <- occ_wide_clean[, c(488:493)]
+tmmn <- occ_wide_clean[, c(494:499)]
 head(tmmn)
-tmmx <- occ_wide_clean[, c(494:499)]
+tmmx <- occ_wide_clean[, c(500:505)]
 head(tmmx)
 
 # Standardise survey covariates
@@ -170,6 +168,16 @@ Mod.final <- colext(psiformula = ~ bio2 + tree_cover + grass_cover,
 # Inspect the fitted model:
 summary(Mod.final)
 
+Mod.final <- colext(psiformula = ~ bio2 + tree_cover + grass_cover, 
+                    gammaformula = ~ Land_Cover_Type_1_Percent_Class_7 + Land_Cover_Type_1_Percent_Class_13 + NDVI + tmmx, # pr, tmmn??
+                    epsilonformula = ~ Land_Cover_Type_1_Percent_Class_6 + Land_Cover_Type_1_Percent_Class_7 + Land_Cover_Type_1_Percent_Class_12 +
+                      Land_Cover_Type_1_Percent_Class_13 + NDVI + pr, # LCT1PC_14
+                    pformula = ~ time + duration,
+                    data = occ_umf)
+
+# 1601.072   
+summary(Mod.final)
+
 model_occ <- Mod.final
 
 # Check the model fit
@@ -246,10 +254,9 @@ occPlotFacet
 # Colonization
 
 colformulaList<-c(
-  ~Land_Cover_Type_1_Percent_Class_0,
+  ~Land_Cover_Type_1_Percent_Class_7,
   ~Land_Cover_Type_1_Percent_Class_13,
   ~NDVI,
-  ~pr,
   ~tmmx
 )
 
@@ -312,7 +319,8 @@ extformulaList<-c(
   ~Land_Cover_Type_1_Percent_Class_7,
   ~Land_Cover_Type_1_Percent_Class_12,
   ~Land_Cover_Type_1_Percent_Class_13,
-  ~tmmn
+  ~NDVI,
+  ~pr
 )
 
 #get obsCovs as data.frame
@@ -370,9 +378,7 @@ extPlotFacet
 # Detection 
 detformulaList<-c(
   ~time,
-  ~duration,
-  ~effort,
-  ~observers
+  ~duration
 )
 
 
@@ -559,21 +565,19 @@ ext<-data.frame(matrix(ncol=T,nrow=S))
 for(i in 1:T){
   pp <- c(2017:2022)
   #spXdets_sdf<-detGGA_sdf[detGGA_sdf$CommonName ==speciesName,]
-  Land_Cover_Type_1_Percent_Class_0 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_0_',(pp[i])))])
+  Land_Cover_Type_1_Percent_Class_7 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_7_',(pp[i])))])
   Land_Cover_Type_1_Percent_Class_13 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_13_',(pp[i])))])
   NDVI <- as.data.frame(occ_wide_clean[,c(paste0('NDVI_',(pp[i])))])
-  pr <- as.data.frame(occ_wide_clean[,c(paste0('pr_',(pp[i])))])
   tmmx <- as.data.frame(occ_wide_clean[,c(paste0('tmmx_',(pp[i])))])
-  new.dat<-cbind(Land_Cover_Type_1_Percent_Class_0,
-                 Land_Cover_Type_1_Percent_Class_13,NDVI,pr,tmmx) %>% 
+  new.dat<-cbind(Land_Cover_Type_1_Percent_Class_7,
+                 Land_Cover_Type_1_Percent_Class_13,NDVI,tmmx) %>% 
     drop_na() %>% 
     scale(.) %>% 
     as.data.frame(.)
   
-  names(new.dat) <- c("Land_Cover_Type_1_Percent_Class_0",
+  names(new.dat) <- c("Land_Cover_Type_1_Percent_Class_7",
                       "Land_Cover_Type_1_Percent_Class_13",
                       "NDVI",
-                      "pr",
                       "tmmx"
   )
   if(nrow(new.dat) > nrow(predict_data)) {
@@ -592,9 +596,10 @@ for(i in 1:T){
   Land_Cover_Type_1_Percent_Class_7 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_7_',(pp[i])))])  
   Land_Cover_Type_1_Percent_Class_12 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_12_',(pp[i])))])  
   Land_Cover_Type_1_Percent_Class_13 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_13_',(pp[i])))])  
-  tmmn <- as.data.frame(occ_wide_clean[,c(paste0('tmmn_',(pp[i])))])  
+  NDVI <- as.data.frame(occ_wide_clean[,c(paste0('NDVI_',(pp[i])))])
+  pr <- as.data.frame(occ_wide_clean[,c(paste0('pr_',(pp[i])))])
   new.dat<-cbind(Land_Cover_Type_1_Percent_Class_6,Land_Cover_Type_1_Percent_Class_7,
-                 Land_Cover_Type_1_Percent_Class_12,Land_Cover_Type_1_Percent_Class_13,tmmn) %>% 
+                 Land_Cover_Type_1_Percent_Class_12,Land_Cover_Type_1_Percent_Class_13,NDVI,pr) %>% 
     drop_na() %>% 
     scale(.) %>% 
     as.data.frame(.)
@@ -603,7 +608,8 @@ for(i in 1:T){
                       "Land_Cover_Type_1_Percent_Class_7",
                       "Land_Cover_Type_1_Percent_Class_12", 
                       "Land_Cover_Type_1_Percent_Class_13",
-                      "tmmn")
+                      "NDVI",
+                      "pr")
   if(nrow(new.dat) > nrow(predict_data)) {
     new.dat <- new.dat[c(1:nrow(predict_data)),]
   } else {
@@ -647,8 +653,8 @@ dev.off()
 mean_prev <- data.frame(year=as.character(2017:2022), mean_prev=colMeans(prevT), sd_prev=apply(prevT,2,sd))
 col_prev <- data.frame(year=as.character(2017:2022), mean_prev=colMeans(col), sd_prev=apply(col,2,sd))
 ext_prev <- data.frame(year=as.character(2017:2022), mean_prev=colMeans(ext), sd_prev=apply(ext,2,sd))
+
 # Plot mean occupancy (prevalence) and sd:
-library(ggplot2)
 ggplot(mean_prev, aes(x=year, y=mean_prev, group=1)) + 
   geom_errorbar(aes(ymin=mean_prev-sd_prev, ymax=mean_prev+sd_prev), width=.1) +
   geom_line() +

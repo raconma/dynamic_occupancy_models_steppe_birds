@@ -46,9 +46,7 @@ ebd <- auk_ebd("../raw_data/ebird_raw_mar2024/ebd_ES_smp_relMar-2024.txt",
                file_sampling = "../raw_data/ebird_raw_mar2024/ebd_sampling_relMar-2024/ebd_sampling_relMar-2024.txt")
 
 # Declare the studied species
-species <- c(c("Circus pygargus", "cirpyg"),
-             c("Falco naumanni", "falnau"),
-             c("Otis tarda", "otitar"),
+species <- c(c("Otis tarda", "otitar"),
              c("Pterocles alchata", "ptealc"),
              c("Pterocles orientalis", "pteori"),
              c("Tetrax tetrax", "tettet")
@@ -61,16 +59,28 @@ for (i in seq(1, length(species), by = 2)) {
   if (!dir.exists(data_dir)) {
     dir.create(data_dir)
   }
+  
+  # Breeding season for each species
+  if (species[i] == "Otis tarda" | species[i] == "Tetrax tetrax") {
+    date_range <- c("*-04-01", "*-06-30")
+  } else if (species[i] == "Pterocles alchata" | species[i] == "Pterocles orientalis") {
+    date_range <- c("*-05-01", "*-08-31")
+  }
+  print((species[i]))
+  print(date_range)
+  
   # Filter the data by species, country code, observation dates and observation protocols
   ebd_filters <- ebd %>% 
     auk_species(species[i]) %>% 
     auk_country("ES") %>% 
-    auk_date(date = c("*-05-01", "*-07-30")) %>% 
+    auk_date(date = date_range) %>% 
     auk_protocol(protocol = c("Stationary", "Traveling")) %>% 
     auk_complete()
   
   # Save the data as a text file
+  ####################### DELETE FILES FIRST #######################
   f_ebd <- file.path(data_dir, paste0("ebd_",species[i + 1],"_breeding.txt"))
+  print(f_ebd)
   f_sampling <- file.path(data_dir, paste0("ebd_checklists_breeding_",species[i + 1],".txt"))
   if (!file.exists(f_ebd)) {
     auk_filter(ebd_filters, file = f_ebd, file_sampling = f_sampling)

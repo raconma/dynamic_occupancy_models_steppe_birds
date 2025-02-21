@@ -31,8 +31,6 @@ filter <- dplyr::filter
 
 theme_set(theme_bw())
 
-set.seed(1)
-
 ################################################################################
 ##################       PREPARE THE DATA FOR THE MODELS      ##################
 ################################################################################
@@ -42,17 +40,17 @@ occ_wide_clean <- read.csv("../data/ptealc/ptealc_occ_wide_dynamic.csv")
 names(occ_wide_clean)
 
 # Survey covariates
-duration <- as.matrix(occ_wide_clean[, c(32:41, 102:111, 172:181, 242:251, 312:321, 382:391)])
+duration <- as.matrix(occ_wide_clean[, c(33:42, 104:113, 175:184, 246:255, 317:326, 388:397)])
 head(duration) 
-effort <- as.matrix(occ_wide_clean[, c(42:51, 112:121, 182:191, 252:261, 322:331, 392:401)])
+effort <- as.matrix(occ_wide_clean[, c(43:52, 114:123, 185:194, 256:265, 327:336, 398:407)])
 head(effort)
-observers <- as.matrix(occ_wide_clean[, c(52:61, 122:131, 192:201, 262:271, 332:341, 402:411)])
+observers <- as.matrix(occ_wide_clean[, c(53:62, 124:133, 195:204, 266:275, 337:346, 408:417)])
 head(observers)
-time <- occ_wide_clean[, c(22:31, 92:101, 162:171, 232:241, 302:311, 372:381)]
+time <- occ_wide_clean[, c(23:32, 94:103, 165:174, 236:245, 307:316, 378:387)]
 head(time)
 
 # Observations / Detection histories
-detections <- occ_wide_clean[, c(2:11, 73:82, 143:152, 213:222, 283:292, 353:362)]
+detections <- occ_wide_clean[, c(2:11, 74:83, 145:154, 216:225, 287:296, 358:367)]
 names(detections)
 
 # convert all_star column to 1s and 0s
@@ -65,33 +63,33 @@ is.na(y.cross)
 y.cross[is.na(time) != is.na(y.cross)] <- NA
 
 # Site covariates
-siteCovs <- occ_wide_clean[, c(17:21)]
+siteCovs <- occ_wide_clean[, c(17:22)]
 head(siteCovs)
 
 # Yearly site covariates
-EVI <- occ_wide_clean[, c(422:427)]
+EVI <- occ_wide_clean[, c(428:433)]
 head(EVI)
-Land_Cover_Type_1_Percent_Class_0 <- occ_wide_clean[, c(428:433)]
+Land_Cover_Type_1_Percent_Class_0 <- occ_wide_clean[, c(434:439)]
 head(Land_Cover_Type_1_Percent_Class_0)
-Land_Cover_Type_1_Percent_Class_10 <- occ_wide_clean[, c(434:439)]
+Land_Cover_Type_1_Percent_Class_10 <- occ_wide_clean[, c(440:445)]
 head(Land_Cover_Type_1_Percent_Class_10)
-Land_Cover_Type_1_Percent_Class_12 <- occ_wide_clean[, c(440:445)]
+Land_Cover_Type_1_Percent_Class_12 <- occ_wide_clean[, c(446:451)]
 head(Land_Cover_Type_1_Percent_Class_12)
-Land_Cover_Type_1_Percent_Class_13 <- occ_wide_clean[, c(446:451)]
+Land_Cover_Type_1_Percent_Class_13 <- occ_wide_clean[, c(452:457)]
 head(Land_Cover_Type_1_Percent_Class_13)
-Land_Cover_Type_1_Percent_Class_14 <- occ_wide_clean[, c(452:457)]
+Land_Cover_Type_1_Percent_Class_14 <- occ_wide_clean[, c(458:463)]
 head(Land_Cover_Type_1_Percent_Class_14)
-Land_Cover_Type_1_Percent_Class_6 <- occ_wide_clean[, c(458:463)]
+Land_Cover_Type_1_Percent_Class_6 <- occ_wide_clean[, c(464:469)]
 head(Land_Cover_Type_1_Percent_Class_6)
-Land_Cover_Type_1_Percent_Class_7 <- occ_wide_clean[, c(464:469)]
+Land_Cover_Type_1_Percent_Class_7 <- occ_wide_clean[, c(470:475)]
 head(Land_Cover_Type_1_Percent_Class_7)
-NDVI <- occ_wide_clean[, c(476:481)]
+NDVI <- occ_wide_clean[, c(482:487)]
 head(NDVI)
-pr <- occ_wide_clean[, c(482:487)]
+pr <- occ_wide_clean[, c(488:493)]
 head(pr)
-tmmn <- occ_wide_clean[, c(488:493)]
+tmmn <- occ_wide_clean[, c(494:499)]
 head(tmmn)
-tmmx <- occ_wide_clean[, c(494:499)]
+tmmx <- occ_wide_clean[, c(500:505)]
 head(tmmx)
 
 # Standardise survey covariates
@@ -161,9 +159,19 @@ occ_umf <- unmarkedMultFrame(y = y.cross, # detection histories
 #epsilon extin
 #p detect
 
-Mod.final <- colext(psiformula = ~ bio1 + bio2 + tree_cover + grass_cover, 
+Mod.final <- colext(psiformula = ~ bio1 + bio2 + tree_cover + grass_cover + topo_aspect, 
                     gammaformula = ~ Land_Cover_Type_1_Percent_Class_0 + Land_Cover_Type_1_Percent_Class_13 + NDVI + pr, 
                     epsilonformula = ~  Land_Cover_Type_1_Percent_Class_0 + Land_Cover_Type_1_Percent_Class_13 + pr + tmmn + tmmx, 
+                    pformula = ~ time + duration + effort + observers, 
+                    data = occ_umf)
+
+# Inspect the fitted model:
+summary(Mod.final)
+
+# 1578.183 el fallo parece NDVI
+Mod.final <- colext(psiformula = ~ bio1 + bio2 + tree_cover + grass_cover + topo_aspect, 
+                    gammaformula = ~ Land_Cover_Type_1_Percent_Class_0 + Land_Cover_Type_1_Percent_Class_13 + NDVI + pr, #tmmn tmmx
+                    epsilonformula = ~ Land_Cover_Type_1_Percent_Class_0 + Land_Cover_Type_1_Percent_Class_13 + pr + tmmn + tmmx, 
                     pformula = ~ time + duration + effort + observers, 
                     data = occ_umf)
 
@@ -190,7 +198,8 @@ occformulaList<-c(
   ~bio1,
   ~bio2,
   ~tree_cover,
-  ~grass_cover)
+  ~grass_cover,
+  ~topo_aspect)
 #get obsCovs as data.frame
 siteCovs.df<-as.data.frame(occ_umf@siteCovs)
 
@@ -451,10 +460,10 @@ pred_surface <- pred_surface %>%
 # We need to apply the same re-scaling of our covariates as we did before, so that the new data are at the same scale as our coefficient estimates.
 
 pred_surface_std <- pred_surface %>%
-  mutate_at(c("bio1", "bio2", "tree_cover", "grass_cover"), ~(scale(.) %>% as.vector))
+  mutate_at(c("bio1", "bio2", "tree_cover", "grass_cover", "topo_aspect"), ~(scale(.) %>% as.vector))
 
 occ_pred <- predict(model_occ, 
-                    newdata = as.data.frame(pred_surface_std[,c("bio1", "bio2", "tree_cover", "grass_cover")]), type = "psi")
+                    newdata = as.data.frame(pred_surface_std[,c("bio1", "bio2", "tree_cover", "grass_cover", "topo_aspect")]), type = "psi")
 
 
 pred_occ <- bind_cols(pred_surface_std, occ_prob = occ_pred$Predicted,occ_se = occ_pred$SE) %>% 
@@ -549,7 +558,8 @@ T<-occ_umf@numPrimary # times (i.e. primary sample periods)
 psi1<-predict(model_prediction, type="psi",newdata=as.data.frame(predict_data[,c("bio1",
                                                                                  "bio2",
                                                                                  "tree_cover",
-                                                                                 "grass_cover")]))[1] # initial occ
+                                                                                 "grass_cover",
+                                                                                 "topo_aspect")]))[1] # initial occ
 
 #Get colonisation & extinction predictions using yearly + site covariates
 col<-data.frame(matrix(ncol=T,nrow=S))
@@ -645,8 +655,8 @@ dev.off()
 mean_prev <- data.frame(year=as.character(2017:2022), mean_prev=colMeans(prevT), sd_prev=apply(prevT,2,sd))
 col_prev <- data.frame(year=as.character(2017:2022), mean_prev=colMeans(col), sd_prev=apply(col,2,sd))
 ext_prev <- data.frame(year=as.character(2017:2022), mean_prev=colMeans(ext), sd_prev=apply(ext,2,sd))
+
 # Plot mean occupancy (prevalence) and sd:
-library(ggplot2)
 ggplot(mean_prev, aes(x=year, y=mean_prev, group=1)) + 
   geom_errorbar(aes(ymin=mean_prev-sd_prev, ymax=mean_prev+sd_prev), width=.1) +
   geom_line() +
