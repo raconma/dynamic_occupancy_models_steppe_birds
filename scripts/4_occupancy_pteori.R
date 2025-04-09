@@ -130,6 +130,26 @@ years <- data.frame(lapply(years, as.factor))
 
 dim(years)
 
+# Create a matrix for the variables to match the dimensions of the observation variables
+expand_matrix <- function(mat, J) {
+  expanded_mat <- kronecker(mat, matrix(1, nrow = 1, ncol = J))
+  original_colnames <- colnames(mat)
+  new_colnames <- as.vector(sapply(original_colnames, function(name) paste0(name, ".", 1:J)))
+  colnames(expanded_mat) <- new_colnames
+  return(expanded_mat)
+}
+
+# Apply the function to NDVI, pr, topo_aspect, and topo_elev
+NDVI_obs <- expand_matrix(NDVI, J)
+pr_obs <- expand_matrix(pr, J)
+topo_aspect_obs <- expand_matrix(siteCovs[, "topo_aspect", drop = FALSE], J*T)
+topo_elev_obs <- expand_matrix(siteCovs[, "topo_elev", drop = FALSE], J*T)
+
+dim(NDVI_obs)
+dim(pr_obs)
+dim(topo_aspect_obs)
+dim(topo_elev_obs)
+
 # Make unmarkedMultFrame for dynamic occupancy model
 occ_umf <- unmarkedMultFrame(y = y.cross, # detection histories
                              siteCovs = data.frame(siteCovs),  # (static) site covariates
@@ -147,7 +167,9 @@ occ_umf <- unmarkedMultFrame(y = y.cross, # detection histories
                                                    tmmn = tmmn,
                                                    tmmx = tmmx), # list of yearly (dynamic) site covariates
                              obsCovs = list(duration = duration, effort = effort,
-                                            observers = observers, time = time), # list of survey covariates
+                                            observers = observers, time = time,
+                                            NDVI_obs = NDVI_obs, pr_obs = pr_obs,
+                                            topo_aspect_obs = topo_aspect_obs, topo_elev_obs = topo_elev_obs), # list of survey covariates
                              numPrimary = 6) # number of primary time periods (here, number of years)
 
 ################################################################################
@@ -159,23 +181,26 @@ occ_umf <- unmarkedMultFrame(y = y.cross, # detection histories
 #epsilon extin
 #p detect
 
+# 1601.072 
+#Mod.final <- colext(psiformula = ~ bio2 + tree_cover + grass_cover, 
+#                    gammaformula = ~ Land_Cover_Type_1_Percent_Class_7 + Land_Cover_Type_1_Percent_Class_13 + NDVI + tmmx, # pr
+#                    epsilonformula = ~ Land_Cover_Type_1_Percent_Class_6 + Land_Cover_Type_1_Percent_Class_7 + Land_Cover_Type_1_Percent_Class_12 +
+#                      Land_Cover_Type_1_Percent_Class_13 + NDVI + pr, # LCT1PC_14
+#                    pformula = ~ time + duration,
+#                    data = occ_umf)
+
+# Inspect the fitted model:
+#summary(Mod.final)
+
+# 1597.125
 Mod.final <- colext(psiformula = ~ bio2 + tree_cover + grass_cover, 
-                    gammaformula = ~ Land_Cover_Type_1_Percent_Class_0 + Land_Cover_Type_1_Percent_Class_13 + NDVI + pr + tmmx, 
-                    epsilonformula = ~ Land_Cover_Type_1_Percent_Class_6 + Land_Cover_Type_1_Percent_Class_7 + Land_Cover_Type_1_Percent_Class_12 + Land_Cover_Type_1_Percent_Class_13 + tmmn, 
-                    pformula = ~ time + duration + effort + observers, 
+                    gammaformula = ~ Land_Cover_Type_1_Percent_Class_7 + NDVI + tmmn + tmmx,
+                    epsilonformula = ~ Land_Cover_Type_1_Percent_Class_7 + Land_Cover_Type_1_Percent_Class_12 +
+                      Land_Cover_Type_1_Percent_Class_13 + NDVI + pr,
+                    pformula = ~ time + duration + observers + pr_obs + topo_aspect_obs,
                     data = occ_umf)
 
 # Inspect the fitted model:
-summary(Mod.final)
-
-Mod.final <- colext(psiformula = ~ bio2 + tree_cover + grass_cover, 
-                    gammaformula = ~ Land_Cover_Type_1_Percent_Class_7 + Land_Cover_Type_1_Percent_Class_13 + NDVI + tmmx, # pr, tmmn??
-                    epsilonformula = ~ Land_Cover_Type_1_Percent_Class_6 + Land_Cover_Type_1_Percent_Class_7 + Land_Cover_Type_1_Percent_Class_12 +
-                      Land_Cover_Type_1_Percent_Class_13 + NDVI + pr, # LCT1PC_14
-                    pformula = ~ time + duration,
-                    data = occ_umf)
-
-# 1601.072   
 summary(Mod.final)
 
 model_occ <- Mod.final
@@ -255,8 +280,8 @@ occPlotFacet
 
 colformulaList<-c(
   ~Land_Cover_Type_1_Percent_Class_7,
-  ~Land_Cover_Type_1_Percent_Class_13,
   ~NDVI,
+  ~tmmn,
   ~tmmx
 )
 
@@ -315,7 +340,6 @@ colPlotFacet
 # Extinction
 
 extformulaList<-c(
-  ~Land_Cover_Type_1_Percent_Class_6,
   ~Land_Cover_Type_1_Percent_Class_7,
   ~Land_Cover_Type_1_Percent_Class_12,
   ~Land_Cover_Type_1_Percent_Class_13,
@@ -378,7 +402,10 @@ extPlotFacet
 # Detection 
 detformulaList<-c(
   ~time,
-  ~duration
+  ~duration,
+  ~observers,
+  ~pr_obs,
+  ~topo_aspect_obs
 )
 
 
@@ -438,6 +465,17 @@ detPlotFacet
 
 # Load variables
 variables <- brick(stack(here("../data/environmental_data/environmental_data_occ/variables_spain.grd")))
+aspect <- raster(here("../data/topology_data/topo_aspect_masked.tif"))
+names(aspect) <- "topo_aspect"
+elev <- raster(here("../data/topology_data/topo_elev_masked.tif"))    
+names(elev) <- "topo_elev"
+
+aspect_resampled <- resample(aspect, variables, method = "bilinear")
+elev_resampled <- resample(elev, variables, method = "bilinear")
+compareRaster(variables, aspect_resampled, elev_resampled)
+
+variables <- addLayer(variables, aspect_resampled, elev_resampled)
+
 # Select the variables that we used to calibrate our occupancy models
 variables_selection <- c("bio2", "tree_cover", "grass_cover")
 variables.sel <- variables[[variables_selection]]
@@ -566,18 +604,17 @@ for(i in 1:T){
   pp <- c(2017:2022)
   #spXdets_sdf<-detGGA_sdf[detGGA_sdf$CommonName ==speciesName,]
   Land_Cover_Type_1_Percent_Class_7 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_7_',(pp[i])))])
-  Land_Cover_Type_1_Percent_Class_13 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_13_',(pp[i])))])
   NDVI <- as.data.frame(occ_wide_clean[,c(paste0('NDVI_',(pp[i])))])
+  tmmn <- as.data.frame(occ_wide_clean[,c(paste0('tmmn_',(pp[i])))])
   tmmx <- as.data.frame(occ_wide_clean[,c(paste0('tmmx_',(pp[i])))])
-  new.dat<-cbind(Land_Cover_Type_1_Percent_Class_7,
-                 Land_Cover_Type_1_Percent_Class_13,NDVI,tmmx) %>% 
+  new.dat<-cbind(Land_Cover_Type_1_Percent_Class_7,NDVI,tmmn,tmmx) %>% 
     drop_na() %>% 
     scale(.) %>% 
     as.data.frame(.)
   
   names(new.dat) <- c("Land_Cover_Type_1_Percent_Class_7",
-                      "Land_Cover_Type_1_Percent_Class_13",
                       "NDVI",
+                      "tmmn",
                       "tmmx"
   )
   if(nrow(new.dat) > nrow(predict_data)) {
@@ -592,20 +629,18 @@ for(i in 1:T){
 for(i in 1:T){
   pp <- c(2017:2022)
   #spXdets_sdf<-detGGA_sdf[detGGA_sdf$CommonName ==speciesName,]
-  Land_Cover_Type_1_Percent_Class_6 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_6_',(pp[i])))])
   Land_Cover_Type_1_Percent_Class_7 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_7_',(pp[i])))])  
   Land_Cover_Type_1_Percent_Class_12 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_12_',(pp[i])))])  
   Land_Cover_Type_1_Percent_Class_13 <- as.data.frame(occ_wide_clean[,c(paste0('Land_Cover_Type_1_Percent_Class_13_',(pp[i])))])  
   NDVI <- as.data.frame(occ_wide_clean[,c(paste0('NDVI_',(pp[i])))])
   pr <- as.data.frame(occ_wide_clean[,c(paste0('pr_',(pp[i])))])
-  new.dat<-cbind(Land_Cover_Type_1_Percent_Class_6,Land_Cover_Type_1_Percent_Class_7,
-                 Land_Cover_Type_1_Percent_Class_12,Land_Cover_Type_1_Percent_Class_13,NDVI,pr) %>% 
+  new.dat<-cbind(Land_Cover_Type_1_Percent_Class_7, Land_Cover_Type_1_Percent_Class_12,
+                 Land_Cover_Type_1_Percent_Class_13,NDVI,pr) %>% 
     drop_na() %>% 
     scale(.) %>% 
     as.data.frame(.)
   
-  names(new.dat) <- c("Land_Cover_Type_1_Percent_Class_6",
-                      "Land_Cover_Type_1_Percent_Class_7",
+  names(new.dat) <- c("Land_Cover_Type_1_Percent_Class_7",
                       "Land_Cover_Type_1_Percent_Class_12", 
                       "Land_Cover_Type_1_Percent_Class_13",
                       "NDVI",
