@@ -187,7 +187,7 @@ map_pred <- ggplot(atlas) +
   scale_fill_manual(values=c("white","darkgreen"),
                     name="Prediction",
                     labels=c("Absence (0)", "Presence (1)")) +
-  ggtitle("Model prediction (Optimal threshold via blockCV)") +
+  ggtitle("Model prediction (Optimal threshold)") +
   theme_bw()
 
 map_obs <- ggplot(atlas) +
