@@ -80,7 +80,7 @@ run_split_validation <- function(data, split = 0.7, seed = 123) {
   
   list(split = split, threshold = thresh, auc = auc_test, rmse = rmse_test,
        sens = sens, spec = spec, TSS = TSS, confusion = cm_test,
-       train = train, test = test)  # >>> CAMBIO: añadimos train y test
+       train = train, test = test)
 }
 
 # Compare 70/30 vs 80/20 splits
