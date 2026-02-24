@@ -1,5 +1,5 @@
 // Import the first part of the data
-var coords = ee.FeatureCollection('projects/ee-rcontr03/assets/otitar_occ_wide_latlong');
+var coords = ee.FeatureCollection('projects/{project_name}/assets/otitar_occ_wide_latlong');
 
 // Visualize the data on the map
 Map.addLayer(coords, {color: 'green'}, 'Presence - Absence');
