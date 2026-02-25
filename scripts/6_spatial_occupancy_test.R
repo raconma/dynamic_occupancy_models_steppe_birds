@@ -490,212 +490,514 @@ if (RUN_PHASE_C) {
 
 ###############################################################################
 # DIAGNOSTICS
+#
+# Design rationale for Moran's I comparison:
+#   The valid comparison is tPGOcc (Phase A) vs stPGOcc (Phase C), because
+#   both use the SAME J=3052 sites over the SAME T=6 years. Comparing against
+#   spPGOcc (Phase B) would be invalid: different site set (1218 vs 3052),
+#   different temporal extent (1 year vs 6), and different neighbour matrix.
+#
+#   If Phase C was not run (RUN_PHASE_C = FALSE), we report only Phase A
+#   Moran's I and flag that the spatial comparison requires Phase C.
+#
+# What we call "residuals" here:
+#   resid_j = E[z_j | data] - y_naive_j
+#   where E[z_j | data] is the posterior mean of the latent occupancy state
+#   (averaged over years), and y_naive_j = 1 if species was ever detected at
+#   site j across all years, 0 otherwise. This is a standard approximation
+#   in occupancy modelling (see Doser et al. 2022, Ecological Monographs).
+#   It is NOT a classical Pearson/deviance residual, but is the appropriate
+#   metric for assessing spatial structure in latent-state models.
 ###############################################################################
 
 cat("====================================================================\n")
 cat(" Diagnostics\n")
 cat("====================================================================\n\n")
 
-# --- 1. Convergence: Rhat and ESS ---
-cat("--- Convergence (Phase A: tPGOcc) ---\n")
-if (exists("fit_tpgocc")) {
-  # Check Rhat from summary
-  s <- summary(fit_tpgocc)
-  cat("  (See summary above for Rhat and ESS columns)\n\n")
-}
+sp_code <- "otitar"   # for output filenames
 
-# --- 2. Moran's I on spatial residuals ---
-cat("--- Moran's I on residuals ---\n")
-
-# For the non-spatial model (tPGOcc), extract posterior mean of z
-# and compute residuals against detection history
-if (exists("fit_tpgocc")) {
-  library(spdep)
-
-  # Posterior mean occupancy probability per site (averaged over years)
-  z_mean <- apply(fit_tpgocc$z.samples, c(2, 3), mean)  # [J x T]
-  psi_mean <- rowMeans(z_mean, na.rm = TRUE)  # average over years
-
-  # Naive detection per site
-  y_detected <- apply(y_array, 1, function(x) as.numeric(any(x == 1, na.rm = TRUE)))
-
-  resid_nonspatial <- psi_mean - y_detected
-
-  # Build neighbours (k-nearest for point data)
-  knn <- knearneigh(coords, k = 8)
-  nb <- knn2nb(knn)
-  lw <- nb2listw(nb, style = "W")
-
-  moran_nonspatial <- moran.test(resid_nonspatial, lw, zero.policy = TRUE)
-  cat("\n  tPGOcc (non-spatial) residual Moran's I:\n")
-  print(moran_nonspatial)
-  cat("  Interpretation: Moran's I > 0 with p < 0.05 means spatial autocorrelation\n")
-  cat("  remains unaccounted for.\n\n")
-}
-
-# For the spatial model (spPGOcc, single year), if available
-if (exists("fit_sppgocc")) {
-  z_sp <- apply(fit_sppgocc$z.samples, 2, mean)
-  y_det_sub <- apply(y_sub, 1, function(x) as.numeric(any(x == 1, na.rm = TRUE)))
-  resid_spatial <- z_sp - y_det_sub
-
-  knn_sub <- knearneigh(coords_sub, k = 8)
-  nb_sub <- knn2nb(knn_sub)
-  lw_sub <- nb2listw(nb_sub, style = "W")
-
-  moran_spatial <- moran.test(resid_spatial, lw_sub, zero.policy = TRUE)
-  cat("  spPGOcc (spatial, 2021) residual Moran's I:\n")
-  print(moran_spatial)
-  cat("\n")
-}
-
-# --- 3. Model comparison: WAIC ---
-cat("--- WAIC Comparison ---\n")
-cat("  tPGOcc  (non-spatial, multi-season): ", if (exists("waic_A")) round(waic_A$WAIC, 1) else "not run", "\n")
-cat("  spPGOcc (spatial, single-year 2021): ", if (exists("waic_B")) round(waic_B$WAIC, 1) else "not run", "\n")
-if (RUN_PHASE_C && exists("waic_C")) {
-  cat("  stPGOcc (spatial, multi-season):     ", round(waic_C$WAIC, 1), "\n")
-}
-cat("\n  Lower WAIC = better fit. WAIC difference > 10 is strong.\n\n")
+library(spdep)
+library(ggplot2)
 
 
-# --- 4. AUC/TSS comparison with colext ---
-# Load colext predictions for comparison (if available)
-pred_path <- here("data-raw", "data", "otitar", "occ_otitar_prediction.csv")
-atlas_path <- here("data", "raw", "validation", "atlas_biodiversidad", "aves_spain.shp")
+# =========================================================================
+# 1. MCMC CONVERGENCE: Rhat and ESS
+# =========================================================================
 
-if (file.exists(pred_path) && file.exists(atlas_path)) {
-  cat("--- AUC/TSS vs colext (atlas validation) ---\n")
+cat("--- 1. MCMC Convergence ---\n\n")
 
-  library(terra)
-  library(pROC)
-  library(Metrics)
+# Helper: extract Rhat and ESS from an spOccupancy summary object
+extract_mcmc_diag <- function(fit, model_name) {
+  s <- summary(fit)
 
-  atlas <- st_read(atlas_path, quiet = TRUE)
+  rows <- list()
 
-  # colext predictions
-  pred_colext <- read.csv(pred_path)
-  names(pred_colext) <- tolower(names(pred_colext))
-  r_colext <- rast(data.frame(x = pred_colext$longitude, y = pred_colext$latitude,
-                               occ_prob = pred_colext$occ_prob), type = "xyz")
-  crs(r_colext) <- "+proj=longlat"
-  r_colext_proj <- project(r_colext, crs(atlas))
-  ext_colext <- terra::extract(r_colext_proj, atlas, fun = median, na.rm = TRUE)
-  atlas$pred_colext <- ext_colext$occ_prob
-
-  # spPGOcc predictions (single year, only for sites with data)
-  # Map posterior z back to spatial locations and rasterize
-  if (exists("fit_sppgocc")) {
-    z_sp_mean <- apply(fit_sppgocc$z.samples, 2, mean)
-    pred_sp_df <- data.frame(
-      x = coords_lonlat[has_data, 1],
-      y = coords_lonlat[has_data, 2],
-      occ_prob = z_sp_mean
-    )
-    r_sp <- rast(pred_sp_df, type = "xyz")
-    crs(r_sp) <- "+proj=longlat"
-    r_sp_proj <- project(r_sp, crs(atlas))
-    ext_sp <- terra::extract(r_sp_proj, atlas, fun = median, na.rm = TRUE)
-    atlas$pred_spatial <- ext_sp$occ_prob
-  }
-
-  # Compute metrics on valid polygons
-  atlas_valid <- atlas %>%
-    filter(!is.na(pred_colext))
-
-  if (nrow(atlas_valid) > 50) {
-    # colext AUC
-    roc_colext <- pROC::roc(atlas_valid$OTITAR, atlas_valid$pred_colext, quiet = TRUE)
-    auc_colext <- pROC::auc(roc_colext)
-    th_colext <- pROC::coords(roc_colext, "best", ret = "threshold") %>% as.numeric()
-    bin_colext <- ifelse(atlas_valid$pred_colext >= th_colext, 1, 0)
-    cm_colext <- table(factor(atlas_valid$OTITAR, 0:1), factor(bin_colext, 0:1))
-    TSS_colext <- cm_colext["1","1"]/(cm_colext["1","1"]+cm_colext["1","0"]) +
-                  cm_colext["0","0"]/(cm_colext["0","0"]+cm_colext["0","1"]) - 1
-
-    cat("  colext:   AUC =", round(auc_colext, 3), "| TSS =", round(TSS_colext, 3), "\n")
-
-    # spPGOcc AUC (if available)
-    if ("pred_spatial" %in% names(atlas_valid)) {
-      av_sp <- atlas_valid %>% filter(!is.na(pred_spatial))
-      if (nrow(av_sp) > 50) {
-        roc_sp <- pROC::roc(av_sp$OTITAR, av_sp$pred_spatial, quiet = TRUE)
-        auc_sp <- pROC::auc(roc_sp)
-        th_sp <- pROC::coords(roc_sp, "best", ret = "threshold") %>% as.numeric()
-        bin_sp <- ifelse(av_sp$pred_spatial >= th_sp, 1, 0)
-        cm_sp <- table(factor(av_sp$OTITAR, 0:1), factor(bin_sp, 0:1))
-        TSS_sp <- cm_sp["1","1"]/(cm_sp["1","1"]+cm_sp["1","0"]) +
-                  cm_sp["0","0"]/(cm_sp["0","0"]+cm_sp["0","1"]) - 1
-        cat("  spPGOcc: AUC =", round(auc_sp, 3), "| TSS =", round(TSS_sp, 3), "\n")
-      }
+  # Occupancy coefficients (beta)
+  if (!is.null(s$beta.samples)) {
+    b <- s$beta.samples
+    for (i in seq_len(nrow(b))) {
+      rows[[length(rows) + 1]] <- data.frame(
+        Model = model_name, Parameter = paste0("beta[", rownames(b)[i], "]"),
+        Mean = b[i, "Mean"], Rhat = b[i, "Rhat"], ESS = b[i, "ESS"],
+        stringsAsFactors = FALSE
+      )
     }
   }
-  cat("\n")
-} else {
-  cat("  (Prediction/atlas files not available for AUC/TSS comparison)\n\n")
+
+  # Detection coefficients (alpha)
+  if (!is.null(s$alpha.samples)) {
+    a <- s$alpha.samples
+    for (i in seq_len(nrow(a))) {
+      rows[[length(rows) + 1]] <- data.frame(
+        Model = model_name, Parameter = paste0("alpha[", rownames(a)[i], "]"),
+        Mean = a[i, "Mean"], Rhat = a[i, "Rhat"], ESS = a[i, "ESS"],
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+
+  # Spatial / covariance parameters (theta)
+  if (!is.null(s$theta.samples)) {
+    th <- s$theta.samples
+    for (i in seq_len(nrow(th))) {
+      rows[[length(rows) + 1]] <- data.frame(
+        Model = model_name, Parameter = paste0("theta[", rownames(th)[i], "]"),
+        Mean = th[i, "Mean"], Rhat = th[i, "Rhat"], ESS = th[i, "ESS"],
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+
+  if (length(rows) == 0) return(NULL)
+  do.call(rbind, rows)
+}
+
+diag_frames <- list()
+
+if (exists("fit_tpgocc")) {
+  diag_A <- extract_mcmc_diag(fit_tpgocc, "tPGOcc")
+  if (!is.null(diag_A)) {
+    diag_frames[["A"]] <- diag_A
+    cat("  tPGOcc: max Rhat =", round(max(diag_A$Rhat, na.rm = TRUE), 3),
+        "| min ESS =", round(min(diag_A$ESS, na.rm = TRUE), 0), "\n")
+    n_bad <- sum(diag_A$Rhat > 1.1, na.rm = TRUE)
+    if (n_bad > 0) cat("  WARNING:", n_bad, "parameters with Rhat > 1.1\n")
+  }
+}
+
+if (exists("fit_sppgocc")) {
+  diag_B <- extract_mcmc_diag(fit_sppgocc, "spPGOcc")
+  if (!is.null(diag_B)) {
+    diag_frames[["B"]] <- diag_B
+    cat("  spPGOcc: max Rhat =", round(max(diag_B$Rhat, na.rm = TRUE), 3),
+        "| min ESS =", round(min(diag_B$ESS, na.rm = TRUE), 0), "\n")
+  }
+}
+
+if (RUN_PHASE_C && exists("fit_stpgocc")) {
+  diag_C <- extract_mcmc_diag(fit_stpgocc, "stPGOcc")
+  if (!is.null(diag_C)) {
+    diag_frames[["C"]] <- diag_C
+    cat("  stPGOcc: max Rhat =", round(max(diag_C$Rhat, na.rm = TRUE), 3),
+        "| min ESS =", round(min(diag_C$ESS, na.rm = TRUE), 0), "\n")
+  }
+}
+
+# Save combined MCMC diagnostics
+if (length(diag_frames) > 0) {
+  mcmc_diag_df <- do.call(rbind, diag_frames)
+  mcmc_path <- here("results", paste0(sp_code, "_mcmc_diagnostics.csv"))
+  write.csv(mcmc_diag_df, mcmc_path, row.names = FALSE)
+  cat("\n  Saved:", mcmc_path, "\n")
+}
+cat("\n")
+
+
+# =========================================================================
+# 2. MORAN'S I ON RESIDUALS
+#    CRITICAL: both models compared on the SAME sites / SAME neighbour matrix.
+#    tPGOcc vs stPGOcc (both J=3052, T=6). NOT vs spPGOcc (different J/T).
+# =========================================================================
+
+cat("--- 2. Moran's I on residuals ---\n\n")
+
+# Build a SINGLE neighbour matrix for the full dataset (J=3052).
+# This is reused for both tPGOcc and stPGOcc to ensure a fair comparison.
+knn_full <- knearneigh(coords, k = 8)
+nb_full  <- knn2nb(knn_full)
+lw_full  <- nb2listw(nb_full, style = "W")
+
+# Naive detection per site (ever detected across all years)
+y_naive <- apply(y_array, 1, function(x) as.numeric(any(x == 1, na.rm = TRUE)))
+
+# --- tPGOcc residuals (non-spatial baseline) ---
+moran_A <- NULL
+resid_A <- NULL
+
+if (exists("fit_tpgocc")) {
+  # z.samples: [n_samples x J x T]
+  # Posterior mean of z per site, averaged over years
+  z_mean_A <- apply(fit_tpgocc$z.samples, c(2, 3), mean)  # [J x T]
+  psi_mean_A <- rowMeans(z_mean_A, na.rm = TRUE)           # [J]
+
+  resid_A <- psi_mean_A - y_naive
+
+  moran_A <- moran.test(resid_A, lw_full, zero.policy = TRUE)
+  cat("  tPGOcc (non-spatial, J=", J, ", T=", n_years, "):\n", sep = "")
+  cat("    Moran's I =", round(moran_A$estimate["Moran I statistic"], 4),
+      "| p =", signif(moran_A$p.value, 3), "\n\n")
+}
+
+# --- stPGOcc residuals (spatio-temporal model) ---
+moran_C <- NULL
+resid_C <- NULL
+w_spatial <- NULL
+
+if (RUN_PHASE_C && exists("fit_stpgocc")) {
+  z_mean_C <- apply(fit_stpgocc$z.samples, c(2, 3), mean)  # [J x T]
+  psi_mean_C <- rowMeans(z_mean_C, na.rm = TRUE)            # [J]
+
+  resid_C <- psi_mean_C - y_naive
+
+  moran_C <- moran.test(resid_C, lw_full, zero.policy = TRUE)
+  cat("  stPGOcc (spatial, J=", J, ", T=", n_years, "):\n", sep = "")
+  cat("    Moran's I =", round(moran_C$estimate["Moran I statistic"], 4),
+      "| p =", signif(moran_C$p.value, 3), "\n\n")
+
+  # Spatial random effect (w) — posterior mean per site
+  if (!is.null(fit_stpgocc$w.samples)) {
+    w_spatial <- apply(fit_stpgocc$w.samples, 2, mean)  # [J]
+  }
+} else if (!RUN_PHASE_C) {
+  cat("  stPGOcc: NOT RUN (Phase C disabled).\n")
+  cat("  -> Set RUN_PHASE_C <- TRUE to enable the spatial comparison.\n")
+  cat("  -> Without Phase C, Moran's I comparison is not possible.\n\n")
+}
+
+# Reduction summary
+if (!is.null(moran_A) && !is.null(moran_C)) {
+  I_A <- moran_A$estimate["Moran I statistic"]
+  I_C <- moran_C$estimate["Moran I statistic"]
+  reduction_pct <- (I_A - I_C) / I_A * 100
+  cat("  --> Moran's I reduction: ", round(I_A, 4), " -> ", round(I_C, 4),
+      " (", round(reduction_pct, 1), "%)\n\n", sep = "")
 }
 
 
-###############################################################################
-# SUMMARY AND RECOMMENDATION
-###############################################################################
+# =========================================================================
+# 3. SPATIAL RANGE (from Phase C if available, else Phase B)
+# =========================================================================
+
+cat("--- 3. Spatial range ---\n\n")
+
+eff_range_median <- NA
+eff_range_lo     <- NA
+eff_range_hi     <- NA
+
+if (RUN_PHASE_C && exists("fit_stpgocc") && !is.null(fit_stpgocc$theta.samples)) {
+  phi_post <- fit_stpgocc$theta.samples[, "phi"]
+  # Exponential covariance: effective range (correlation ~ 0.05) = 3 / phi
+  eff_range <- 3 / phi_post / 1000  # convert m to km
+  eff_range_lo     <- quantile(eff_range, 0.025)
+  eff_range_median <- quantile(eff_range, 0.500)
+  eff_range_hi     <- quantile(eff_range, 0.975)
+  cat("  stPGOcc effective spatial range:\n")
+  cat("    Median:", round(eff_range_median, 1), "km\n")
+  cat("    95% CI: [", round(eff_range_lo, 1), ",", round(eff_range_hi, 1), "] km\n\n")
+} else if (exists("fit_sppgocc") && !is.null(fit_sppgocc$theta.samples)) {
+  phi_post <- fit_sppgocc$theta.samples[, "phi"]
+  eff_range <- 3 / phi_post / 1000
+  eff_range_lo     <- quantile(eff_range, 0.025)
+  eff_range_median <- quantile(eff_range, 0.500)
+  eff_range_hi     <- quantile(eff_range, 0.975)
+  cat("  spPGOcc effective spatial range (Phase B only, single year):\n")
+  cat("    Median:", round(eff_range_median, 1), "km\n")
+  cat("    95% CI: [", round(eff_range_lo, 1), ",", round(eff_range_hi, 1), "] km\n")
+  cat("    (Note: from single-year model. Run Phase C for multi-year estimate.)\n\n")
+} else {
+  cat("  Spatial range: not available (no spatial model fitted).\n\n")
+}
+
+
+# =========================================================================
+# 4. MODEL COMPARISON TABLE -> results/{sp}_model_comparison.csv
+# =========================================================================
+
+cat("--- 4. Model comparison table ---\n\n")
+
+comp_rows <- list()
+
+# tPGOcc
+if (exists("waic_A")) {
+  comp_rows[["tPGOcc"]] <- data.frame(
+    Model = "tPGOcc",
+    WAIC = round(waic_A$WAIC, 1),
+    Moran_I = if (!is.null(moran_A)) round(moran_A$estimate["Moran I statistic"], 4) else NA,
+    Moran_p = if (!is.null(moran_A)) signif(moran_A$p.value, 3) else NA,
+    Spatial_range_km = NA,
+    Runtime_min = round(as.numeric(difftime(t_end_A, t_start_A, units = "mins")), 1),
+    stringsAsFactors = FALSE
+  )
+}
+
+# spPGOcc (Phase B — informational only, not directly comparable)
+if (exists("waic_B")) {
+  range_B <- NA
+  if (exists("fit_sppgocc") && !is.null(fit_sppgocc$theta.samples)) {
+    range_B <- round(median(3 / fit_sppgocc$theta.samples[, "phi"] / 1000), 1)
+  }
+  comp_rows[["spPGOcc"]] <- data.frame(
+    Model = "spPGOcc (2021 only)",
+    WAIC = round(waic_B$WAIC, 1),
+    Moran_I = NA,   # not comparable (different site set)
+    Moran_p = NA,
+    Spatial_range_km = range_B,
+    Runtime_min = round(as.numeric(difftime(t_end_B, t_start_B, units = "mins")), 1),
+    stringsAsFactors = FALSE
+  )
+}
+
+# stPGOcc (Phase C)
+if (RUN_PHASE_C && exists("waic_C")) {
+  comp_rows[["stPGOcc"]] <- data.frame(
+    Model = "stPGOcc",
+    WAIC = round(waic_C$WAIC, 1),
+    Moran_I = if (!is.null(moran_C)) round(moran_C$estimate["Moran I statistic"], 4) else NA,
+    Moran_p = if (!is.null(moran_C)) signif(moran_C$p.value, 3) else NA,
+    Spatial_range_km = round(eff_range_median, 1),
+    Runtime_min = round(as.numeric(difftime(t_end_C, t_start_C, units = "mins")), 1),
+    stringsAsFactors = FALSE
+  )
+}
+
+if (length(comp_rows) > 0) {
+  comp_df <- do.call(rbind, comp_rows)
+  rownames(comp_df) <- NULL
+  comp_path <- here("results", paste0(sp_code, "_model_comparison.csv"))
+  write.csv(comp_df, comp_path, row.names = FALSE)
+  cat("  Model comparison table:\n")
+  print(comp_df, row.names = FALSE)
+  cat("\n  Saved:", comp_path, "\n")
+
+  # WAIC difference
+  if (exists("waic_A") && RUN_PHASE_C && exists("waic_C")) {
+    delta_waic <- waic_A$WAIC - waic_C$WAIC
+    cat("\n  DELTA WAIC (tPGOcc - stPGOcc) =", round(delta_waic, 1))
+    if (delta_waic > 10) {
+      cat("  -> STRONG support for spatial model\n")
+    } else if (delta_waic > 2) {
+      cat("  -> Moderate support for spatial model\n")
+    } else {
+      cat("  -> Weak or no support for spatial model\n")
+    }
+  }
+}
+cat("\n")
+
+
+# =========================================================================
+# 5. DIAGNOSTIC FIGURE -> figs/{sp}_spatial_diagnostics.png
+#    Panel 1: Non-spatial residuals map (tPGOcc)
+#    Panel 2: Spatial random effect w (stPGOcc), or Phase B w if C not run
+# =========================================================================
+
+cat("--- 5. Diagnostic figure ---\n\n")
+
+# We need at least tPGOcc residuals to make the figure
+if (!is.null(resid_A)) {
+
+  # Data frame with coordinates + residuals for plotting
+  diag_plot_df <- data.frame(
+    lon = coords_lonlat[, 1],
+    lat = coords_lonlat[, 2],
+    resid_nonspatial = resid_A
+  )
+
+  # Panel 1: non-spatial residuals
+  p1 <- ggplot(diag_plot_df, aes(x = lon, y = lat, colour = resid_nonspatial)) +
+    geom_point(size = 0.4, alpha = 0.7) +
+    scale_colour_gradient2(low = "blue", mid = "white", high = "red",
+                           midpoint = 0, name = "Residual") +
+    labs(title = "tPGOcc residuals (non-spatial)",
+         subtitle = paste0("Moran's I = ",
+                           if (!is.null(moran_A))
+                             round(moran_A$estimate["Moran I statistic"], 3)
+                           else "NA")) +
+    coord_quickmap() + theme_minimal() +
+    theme(legend.position = "bottom")
+
+  # Panel 2: spatial random effect w (stPGOcc preferred, else spPGOcc)
+  p2 <- NULL
+  if (!is.null(w_spatial) && length(w_spatial) == J) {
+    # stPGOcc w (full multi-season, same J sites)
+    diag_plot_df$w <- w_spatial
+    p2 <- ggplot(diag_plot_df, aes(x = lon, y = lat, colour = w)) +
+      geom_point(size = 0.4, alpha = 0.7) +
+      scale_colour_gradient2(low = "blue", mid = "white", high = "red",
+                             midpoint = 0, name = "w") +
+      labs(title = "stPGOcc spatial random effect (w)",
+           subtitle = paste0("Effective range: ",
+                             round(eff_range_median, 0), " km [",
+                             round(eff_range_lo, 0), "-",
+                             round(eff_range_hi, 0), "]")) +
+      coord_quickmap() + theme_minimal() +
+      theme(legend.position = "bottom")
+
+  } else if (exists("fit_sppgocc") && !is.null(fit_sppgocc$w.samples)) {
+    # Fallback: spPGOcc w (Phase B, subset of sites)
+    w_B <- apply(fit_sppgocc$w.samples, 2, mean)
+    w_df <- data.frame(
+      lon = coords_lonlat[has_data, 1],
+      lat = coords_lonlat[has_data, 2],
+      w = w_B
+    )
+    p2 <- ggplot(w_df, aes(x = lon, y = lat, colour = w)) +
+      geom_point(size = 0.5, alpha = 0.7) +
+      scale_colour_gradient2(low = "blue", mid = "white", high = "red",
+                             midpoint = 0, name = "w") +
+      labs(title = "spPGOcc spatial effect (2021 only)",
+           subtitle = paste0("N = ", sum(has_data),
+                             " sites | Range: ", round(eff_range_median, 0), " km")) +
+      coord_quickmap() + theme_minimal() +
+      theme(legend.position = "bottom")
+
+  } else {
+    # No spatial model available — second panel shows stPGOcc residuals or placeholder
+    if (!is.null(resid_C)) {
+      diag_plot_df$resid_spatial <- resid_C
+      p2 <- ggplot(diag_plot_df, aes(x = lon, y = lat, colour = resid_spatial)) +
+        geom_point(size = 0.4, alpha = 0.7) +
+        scale_colour_gradient2(low = "blue", mid = "white", high = "red",
+                               midpoint = 0, name = "Residual") +
+        labs(title = "stPGOcc residuals (spatial)",
+             subtitle = paste0("Moran's I = ",
+                               if (!is.null(moran_C))
+                                 round(moran_C$estimate["Moran I statistic"], 3)
+                               else "NA")) +
+        coord_quickmap() + theme_minimal() +
+        theme(legend.position = "bottom")
+    } else {
+      p2 <- ggplot() +
+        annotate("text", x = 0.5, y = 0.5, label = "Phase C not run\nSet RUN_PHASE_C <- TRUE",
+                 size = 5, hjust = 0.5) +
+        theme_void() +
+        labs(title = "Spatial effect not available")
+    }
+  }
+
+  fig_path <- here("figs", paste0(sp_code, "_spatial_diagnostics.png"))
+  ggsave(fig_path,
+         gridExtra::grid.arrange(p1, p2, ncol = 2),
+         width = 14, height = 6, dpi = 150)
+  cat("  Saved:", fig_path, "\n\n")
+
+} else {
+  cat("  Cannot generate figure: tPGOcc residuals not available.\n\n")
+}
+
+
+# =========================================================================
+# 6. PAPER-READY SUMMARY
+# =========================================================================
 
 t_end_global <- Sys.time()
 total_time <- difftime(t_end_global, t_start_global, units = "mins")
 
 cat("====================================================================\n")
-cat(" SUMMARY\n")
+cat(" PAPER-READY SUMMARY\n")
 cat("====================================================================\n\n")
 
+cat("Species:", sp_code, "\n")
+cat("Sites:", J, "| Years:", n_years, "| Replicates:", n_reps, "\n")
 cat("Total elapsed time:", round(total_time, 1), "min\n\n")
 
-cat("Timing per phase:\n")
-if (exists("t_end_A")) cat("  Phase A (tPGOcc, non-spatial):  ", round(difftime(t_end_A, t_start_A, units="mins"), 1), "min\n")
-if (exists("t_end_B")) cat("  Phase B (spPGOcc, spatial 2021):", round(difftime(t_end_B, t_start_B, units="mins"), 1), "min\n")
-if (RUN_PHASE_C && exists("t_end_C")) cat("  Phase C (stPGOcc, full ST):     ", round(as.numeric(time_C), 1), "hours\n")
+cat("--- Timing ---\n")
+if (exists("t_end_A")) cat("  tPGOcc  (non-spatial): ", round(difftime(t_end_A, t_start_A, units = "mins"), 1), "min\n")
+if (exists("t_end_B")) cat("  spPGOcc (spatial, 2021): ", round(difftime(t_end_B, t_start_B, units = "mins"), 1), "min\n")
+if (RUN_PHASE_C && exists("t_end_C")) cat("  stPGOcc (spatio-temporal): ", round(as.numeric(time_C) * 60, 1), "min (", round(as.numeric(time_C), 1), "h)\n")
 
-cat("\nModel comparison:\n")
-if (exists("waic_A")) cat("  tPGOcc WAIC:  ", round(waic_A$WAIC, 1), "\n")
-if (exists("waic_B")) cat("  spPGOcc WAIC: ", round(waic_B$WAIC, 1), "(single year, not directly comparable)\n")
-if (RUN_PHASE_C && exists("waic_C")) cat("  stPGOcc WAIC: ", round(waic_C$WAIC, 1), "\n")
+cat("\n--- Model selection (WAIC) ---\n")
+if (exists("waic_A")) cat("  tPGOcc WAIC: ", round(waic_A$WAIC, 1), "\n")
+if (RUN_PHASE_C && exists("waic_C")) {
+  cat("  stPGOcc WAIC:", round(waic_C$WAIC, 1), "\n")
+  delta <- waic_A$WAIC - waic_C$WAIC
+  cat("  DELTA WAIC:  ", round(delta, 1),
+      if (delta > 10) " (strong)" else if (delta > 2) " (moderate)" else " (weak)", "\n")
+} else {
+  cat("  stPGOcc WAIC: not available (Phase C not run)\n")
+}
 
-cat("\nMoran's I comparison:\n")
-if (exists("moran_nonspatial")) cat("  Non-spatial residuals: I =", round(moran_nonspatial$estimate[1], 3), "p =", signif(moran_nonspatial$p.value, 3), "\n")
-if (exists("moran_spatial"))    cat("  Spatial residuals:     I =", round(moran_spatial$estimate[1], 3), "p =", signif(moran_spatial$p.value, 3), "\n")
+cat("\n--- Spatial autocorrelation (Moran's I) ---\n")
+if (!is.null(moran_A)) {
+  cat("  tPGOcc  (no spatial effect): I =", round(moran_A$estimate["Moran I statistic"], 4),
+      ", p =", signif(moran_A$p.value, 3), "\n")
+}
+if (!is.null(moran_C)) {
+  cat("  stPGOcc (with spatial effect): I =", round(moran_C$estimate["Moran I statistic"], 4),
+      ", p =", signif(moran_C$p.value, 3), "\n")
+  cat("  Reduction:", round(reduction_pct, 1), "%\n")
+} else {
+  cat("  stPGOcc: Phase C not run — comparison pending.\n")
+}
+
+cat("\n--- Spatial range ---\n")
+if (!is.na(eff_range_median)) {
+  cat("  Effective range:", round(eff_range_median, 1),
+      "km [95% CI:", round(eff_range_lo, 1), "-", round(eff_range_hi, 1), "km]\n")
+  if (eff_range_median > 50) {
+    cat("  Interpretation: broad-scale spatial structure, consistent with\n")
+    cat("  biogeographic / macroecological processes.\n")
+  } else if (eff_range_median > 20) {
+    cat("  Interpretation: mesoscale spatial structure, consistent with\n")
+    cat("  landscape-level habitat connectivity and metapopulation dynamics.\n")
+  } else {
+    cat("  Interpretation: fine-scale spatial structure, consistent with\n")
+    cat("  local dispersal limitation and conspecific attraction.\n")
+  }
+} else {
+  cat("  Not available.\n")
+}
+
+cat("\n--- Output files ---\n")
+cat("  results/", sp_code, "_mcmc_diagnostics.csv\n", sep = "")
+cat("  results/", sp_code, "_model_comparison.csv\n", sep = "")
+cat("  figs/", sp_code, "_spatial_diagnostics.png\n", sep = "")
+cat("  results/", sp_code, "_spatial_tPGOcc.rds\n", sep = "")
+cat("  results/", sp_code, "_spatial_spPGOcc_2021.rds\n", sep = "")
+if (RUN_PHASE_C) cat("  results/", sp_code, "_spatial_stPGOcc.rds\n", sep = "")
 
 cat("\n")
 cat("====================================================================\n")
-cat(" DECISION FRAMEWORK: Is it worth scaling to other species?\n")
+cat(" DECISION FRAMEWORK: Scale to other species?\n")
 cat("====================================================================\n")
 cat("
-Questions to answer from the results above:
+Evaluate based on the results above:
 
-1. SPATIAL RANGE: If the effective range is > 50 km, the spatial random
-   effect captures broad-scale patterns (biogeography). If < 20 km, it
-   captures local clustering (dispersal). Both are ecologically meaningful.
+1. SPATIAL RANGE:
+   > 50 km  -> biogeographic-scale structure (broad patterns)
+   20-50 km -> landscape-scale connectivity (metapopulations)
+   < 20 km  -> local dispersal limitation (fine-scale)
 
-2. MORAN'S I REDUCTION: If the spatial model reduces Moran's I from
-   ~0.38 to < 0.10, the spatial effect substantially improves residual
-   independence. This justifies the computational cost.
+2. MORAN'S I REDUCTION:
+   > 50% reduction -> spatial effect highly effective; include in paper
+   20-50%          -> moderate; report as supplementary analysis
+   < 20%           -> spatial structure minimal; stick with colext
 
-3. WAIC IMPROVEMENT: If stPGOcc WAIC is >10 lower than tPGOcc, the spatial
-   structure provides meaningful predictive improvement.
+3. WAIC IMPROVEMENT (tPGOcc vs stPGOcc):
+   delta > 10  -> strong support for spatial model
+   delta 2-10  -> moderate support
+   delta < 2   -> no meaningful improvement
 
-4. AUC/TSS: If AUC improves by > 0.02 or TSS by > 0.05, there is practical
-   predictive gain for conservation mapping.
-
-5. COST-BENEFIT: If Phase B (single-year) takes < 2 hours and reduces
-   Moran's I, it is worth running Phase C. If Phase C takes < 12 hours
-   on your hardware, it is viable for all 4 species.
+4. COST-BENEFIT:
+   Phase C < 12h -> viable for all 4 species
+   Phase C 12-48h -> consider subsampling to ~1000 sites
+   Phase C > 48h  -> not viable at full scale
 
 ALTERNATIVES if stPGOcc is too slow:
-  a) Subsample to ~1000 sites (stratified by region) — cuts time ~9x
-  b) Use tPGOcc with ar1=TRUE (already done in Phase A) — captures
-     temporal autocorrelation without spatial structure
-  c) Use a CAR (Conditional AutoRegressive) model via INLA but with
-     simplified detection — faster but loses observation-level covariates
-  d) Add geographic coordinates as covariates in colext() (trend surface) —
-     crude but computationally free. Try: psi ~ bio1 + ... + poly(x, 2) + poly(y, 2)
-  e) Use spatial eigenvectors (MEMs) from spdep::ME() as covariates in
-     colext() — captures spatial patterns without full GP overhead
+  a) Subsample to ~1000 sites (stratified by region)
+  b) tPGOcc with ar1=TRUE captures temporal but not spatial autocorrelation
+  c) Add spatial eigenvectors (MEMs) as covariates in colext() —
+     computationally free approximation to spatial structure
+  d) Trend surface: add poly(x, 2) + poly(y, 2) to colext psi formula —
+     captures broad spatial gradients without GP overhead
 ")
