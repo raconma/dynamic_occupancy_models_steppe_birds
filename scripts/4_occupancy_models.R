@@ -196,11 +196,42 @@ for (sp in species_codes) {
 
   EVI  <- scale(EVI)
   Land_Cover_Type_1_Percent_Class_0  <- scale(Land_Cover_Type_1_Percent_Class_0)
+  Land_Cover_Type_1_Percent_Class_6  <- scale(Land_Cover_Type_1_Percent_Class_6)
+  Land_Cover_Type_1_Percent_Class_7  <- scale(Land_Cover_Type_1_Percent_Class_7)
+  Land_Cover_Type_1_Percent_Class_10 <- scale(Land_Cover_Type_1_Percent_Class_10)
+  Land_Cover_Type_1_Percent_Class_12 <- scale(Land_Cover_Type_1_Percent_Class_12)
   Land_Cover_Type_1_Percent_Class_13 <- scale(Land_Cover_Type_1_Percent_Class_13)
+  Land_Cover_Type_1_Percent_Class_14 <- scale(Land_Cover_Type_1_Percent_Class_14)
   NDVI <- scale(NDVI)
   pr   <- scale(pr)
   tmmn <- scale(tmmn)
   tmmx <- scale(tmmx)
+
+  # -- Capture training scaling for dynamic covariates --
+  # scale() on a matrix gives per-column center/scale (one per year).
+  # We store these keyed by "covariate_year" so the simulation section
+  # can apply the EXACT SAME scaling as training — not a per-year re-scaling.
+  train_dyn_scale <- list()
+  .dyn_mats <- list(
+    EVI = EVI, NDVI = NDVI, pr = pr, tmmn = tmmn, tmmx = tmmx,
+    Land_Cover_Type_1_Percent_Class_0  = Land_Cover_Type_1_Percent_Class_0,
+    Land_Cover_Type_1_Percent_Class_6  = Land_Cover_Type_1_Percent_Class_6,
+    Land_Cover_Type_1_Percent_Class_7  = Land_Cover_Type_1_Percent_Class_7,
+    Land_Cover_Type_1_Percent_Class_10 = Land_Cover_Type_1_Percent_Class_10,
+    Land_Cover_Type_1_Percent_Class_12 = Land_Cover_Type_1_Percent_Class_12,
+    Land_Cover_Type_1_Percent_Class_13 = Land_Cover_Type_1_Percent_Class_13,
+    Land_Cover_Type_1_Percent_Class_14 = Land_Cover_Type_1_Percent_Class_14
+  )
+  for (.nm in names(.dyn_mats)) {
+    .ctrs <- attr(.dyn_mats[[.nm]], "scaled:center")
+    .scls <- attr(.dyn_mats[[.nm]], "scaled:scale")
+    for (.yi in seq_along(YEARS)) {
+      train_dyn_scale[[paste0(.nm, "_", YEARS[.yi])]] <- list(
+        center = .ctrs[.yi], scale = .scls[.yi]
+      )
+    }
+  }
+  rm(.dyn_mats, .nm, .ctrs, .scls, .yi)
 
   # -- Build year factor --
   n <- nrow(occ_wide_clean)
@@ -413,11 +444,21 @@ for (sp in species_codes) {
 
   ##############################################################################
   # STOCHASTIC SIMULATIONS
+  #
+  # IMPORTANT: All covariates must be scaled using the TRAINING scaling
+  # parameters, not re-scaled from scratch. Three bugs were fixed here:
+  #   Bug 1 (CRITICAL): psi covariates were passed UNSCALED to predict().
+  #          The model expects scaled inputs (trained on scale(siteCovs)).
+  #          Raw values (e.g. grass_cover=45) caused logit saturation → ψ₁≈1.
+  #   Bug 2 (HIGH): gamma/epsilon covariates were re-scaled per year with
+  #          their own mean/sd instead of the training scaling parameters.
+  #   Bug 3 (HIGH): Land Cover classes 6,7,10,12,14 were not scaled in
+  #          training but got scaled in simulation → coefficient mismatch.
+  #          Fixed above (now all classes are scaled in training too).
   ##############################################################################
   message("  Running stochastic simulations (nsim=", NSIM_PREV, ")...")
 
-  # FIX: set.seed for reproducible simulations
-  set.seed(123)
+  set.seed(123)  # reproducible simulations
 
   predict_data <- occ_wide_clean %>%
     drop_na(paste0("NDVI_", YEARS))
@@ -425,43 +466,72 @@ for (sp in species_codes) {
   S <- nrow(predict_data)
   T_sim <- occ_umf@numPrimary
 
-  # Initial occupancy
+  # --- Initial occupancy (ψ₁) ---
+  # FIX Bug 1: scale psi covariates using TRAINING params (from step 2).
+  # Previously passed raw values to predict() → logit saturation → ψ₁ ≈ 1.
+  psi_data <- predict_data[, cfg$psi_vars, drop = FALSE]
+  for (v in cfg$psi_vars) {
+    if (v %in% names(scaling_params)) {
+      psi_data[[v]] <- scale_with_params(
+        psi_data[[v]], scaling_params[[v]]$center, scaling_params[[v]]$scale
+      )
+    }
+  }
   psi1 <- predict(Mod.final, type = "psi",
-                   newdata = as.data.frame(predict_data[, cfg$psi_vars]))[1]
+                   newdata = as.data.frame(psi_data))$Predicted
 
-  # Colonisation and extinction per year
-  col_mat <- data.frame(matrix(ncol = T_sim, nrow = S))
-  ext_mat <- data.frame(matrix(ncol = T_sim, nrow = S))
+  message("    psi1: mean=", round(mean(psi1, na.rm = TRUE), 4),
+          " | range=[", round(min(psi1, na.rm = TRUE), 4), ", ",
+          round(max(psi1, na.rm = TRUE), 4), "]")
+
+  # --- Colonisation and extinction per year ---
+  # FIX Bug 2: scale dynamic covariates using train_dyn_scale (captured from
+  # the training scale() calls), not a fresh scale() per year.
+  col_mat <- matrix(NA_real_, nrow = S, ncol = T_sim)
+  ext_mat <- matrix(NA_real_, nrow = S, ncol = T_sim)
 
   for (i in 1:T_sim) {
     yr <- YEARS[i]
 
-    # Colonisation prediction data
-    col_cols <- list()
+    # Colonisation
+    new_col <- data.frame(row.names = seq_len(S))
     for (v in cfg$gamma_vars) {
-      col_name <- paste0(v, "_", yr)
-      col_cols[[v]] <- occ_wide_clean[[col_name]]
+      key <- paste0(v, "_", yr)
+      raw_val <- predict_data[[key]]
+      sc <- train_dyn_scale[[key]]
+      if (!is.null(sc)) {
+        new_col[[v]] <- scale_with_params(raw_val, sc$center, sc$scale)
+      } else {
+        new_col[[v]] <- raw_val
+        warning("No training scaling for: ", key, " — using raw values")
+      }
     }
-    new_col <- as.data.frame(col_cols) %>% drop_na() %>% scale() %>%
-      as.data.frame()
-    names(new_col) <- cfg$gamma_vars
-    if (nrow(new_col) > S) new_col <- new_col[1:S, , drop = FALSE]
-    col_mat[, i] <- predict(Mod.final, type = "col", newdata = new_col)[1]
+    col_mat[, i] <- predict(Mod.final, type = "col",
+                             newdata = new_col)$Predicted
 
-    # Extinction prediction data
-    ext_cols <- list()
+    # Extinction
+    new_ext <- data.frame(row.names = seq_len(S))
     for (v in cfg$epsilon_vars) {
-      ext_name <- paste0(v, "_", yr)
-      ext_cols[[v]] <- occ_wide_clean[[ext_name]]
+      key <- paste0(v, "_", yr)
+      raw_val <- predict_data[[key]]
+      sc <- train_dyn_scale[[key]]
+      if (!is.null(sc)) {
+        new_ext[[v]] <- scale_with_params(raw_val, sc$center, sc$scale)
+      } else {
+        new_ext[[v]] <- raw_val
+        warning("No training scaling for: ", key, " — using raw values")
+      }
     }
-    new_ext <- as.data.frame(ext_cols) %>% drop_na() %>% scale() %>%
-      as.data.frame()
-    names(new_ext) <- cfg$epsilon_vars
-    if (nrow(new_ext) > S) new_ext <- new_ext[1:S, , drop = FALSE]
-    ext_mat[, i] <- predict(Mod.final, type = "ext", newdata = new_ext)[1]
+    ext_mat[, i] <- predict(Mod.final, type = "ext",
+                             newdata = new_ext)$Predicted
   }
 
-  # Stochastic simulations
+  message("    col mean: ", paste(round(colMeans(col_mat, na.rm = TRUE), 4),
+                                   collapse = ", "))
+  message("    ext mean: ", paste(round(colMeans(ext_mat, na.rm = TRUE), 4),
+                                   collapse = ", "))
+
+  # --- Stochastic simulations ---
   prevT <- matrix(NA, NSIM_PREV, T_sim)
 
   for (nn in 1:NSIM_PREV) {
@@ -472,7 +542,7 @@ for (sp in species_codes) {
         (1 - Z[, ii - 1]) * col_mat[, ii]
       Z[, ii] <- (runif(S) < tmp) * 1
     }
-    prevT[nn, ] <- colMeans(Z)
+    prevT[nn, ] <- colMeans(Z, na.rm = TRUE)
   }
 
   # Save simulation results
@@ -480,10 +550,10 @@ for (sp in species_codes) {
     year     = as.character(YEARS),
     mean_occ = colMeans(prevT),
     sd_occ   = apply(prevT, 2, sd),
-    mean_col = colMeans(col_mat),
-    sd_col   = apply(col_mat, 2, sd),
-    mean_ext = colMeans(ext_mat),
-    sd_ext   = apply(ext_mat, 2, sd)
+    mean_col = colMeans(col_mat, na.rm = TRUE),
+    sd_col   = apply(col_mat, 2, sd, na.rm = TRUE),
+    mean_ext = colMeans(ext_mat, na.rm = TRUE),
+    sd_ext   = apply(ext_mat, 2, sd, na.rm = TRUE)
   )
   write.csv(sim_results,
             here("results", paste0(sp, "_simulation_prevalence.csv")),
