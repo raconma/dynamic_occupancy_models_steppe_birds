@@ -18,6 +18,20 @@
 #
 # Note:    The atlas shapefile must contain columns with species codes
 #          (OTITAR, PTEALC, PTEORI, TETTET) as 0/1 presence data.
+#
+# Bugs fixed in this version:
+#   1. pROC::coords("best") can return multiple thresholds on ties → take [1]
+#   2. Binary raster reprojected with bilinear → inflates presence at edges.
+#      Fixed: use method = "near" (nearest neighbour).
+#   3. sf::as_Spatial() deprecated. poly2nb() accepts sf directly (spdep≥1.1)
+#   4. Sensitivity/specificity = NaN when a fold has no presences or absences.
+#      Fixed: guard against 0/0 division.
+#   5. set.seed() was outside loop → fold assignments shifted if species skipped.
+#      Fixed: set.seed() per species inside loop.
+#   6. Column named pred_prob_mean but computed with fun=median. Renamed.
+#   7. CRS "+proj=longlat" missing datum. Fixed: EPSG:4326.
+#   8. No tryCatch around species loop → one failure kills all.
+#   9. Atlas prevalence not reported → hard to interpret AUC/TSS.
 ###############################################################################
 
 # -- Load packages --
@@ -30,8 +44,7 @@ library(pROC)
 library(Metrics)
 library(spdep)
 library(blockCV)
-
-set.seed(123)  # Reproducible spatial CV
+library(gridExtra)
 
 # -- Species to validate --
 species_codes <- c("otitar", "ptealc", "pteori", "tettet")
@@ -51,7 +64,18 @@ if (!file.exists(atlas_path)) {
        "\nSee data-raw/get_data.R for instructions.")
 }
 atlas_full <- st_read(atlas_path, quiet = TRUE)
-message("Atlas loaded: ", nrow(atlas_full), " polygons")
+message("Atlas loaded: ", nrow(atlas_full), " polygons, ",
+        ncol(atlas_full) - 1, " attribute columns")
+
+# Sanity check: if .dbf is missing (e.g. stuck in iCloud), the shapefile
+# loads with geometry only (0 attribute columns). Fail fast with clear message.
+if (ncol(atlas_full) <= 1) {
+  stop("The atlas shapefile loaded with 0 attribute columns.\n",
+       "  This usually means the .dbf file is missing or not downloaded.\n",
+       "  Check that 'aves_spain.dbf' exists (not as .icloud placeholder):\n",
+       "    ", dirname(atlas_path), "/aves_spain.dbf\n",
+       "  On macOS, open the folder in Finder to force iCloud download.")
+}
 
 
 ###############################################################################
@@ -61,6 +85,9 @@ message("Atlas loaded: ", nrow(atlas_full), " polygons")
 for (sp in species_codes) {
 
   message("\n=== Validation: ", sp, " ===")
+
+  # Wrap each species in tryCatch so one failure doesn't kill the rest
+  tryCatch({
 
   atlas_col <- atlas_col_map[sp]
   if (!atlas_col %in% names(atlas_full)) {
@@ -86,7 +113,7 @@ for (sp in species_codes) {
                occ_prob = pred_occ$occ_prob),
     type = "xyz"
   )
-  crs(r_pred) <- "+proj=longlat"
+  crs(r_pred) <- "EPSG:4326"  # FIX: was "+proj=longlat" (missing datum)
 
   # Reproject to atlas CRS
   r_pred_proj <- project(r_pred, crs(atlas_full))
@@ -94,10 +121,17 @@ for (sp in species_codes) {
   # Extract median probability per atlas polygon
   atlas <- atlas_full
   ext_prob <- terra::extract(r_pred_proj, atlas, fun = median, na.rm = TRUE)
-  atlas$pred_prob_mean <- ext_prob$occ_prob
+  atlas$pred_prob_median <- ext_prob$occ_prob  # FIX: renamed (was pred_prob_mean)
 
-  atlas_valid <- atlas %>% filter(!is.na(pred_prob_mean))
-  message("  Valid atlas polygons: ", nrow(atlas_valid))
+  atlas_valid <- atlas %>% filter(!is.na(pred_prob_median))
+
+  # Report atlas prevalence (essential for interpreting AUC/TSS)
+  n_pres <- sum(as.numeric(atlas_valid[[atlas_col]]) == 1, na.rm = TRUE)
+  n_abs  <- sum(as.numeric(atlas_valid[[atlas_col]]) == 0, na.rm = TRUE)
+  prevalence <- n_pres / (n_pres + n_abs)
+  message("  Valid polygons: ", nrow(atlas_valid),
+          " (", n_pres, " presence, ", n_abs, " absence",
+          ", prevalence = ", round(prevalence * 100, 1), "%)")
 
   if (nrow(atlas_valid) < 20) {
     warning("  Too few valid polygons for ", sp, ". Skipping.")
@@ -108,6 +142,9 @@ for (sp in species_codes) {
   # SPATIAL BLOCK CROSS-VALIDATION
   ##############################################################################
   sf_cv <- atlas_valid
+
+  # FIX: set.seed PER SPECIES inside loop (was outside → shifted if sp skipped)
+  set.seed(123)
 
   # cv_spatial replaces the deprecated spatialBlock() in blockCV >= 3.0
   sb <- cv_spatial(
@@ -129,24 +166,28 @@ for (sp in species_codes) {
     test  <- sf_cv[sf_cv$fold == i, ]
 
     # Threshold from training ROC
-    roc_train <- pROC::roc(train[[atlas_col]], train$pred_prob_mean, quiet = TRUE)
-    th <- pROC::coords(roc_train, "best", ret = "threshold") %>% as.numeric()
+    roc_train <- pROC::roc(train[[atlas_col]], train$pred_prob_median,
+                            quiet = TRUE)
+    # FIX: coords("best") can return multiple rows on ties → take first
+    th_df <- pROC::coords(roc_train, "best", ret = "threshold")
+    th <- th_df$threshold[1]
 
     # Binary predictions for test fold
-    test$bin <- ifelse(test$pred_prob_mean >= th, 1, 0)
+    test$bin <- ifelse(test$pred_prob_median >= th, 1, 0)
 
     # Metrics
-    auc_i  <- pROC::auc(pROC::roc(test[[atlas_col]], test$pred_prob_mean,
+    auc_i  <- pROC::auc(pROC::roc(test[[atlas_col]], test$pred_prob_median,
                                      quiet = TRUE))
-    rmse_i <- Metrics::rmse(test[[atlas_col]], test$pred_prob_mean)
+    rmse_i <- Metrics::rmse(test[[atlas_col]], test$pred_prob_median)
 
     cm <- table(factor(test[[atlas_col]], levels = c(0, 1)),
                 factor(test$bin, levels = c(0, 1)))
     TP <- cm["1", "1"]; TN <- cm["0", "0"]
     FP <- cm["0", "1"]; FN <- cm["1", "0"]
 
-    sens_i <- TP / (TP + FN)
-    spec_i <- TN / (TN + FP)
+    # FIX: guard against 0/0 when fold has no presences or no absences
+    sens_i <- ifelse((TP + FN) == 0, NA_real_, TP / (TP + FN))
+    spec_i <- ifelse((TN + FP) == 0, NA_real_, TN / (TN + FP))
     TSS_i  <- sens_i + spec_i - 1
 
     results_cv[[i]] <- data.frame(
@@ -159,18 +200,20 @@ for (sp in species_codes) {
   write.csv(df_cv, here("results", paste0(sp, "_validation_cv.csv")),
             row.names = FALSE)
 
-  # Optimal threshold
-  opt_th <- mean(df_cv$threshold)
+  # Optimal threshold (use na.rm in case a fold had NA threshold)
+  opt_th <- mean(df_cv$threshold, na.rm = TRUE)
 
   ##############################################################################
   # APPLY OPTIMAL THRESHOLD
   ##############################################################################
   r_pred_bin <- r_pred >= opt_th
   names(r_pred_bin) <- "occ_bin"
-  r_pred_bin_proj <- project(r_pred_bin, crs(atlas_full), method = "bilinear")
+  # FIX: use nearest neighbour for binary raster (bilinear creates 0<x<1 values
+  # at edges → inflates presence predictions when thresholded with > 0)
+  r_pred_bin_proj <- project(r_pred_bin, crs(atlas_full), method = "near")
   ext_bin <- terra::extract(r_pred_bin_proj, atlas, fun = max, na.rm = TRUE)
   atlas$pred_bin_final <- ifelse(
-    is.na(atlas$pred_prob_mean), NA,
+    is.na(atlas$pred_prob_median), NA,
     ifelse(ext_bin$occ_bin > 0, 1, 0)
   )
 
@@ -184,13 +227,16 @@ for (sp in species_codes) {
   # inflates correlation to ~1.0 because binning removes within-group variance.
   # See docs/validation_diagnosis.md for full explanation.
 
-  spearman_raw <- cor.test(atlas_valid$pred_prob_mean,
+  spearman_raw <- cor.test(atlas_valid$pred_prob_median,
                            as.numeric(atlas_valid[[atlas_col]]),
                            method = "spearman")
 
   # Pseudo-R² from logistic regression (appropriate for binary response)
-  glm_calib <- glm(reformulate("pred_prob_mean", response = atlas_col),
-                    data = atlas_valid, family = binomial)
+  # suppressWarnings: glm may warn about perfect separation for rare species
+  glm_calib <- suppressWarnings(
+    glm(reformulate("pred_prob_median", response = atlas_col),
+        data = atlas_valid, family = binomial)
+  )
   # McFadden's pseudo-R²
   null_dev <- glm_calib$null.deviance
   res_dev  <- glm_calib$deviance
@@ -200,7 +246,7 @@ for (sp in species_codes) {
   spearman_folds <- sapply(1:max(sf_cv$fold), function(i) {
     test_fold <- sf_cv[sf_cv$fold == i, ]
     suppressWarnings(
-      cor(test_fold$pred_prob_mean,
+      cor(test_fold$pred_prob_median,
           as.numeric(test_fold[[atlas_col]]),
           method = "spearman", use = "complete.obs")
     )
@@ -210,9 +256,9 @@ for (sp in species_codes) {
 
   # --- Calibration plot (decile bins — for VISUALISATION only) ---
   atlas_deciles <- atlas_valid %>%
-    mutate(prob_bin = ntile(pred_prob_mean, 10)) %>%
+    mutate(prob_bin = ntile(pred_prob_median, 10)) %>%
     group_by(prob_bin) %>%
-    summarise(mean_prob = mean(pred_prob_mean),
+    summarise(mean_prob = mean(pred_prob_median),
               obs_prev  = mean(as.numeric(.data[[atlas_col]])),
               n = n(), .groups = "drop")
 
@@ -220,12 +266,13 @@ for (sp in species_codes) {
     geom_point(aes(size = n)) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
     geom_smooth(method = "lm", se = TRUE, color = "blue") +
-    labs(x = "Mean predicted probability (decile bins)",
+    labs(x = "Median predicted probability (decile bins)",
          y = "Observed prevalence",
          title = paste0(sp, ": Calibration plot"),
          subtitle = paste0("Spearman \u03c1 (raw polygons) = ",
                            round(spearman_raw$estimate, 3),
-                           " | Pseudo-R\u00b2 = ", round(pseudo_r2, 3))) +
+                           " | Pseudo-R\u00b2 = ", round(pseudo_r2, 3),
+                           " | Prevalence = ", round(prevalence * 100, 1), "%")) +
     theme_minimal()
   ggsave(here("figs", paste0(sp, "_validation_calibration.png")),
          p_calib, width = 7, height = 6)
@@ -234,7 +281,7 @@ for (sp in species_codes) {
   # SPATIAL RESIDUALS + MORAN'S I
   ##############################################################################
   atlas_resid <- atlas_valid %>%
-    mutate(resid = pred_prob_mean - as.numeric(.data[[atlas_col]]))
+    mutate(resid = pred_prob_median - as.numeric(.data[[atlas_col]]))
 
   p_resid <- ggplot(atlas_resid) +
     geom_sf(aes(fill = resid), color = NA) +
@@ -245,9 +292,10 @@ for (sp in species_codes) {
   ggsave(here("figs", paste0(sp, "_validation_residuals_map.png")),
          p_resid, width = 8, height = 6)
 
+  # FIX: poly2nb() accepts sf directly since spdep 1.1-3. No need for
+  # the deprecated sf::as_Spatial() conversion.
   sf_valid <- atlas_resid %>% filter(!is.na(resid))
-  sp_valid <- sf::as_Spatial(sf_valid)
-  nb <- poly2nb(sp_valid, queen = TRUE)
+  nb <- poly2nb(sf_valid, queen = TRUE)
   lw <- nb2listw(nb, style = "W", zero.policy = TRUE)
   moran_res <- moran.test(sf_valid$resid, lw, zero.policy = TRUE)
 
@@ -280,11 +328,16 @@ for (sp in species_codes) {
   cat("Validation Summary:", sp, "\n")
   cat("Date:", as.character(Sys.time()), "\n\n")
 
+  cat("-- Atlas data --\n")
+  cat("Polygons:", nrow(atlas_valid), "\n")
+  cat("Presences:", n_pres, "| Absences:", n_abs, "\n")
+  cat("Prevalence:", round(prevalence * 100, 1), "%\n\n")
+
   cat("-- Spatial Block CV (5-fold) --\n")
   print(df_cv)
-  cat("\nMean AUC:", round(mean(df_cv$AUC), 3), "\n")
-  cat("Mean TSS:", round(mean(df_cv$TSS), 3), "\n")
-  cat("Mean RMSE:", round(mean(df_cv$RMSE), 3), "\n")
+  cat("\nMean AUC:", round(mean(df_cv$AUC, na.rm = TRUE), 3), "\n")
+  cat("Mean TSS:", round(mean(df_cv$TSS, na.rm = TRUE), 3), "\n")
+  cat("Mean RMSE:", round(mean(df_cv$RMSE, na.rm = TRUE), 3), "\n")
   cat("Optimal threshold:", round(opt_th, 3), "\n\n")
 
   cat("-- Continuous Calibration (polygon-level) --\n")
@@ -303,9 +356,16 @@ for (sp in species_codes) {
   sink()
 
   message("  Validation complete for ", sp,
-          " | Mean AUC=", round(mean(df_cv$AUC), 3),
-          " | Mean TSS=", round(mean(df_cv$TSS), 3),
-          " | Spearman(raw)=", round(spearman_raw$estimate, 3))
+          " | AUC=", round(mean(df_cv$AUC, na.rm = TRUE), 3),
+          " | TSS=", round(mean(df_cv$TSS, na.rm = TRUE), 3),
+          " | Spearman=", round(spearman_raw$estimate, 3),
+          " | Prevalence=", round(prevalence * 100, 1), "%")
+
+  }, error = function(e) {
+    # Ensure sink is closed if it was open
+    while (sink.number() > 0) sink()
+    warning("  ERROR processing ", sp, ": ", conditionMessage(e))
+  })
 }
 
 message("\nStep 5 complete: validation done for all species.")
