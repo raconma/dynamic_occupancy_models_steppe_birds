@@ -1,7 +1,7 @@
 # Informe: Diagnostico y solucion de modelos de ocupacion dinamica para aves esteparias en Espana
 
 **Autor**: Guillermo Fandos
-**Para**: Raul (TFM)
+**Para**: Raul Contreras
 **Fecha**: Marzo 2026
 **Proyecto**: Dynamic occupancy models for steppe birds
 
@@ -467,3 +467,4 @@ source("scripts/test_pipeline_v3_otitar.R")
 - `figs/otitar_v3_psi_map.png` — mapa de ocupacion inicial
 - `figs/otitar_v3_epsilon_map.png` — mapa de extincion (si el mejor modelo tiene covariables en epsilon)
 - `figs/otitar_v3_maps_combined.png` — mapa combinado
+
