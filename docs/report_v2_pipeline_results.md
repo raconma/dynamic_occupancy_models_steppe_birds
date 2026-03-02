@@ -15,6 +15,8 @@ Implementamos un **pipeline alternativo (v2)** con tres cambios clave en el filt
 
 Adicionalmente, el **pipeline v3** expande el analisis con modelos que incluyen covariables estaticas en gamma (colonizacion) y epsilon (extincion), junto con **mapas espaciales de prediccion**. El mejor modelo (AIC) incluye covariables de habitat en epsilon, revelando que la cobertura arborea es el principal predictor de extincion local.
 
+Finalmente, el **pipeline v4** evalua el efecto de **covariables dinamicas** (NDVI, EVI, precipitacion, temperatura) exportadas desde Google Earth Engine como yearlySiteCovs en gamma y epsilon. **Resultado: las covariables dinamicas no mejoran sustancialmente el modelo** (deltaAIC < 2 vs. baseline estatico). La cobertura arborea sigue siendo el predictor dominante de extincion. Este resultado sugiere que, a la escala temporal analizada (2017-2022), la estructura del habitat importa mas que la variabilidad climatica interanual.
+
 ---
 
 ## 2. Contexto: que son los modelos de ocupacion dinamica
@@ -321,6 +323,101 @@ En todos los modelos con covariables en psi (modelos 3-8), el intercepto psi(Int
 
 ---
 
+## 6c. Resultados del Pipeline v4 (*Otis tarda*) — Covariables dinamicas en gamma/epsilon
+
+### 6c.1 Objetivo
+
+El pipeline v4 extiende el v3 incorporando **covariables que varian tanto por sitio como por ano** (yearlySiteCovs) en los parametros de colonizacion (gamma) y extincion (epsilon). Estas variables capturan la variabilidad interanual del habitat y el clima que las covariables estaticas del v3 no pueden representar.
+
+### 6c.2 Variables dinamicas
+
+Las variables provienen de un export de Google Earth Engine (`data/processed/otitar_dynamic_variables.csv`) con datos anuales 2017-2022 para cada localidad:
+
+| Variable | Fuente | Unidad | Significado ecologico |
+|----------|--------|--------|----------------------|
+| NDVI | MODIS (MOD13A1) | x10000 | Productividad vegetal, proxy de calidad del habitat estepario |
+| EVI | MODIS (MOD13A1) | x10000 | Similar al NDVI, mas robusto en zonas de alta biomasa |
+| pr | TerraClimate | mm/mes | Precipitacion acumulada, driver hidrico clave |
+| tmmn | TerraClimate | C x10 | Temperatura minima, severidad invernal |
+| tmmx | TerraClimate | C x10 | Temperatura maxima, estres termico en epoca de cria |
+
+### 6c.3 Problema con NDVI y solucion
+
+Los datos NDVI de GEE contenian valores problematicos:
+- **39 NAs** de 11,928 celdas (0.3%): sitios sin dato MODIS algunos anos
+- **24 valores negativos** (hasta -1594): pixeles de agua, nieve o nubes
+- **NAs en yearlySiteCovs causan fallo del optimizador**: el mensaje "valor inicial en vmmin no es finito" indica que la funcion de verosimilitud retorna NaN en los valores iniciales
+
+**Solucion implementada (3 pasos):**
+1. Imputar NAs por la media del sitio en otros anos (si disponible)
+2. Imputar NAs residuales (24 sitios sin ningun dato) con la media global
+3. Clamp valores extremos: reemplazar valores por debajo del percentil 1% con el valor P1%
+
+Tras esta limpieza, **los 11 modelos convergen sin errores**. La misma limpieza se aplica a EVI (mismo problema, menor magnitud).
+
+### 6c.4 Bateria de modelos
+
+Se evaluaron 11 modelos, todos con la misma estructura base del v3 (psi1 = bio1 + bio2 + tree_cover + grass_cover + topo_elev; p = effort + observers + duration + time):
+
+| # | Modelo | Formula gamma | Formula epsilon | AIC | dAIC | Peso |
+|---|--------|--------------|-----------------|-----|------|------|
+| **m6** | **gam~pr** | **~pr** | **~grass+tree** | **3575.5** | **0.0** | **0.177** |
+| m9 | gam~pr, eps~tree+pr | ~pr | ~tree+pr | 3575.6 | 0.1 | 0.168 |
+| m1 | eps~tree+NDVI | ~1 | ~tree+NDVI | 3576.1 | 0.6 | 0.131 |
+| m0 | Baseline (v3 best) | ~1 | ~grass+tree | 3576.9 | 1.4 | 0.088 |
+| m7 | gam~NDVI+pr | ~NDVI+pr | ~grass+tree | 3577.0 | 1.5 | 0.084 |
+| m2 | eps~tree+pr | ~1 | ~tree+pr | 3577.1 | 1.6 | 0.080 |
+| m3 | eps~tree+tmmx | ~1 | ~tree+tmmx | 3577.2 | 1.7 | 0.076 |
+| m10 | gam+eps NDVI+pr | ~NDVI+pr | ~tree+NDVI+pr | 3577.4 | 1.9 | 0.068 |
+| m4 | eps~tree+NDVI+pr | ~1 | ~tree+NDVI+pr | 3578.1 | 2.6 | 0.048 |
+| m8 | gam~NDVI, eps~tree+NDVI | ~NDVI | ~tree+NDVI | 3578.1 | 2.6 | 0.048 |
+| m5 | gam~NDVI | ~NDVI | ~grass+tree | 3578.9 | 3.4 | 0.032 |
+
+**Todos los modelos convergen.** Los parametros en boundary (psi(Int) y psi(tree_cover)) son los mismos que en v3 y son esperados para una especie rara con fuerte efecto negativo del arbolado (ver seccion 6b.5).
+
+### 6c.5 Interpretacion de la seleccion de modelos
+
+**Resultado principal: las covariables dinamicas NO mejoran sustancialmente el modelo.**
+
+- El mejor modelo (m6: gam~pr) tiene un deltaAIC de solo **-1.4** respecto al baseline estatico (m0). Un deltaAIC < 2 se considera no sustancial segun la escala de Burnham & Anderson (2002).
+- Los pesos de Akaike estan muy repartidos: el mejor modelo tiene peso = 0.18, y 8 de los 11 modelos estan dentro de deltaAIC < 2.
+- Esto indica **incertidumbre en la seleccion de modelos**: ninguna formulacion dinamica se distingue claramente del modelo con solo covariables estaticas.
+
+### 6c.6 Coeficientes del mejor modelo (m6: gam~pr)
+
+#### Colonizacion (gamma):
+| Covariable | Estimacion | SE | z | p-valor | Interpretacion |
+|------------|-----------|-----|---|---------|----------------|
+| Intercepto | -5.462 | 0.276 | -19.82 | <0.001 | Gamma base = 0.42% |
+| **pr** | **-0.514** | **0.307** | **-1.68** | **0.093** | Tendencia negativa marginalmente significativa |
+
+La precipitacion muestra un efecto marginal (p=0.093) y con signo negativo: anos mas lluviosos tienden a menor colonizacion. Esto podria parecer contraintuitivo, pero tiene sentido ecologico: anos lluviosos favorecen el crecimiento de vegetacion alta y leñosa, lo cual **reduce la calidad del habitat abierto** que necesita la avutarda. Sin embargo, el efecto no es estadisticamente significativo al nivel convencional (α=0.05).
+
+#### Extincion (epsilon):
+| Covariable | Estimacion | SE | z | p-valor | Interpretacion |
+|------------|-----------|-----|---|---------|----------------|
+| Intercepto | -0.326 | 0.615 | -0.53 | 0.596 | Variacion capturada por covariables |
+| grass_cover | -0.034 | 0.266 | -0.13 | 0.899 | No significativo |
+| **tree_cover** | **2.242** | **0.721** | **3.11** | **0.002** | **Mas arbolado = mas extincion** |
+
+El patron es identico al v3: **tree_cover es el unico predictor significativo de extincion** (p=0.002). Las variables dinamicas (NDVI, precipitacion, temperatura) no anaden informacion significativa sobre las transiciones una vez que se controla por la estructura del habitat.
+
+### 6c.7 Sintesis ecologica
+
+El hecho de que las covariables dinamicas no mejoren los modelos tiene varias explicaciones ecologicas plausibles:
+
+1. **Escala temporal insuficiente**: 6 anos (2017-2022) puede no capturar eventos climaticos extremos que afecten a poblaciones de una especie longeva como la avutarda (esperanza de vida ~15 anos).
+
+2. **Baja variabilidad interanual en la zona**: la variacion climatica entre anos en las estepas ibericas puede ser insuficiente para generar cambios detectables en ocupacion a escala de celda.
+
+3. **Desfase temporal (lag)**: los efectos del clima sobre la ocupacion pueden manifestarse con retardo (un ano seco afecta a la reproduccion, pero la extincion local se observa 1-2 anos despues). Los modelos actuales usan covariables del mismo ano.
+
+4. **Covariables estaticas capturan la senal principal**: la estructura del habitat (arbolado vs. abierto) es un predictor tan fuerte de extincion que deja poco margen para que las variables dinamicas anadan informacion.
+
+5. **Resolucion espacial**: NDVI/EVI de MODIS tienen 500m de resolucion, lo cual puede no capturar cambios microhabitat relevantes para la avutarda.
+
+---
+
 ## 7. Diagnostico de las otras 3 especies (modelos originales)
 
 Los archivos de datos crudos de *P. alchata*, *P. orientalis* y *T. tetrax* estan almacenados en iCloud y no pudieron descargarse para ejecutar el pipeline v2. Sin embargo, los diagnosticos de los modelos originales muestran el **mismo patron estructural** en las 4 especies:
@@ -359,21 +456,27 @@ Las 4 especies comparten exactamente el mismo problema:
 
 ### 8.2 Que se puede presentar
 
-Con los resultados de los pipelines v2 y v3 se puede:
+Con los resultados de los pipelines v2, v3 y v4 se puede:
 
 1. **Describir el problema metodologico**: como la definicion de "sitio" en `filter_repeat_visits` afecta los modelos de ocupacion dinamica. Esto es una contribucion metodologica relevante para la comunidad de ecologia.
 
-2. **Presentar los modelos corregidos**: con parametros plausibles y significativos para *Otis tarda* (y las otras 3 especies cuando se ejecute el pipeline v2 completo).
+2. **Presentar los modelos corregidos**: con parametros plausibles y significativos para *Otis tarda* (y las otras 3 especies cuando se ejecute el pipeline completo).
 
 3. **Mostrar que la cobertura arborea es el principal predictor de extincion local** de la avutarda, con mapas espaciales de prediccion. Este resultado es ecologicamente relevante en el contexto de cambios de uso del suelo en la peninsula.
 
-4. **Discutir las implicaciones para estudios con datos eBird**: muchos trabajos usan `filter_repeat_visits` sin considerar las implicaciones para modelos multi-temporales.
+4. **Demostrar que la variabilidad climatica interanual no afecta significativamente la dinamica de ocupacion** a la escala temporal analizada (2017-2022). Esto refuerza la importancia de la estructura del habitat por encima de la variabilidad climatica a corto plazo.
+
+5. **Discutir las implicaciones para estudios con datos eBird**: muchos trabajos usan `filter_repeat_visits` sin considerar las implicaciones para modelos multi-temporales.
 
 ### 8.3 Limitaciones actuales
 
-1. **Sin variables dinamicas**: Los pipelines v2/v3 solo usan covariables estaticas porque el cambio de sitios invalida el export original de Google Earth Engine. Para la version final, habria que re-exportar las variables dinamicas (NDVI, temperatura, precipitacion, land cover) para los nuevos sitios.
+1. **Solo ejecutado para *Otis tarda***: Los datos crudos de las otras 3 especies necesitan estar disponibles para ejecutar los pipelines v2/v3/v4.
 
-2. **Solo ejecutado para *Otis tarda***: Los datos crudos de las otras 3 especies necesitan estar disponibles para ejecutar el pipeline v2/v3.
+2. **Escala temporal limitada (6 anos)**: El periodo 2017-2022 puede ser insuficiente para detectar efectos climaticos en una especie longeva. Eventos extremos (sequia severa, olas de calor) podrian no estar bien representados.
+
+3. **Sin efectos retardados (lag)**: Los modelos v4 usan covariables del mismo ano. Un desfase temporal (e.g., sequia en ano t afecta ocupacion en ano t+1) podria revelar efectos dinamicos no detectados.
+
+4. **Covariables de land cover no exploradas como dinamicas**: El export de GEE incluye land cover por ano (MODIS MCD12Q1), pero no se ha evaluado como yearlySiteCov. Cambios de uso del suelo inter-anuales podrian ser mas relevantes que el clima.
 
 ---
 
@@ -382,27 +485,30 @@ Con los resultados de los pipelines v2 y v3 se puede:
 ### 9.0 Completado
 
 - [x] **Pipeline v2**: Diagnostico y correccion de filtros para *Otis tarda*
-- [x] **Pipeline v3**: Modelos con covariables en gamma/epsilon + mapas espaciales para *Otis tarda*
-- [x] **Seleccion de modelos**: Tabla AIC con 8 modelos, identificacion del mejor modelo
+- [x] **Pipeline v3**: Modelos con covariables estaticas en gamma/epsilon + mapas espaciales
+- [x] **Pipeline v4**: Covariables dinamicas (NDVI, EVI, precipitacion, temperatura) en gamma/epsilon
+- [x] **Seleccion de modelos**: Tabla AIC con 8 modelos (v3) y 11 modelos (v4)
 - [x] **Mapas de prediccion**: Ocupacion inicial y extincion para la peninsula iberica
+- [x] **Evaluacion de covariables dinamicas**: Resultado negativo — no mejoran sustancialmente el modelo (dAIC < 2)
 
 ### 9.1 Inmediatos
 
-1. **Ejecutar el pipeline v2/v3** para las 4 especies (necesita archivos `ebd_{sp}_breeding_spain_zf.csv`)
-2. **Verificar resultados** para las 4 especies
+1. **Ejecutar los pipelines v2/v3/v4** para las otras 3 especies (*P. alchata*, *P. orientalis*, *T. tetrax*). Necesita archivos `ebd_{sp}_breeding_spain_zf.csv` y los exports de GEE correspondientes.
+2. **Verificar resultados** comparativos entre especies — determinar si el patron (covariables dinamicas no significativas) es consistente entre las 4 especies o especifico de *O. tarda*
 
 ### 9.2 Corto plazo
 
-3. **Re-exportar variables dinamicas desde GEE** para los nuevos sitios filtrados (ver seccion 8.4 del informe anterior para instrucciones detalladas de como re-exportar desde GEE)
-4. **Incorporar covariables dinamicas en gamma y epsilon** (NDVI, land cover, temperatura) — actualmente solo con covariables estaticas
-5. **Seleccion de modelos final** con AIC/BIC para cada especie con el conjunto completo de covariables
+3. **Explorar efectos retardados (lag)**: Evaluar si covariables del ano t-1 predicen transiciones en el ano t (e.g., sequia en 2019 afecta extincion en 2020). Requiere modificar la construccion de yearlySiteCovs.
+4. **Explorar land cover dinamico**: El export de GEE incluye MODIS MCD12Q1 (Land_Cover_Type_1) por ano. Cambios inter-anuales de uso del suelo podrian ser mas relevantes que variables climaticas.
+5. **Seleccion de modelos final** con AIC/BIC para cada especie
 
 ### 9.3 Medio plazo
 
-6. **Goodness-of-fit (GOF)**: Validar los modelos con bootstrap parametrico
+6. **Goodness-of-fit (GOF)**: Validar los modelos con bootstrap parametrico (parboot en v4 esta implementado pero tarda ~20 min)
 7. **Curvas de respuesta** para las covariables significativas
-8. **Simulaciones estocasticas** de trayectorias de ocupacion
-9. **Redactar manuscrito** para publicacion
+8. **Model averaging**: Dado que los pesos de Akaike estan repartidos en v4, considerar model averaging para las predicciones
+9. **Simulaciones estocasticas** de trayectorias de ocupacion
+10. **Redactar manuscrito** para publicacion
 
 ---
 
@@ -413,11 +519,15 @@ Con los resultados de los pipelines v2 y v3 se puede:
 | `scripts/test_pipeline_v2_otitar.R` | Pipeline v2 completo para *Otis tarda* |
 | `scripts/test_pipeline_v2_all_species.R` | Pipeline v2 multi-especie (pendiente de datos) |
 | `scripts/test_pipeline_v3_otitar.R` | **Pipeline v3**: modelos gamma/epsilon + mapas espaciales |
+| `scripts/test_pipeline_v4_dynamic_covs.R` | **Pipeline v4**: covariables dinamicas (NDVI, EVI, pr, temp) |
 | `scripts/diagnostic_models.R` | Script de diagnostico para los 4 modelos originales |
 | `scripts/test_filter_otitar.R` | Test inicial de filtros para otitar |
 | `scripts/test_filter_otitar_v2.R` | Test avanzado con filtros temporales |
 | `docs/diagnostic_report_raul.md` | Informe diagnostico inicial |
 | `docs/report_v2_pipeline_results.md` | **Este informe** |
+| `results/otitar_v4_model_selection.csv` | Tabla AIC de 11 modelos (v4) con deltaAIC y pesos |
+| `results/otitar_v4_best_model_coefficients.csv` | Coeficientes del mejor modelo v4 |
+| `results/otitar_v4_dynamic_scaling_params.csv` | Parametros de escalado de variables dinamicas |
 | `figs/otitar_v3_psi_map.png` | Mapa de ocupacion inicial (psi1) para *O. tarda* |
 | `figs/otitar_v3_epsilon_map.png` | Mapa de extincion (epsilon) para *O. tarda* |
 | `figs/otitar_v3_maps_combined.png` | Mapa combinado psi + epsilon |
@@ -453,6 +563,9 @@ source("scripts/test_pipeline_v2_all_species.R")
 
 # 3. Pipeline v3 - Otis tarda con modelos gamma/epsilon + mapas (~10 min):
 source("scripts/test_pipeline_v3_otitar.R")
+
+# 4. Pipeline v4 - Otis tarda con covariables dinamicas (~15 min):
+source("scripts/test_pipeline_v4_dynamic_covs.R")
 ```
 
 **Requisitos:**
@@ -460,6 +573,7 @@ source("scripts/test_pipeline_v3_otitar.R")
 - Paquetes: `unmarked`, `auk`, `dplyr`, `tidyr`, `raster`, `terra`, `sf`, `ggplot2`, `rnaturalearth`, `rnaturalearthdata`, `gridExtra`
 - Datos crudos: `data-raw/data/{sp}/ebd_{sp}_breeding_spain_zf.csv`
 - Rasters ambientales: `data-raw/data/environmental_data/` y `topology_data/`
+- Variables dinamicas (v4): `data/processed/otitar_dynamic_variables.csv` (export de GEE)
 - Modelos originales (para comparacion): `data/processed/{sp}_model_object.rds`
 
 **Outputs del pipeline v3:**
@@ -467,4 +581,10 @@ source("scripts/test_pipeline_v3_otitar.R")
 - `figs/otitar_v3_psi_map.png` — mapa de ocupacion inicial
 - `figs/otitar_v3_epsilon_map.png` — mapa de extincion (si el mejor modelo tiene covariables en epsilon)
 - `figs/otitar_v3_maps_combined.png` — mapa combinado
+
+**Outputs del pipeline v4:**
+- Consola: tabla AIC de 11 modelos, diagnosticos, interpretacion ecologica
+- `results/otitar_v4_model_selection.csv` — tabla AIC con deltaAIC y pesos de Akaike
+- `results/otitar_v4_best_model_coefficients.csv` — coeficientes del mejor modelo
+- `results/otitar_v4_dynamic_scaling_params.csv` — parametros de escalado (center, scale)
 
