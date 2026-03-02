@@ -420,7 +420,7 @@ El hecho de que las covariables dinamicas no mejoren los modelos tiene varias ex
 
 ## 7. Diagnostico de las otras 3 especies (modelos originales)
 
-Los archivos de datos crudos de *P. alchata*, *P. orientalis* y *T. tetrax* estan almacenados en iCloud y no pudieron descargarse para ejecutar el pipeline v2. Sin embargo, los diagnosticos de los modelos originales muestran el **mismo patron estructural** en las 4 especies:
+Los diagnosticos de los modelos originales muestran el **mismo patron estructural** en las 4 especies:
 
 ### 7.1 Patron comun
 
@@ -587,4 +587,5 @@ source("scripts/test_pipeline_v4_dynamic_covs.R")
 - `results/otitar_v4_model_selection.csv` — tabla AIC con deltaAIC y pesos de Akaike
 - `results/otitar_v4_best_model_coefficients.csv` — coeficientes del mejor modelo
 - `results/otitar_v4_dynamic_scaling_params.csv` — parametros de escalado (center, scale)
+
 
