@@ -544,6 +544,42 @@ La precipitacion lag-1 muestra la senal mas prometedora: mas lluvia el ano anter
 
 **Conclusiones**: tree_cover es el unico predictor robusto de extincion en todos los pipelines (p < 0.013). Ninguna covariable dinamica supera el umbral de deltaAIC > 2. La estructura del habitat domina sobre la variabilidad interanual. 6 anos (2017-2022) son probablemente insuficientes para detectar efectos dinamicos en una especie longeva.
 
+### 6g. Analisis de sensibilidad: tree_cover en psi vs epsilon
+
+#### Motivacion
+
+tree_cover tiene un efecto enorme en psi (est ~ -11.5, prob ~ 0%): los sitios con alto arbolado nunca estan ocupados. ¿Tiene entonces sentido incluir tree_cover tambien en epsilon? Si esos sitios nunca se ocupan, la extincion alli es irrelevante. Se evaluo si el efecto en epsilon es redundante con el de psi.
+
+#### Variantes evaluadas
+
+| Modelo | tree en psi | tree en eps | grass en eps | AIC | dAIC |
+|--------|:-----------:|:-----------:|:------------:|------:|-----:|
+| **s4** | **SI** | **SI** | **NO** | **3575.3** | **0.0** |
+| s0 (actual) | SI | SI | SI | 3576.9 | 1.6 |
+| s1 | SI | NO | SI | 3589.7 | 14.4 |
+| s2 | NO | SI | SI | 3703.6 | 128.3 |
+| s5 | NO | SI | NO | 3707.1 | 131.8 |
+| s3 | NO | NO | SI | 3787.5 | 212.2 |
+
+#### Coeficientes de tree_cover en epsilon segun modelo
+
+| Modelo | psi(tree) | eps(tree) est | eps(tree) p |
+|--------|-----------|:----------:|:-----------:|
+| s0 (ambos + grass) | -11.33 | 3.400 | 0.022 |
+| s4 (ambos, sin grass) | -11.45 | 2.723 | 0.024 |
+| s2 (solo eps + grass) | — | 5.952 | <0.001 |
+| s5 (solo eps) | — | 5.191 | <0.001 |
+
+#### Interpretacion
+
+1. **tree_cover NO es redundante**: quitarlo de epsilon empeora el AIC en 14.4 puntos (s0 vs s1). Aporta informacion incluso cuando ya esta en psi.
+2. **tree_cover en psi es crucial**: dAIC = -127 entre modelos con y sin tree en psi (s0 vs s2).
+3. **Efecto dual**: tree_cover actua a dos niveles — (a) determina si un sitio puede ser ocupado (psi ~ 0% con alto arbolado), y (b) entre los sitios marginalmente ocupados (con algo de arbolado), predice inestabilidad (mayor extincion).
+4. **grass_cover en epsilon no aporta**: el mejor modelo (s4) excluye grass_cover de epsilon y mejora ligeramente el actual (dAIC = -1.6).
+5. **El efecto de tree en eps depende de si esta en psi**: cuando psi ya filtra sitios boscosos, el coeficiente en eps es menor (3.4 vs 5.95), pero sigue siendo significativo. Cuando no esta en psi, eps absorbe ambos efectos.
+
+**Conclusion**: el modelo optimo seria `psi(bio1+bio2+tree_cover+grass_cover+topo_elev) eps(~tree_cover)`, ligeramente mejor que el actual v3. tree_cover es necesario en ambos submodelos.
+
 ---
 
 ## 7. Diagnostico de las otras 3 especies (modelos originales)
@@ -622,6 +658,7 @@ Con los resultados de los pipelines v2, v3, v4, v4b y v5 se puede:
 - [x] **Seleccion de modelos**: Tabla AIC con 8 modelos (v3), 11 (v4), 11 (v4b) y 12 (v5)
 - [x] **Mapas de prediccion**: Ocupacion inicial y extincion para la peninsula iberica
 - [x] **Evaluacion de covariables dinamicas**: Resultado negativo consistente en 3 pipelines (dAIC < 2)
+- [x] **Sensibilidad tree_cover**: Confirmado que tree_cover es necesario en psi Y epsilon (no redundante). Modelo optimo: eps(~tree_cover) sin grass_cover
 
 ### 9.1 Inmediatos
 
@@ -654,6 +691,7 @@ Con los resultados de los pipelines v2, v3, v4, v4b y v5 se puede:
 | `scripts/test_pipeline_v4_dynamic_covs.R` | **Pipeline v4**: covariables dinamicas (NDVI, EVI, pr, temp) |
 | `scripts/test_pipeline_v4b_landcover_dynamic.R` | **Pipeline v4b**: land cover dinamico (grassland, cropland, shrubland) |
 | `scripts/test_pipeline_v5_lagged_effects.R` | **Pipeline v5**: efectos retardados lag-1 (clima + land cover) |
+| `scripts/test_sensitivity_tree_cover.R` | Sensibilidad: colocacion de tree_cover en psi vs epsilon (6 variantes) |
 | `scripts/diagnostic_models.R` | Script de diagnostico para los 4 modelos originales |
 | `scripts/test_filter_otitar.R` | Test inicial de filtros para otitar |
 | `scripts/test_filter_otitar_v2.R` | Test avanzado con filtros temporales |
@@ -668,6 +706,7 @@ Con los resultados de los pipelines v2, v3, v4, v4b y v5 se puede:
 | `results/otitar_v5_model_selection.csv` | Tabla AIC de 12 modelos (v5) |
 | `results/otitar_v5_best_model_coefficients.csv` | Coeficientes del mejor modelo v5 |
 | `results/otitar_v5_dynamic_scaling_params.csv` | Parametros de escalado variables lag |
+| `results/otitar_sensitivity_tree_cover.csv` | Tabla AIC sensibilidad tree_cover (6 variantes) |
 | `figs/otitar_v3_psi_map.png` | Mapa de ocupacion inicial (psi1) para *O. tarda* |
 | `figs/otitar_v3_epsilon_map.png` | Mapa de extincion (epsilon) para *O. tarda* |
 | `figs/otitar_v3_maps_combined.png` | Mapa combinado psi + epsilon |
@@ -712,6 +751,9 @@ source("scripts/test_pipeline_v4b_landcover_dynamic.R")
 
 # 6. Pipeline v5 - Otis tarda con efectos retardados (~15 min):
 source("scripts/test_pipeline_v5_lagged_effects.R")
+
+# 7. Sensibilidad tree_cover en psi vs epsilon (~5 min):
+source("scripts/test_sensitivity_tree_cover.R")
 ```
 
 **Requisitos:**
@@ -743,5 +785,8 @@ source("scripts/test_pipeline_v5_lagged_effects.R")
 - `results/otitar_v5_model_selection.csv` — tabla AIC (12 modelos)
 - `results/otitar_v5_best_model_coefficients.csv` — coeficientes del mejor modelo
 - `results/otitar_v5_dynamic_scaling_params.csv` — parametros de escalado variables lag
+
+**Outputs de sensibilidad tree_cover:**
+- `results/otitar_sensitivity_tree_cover.csv` — tabla AIC (6 variantes de colocacion de tree_cover)
 
 
