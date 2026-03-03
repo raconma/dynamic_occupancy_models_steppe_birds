@@ -13,7 +13,7 @@ Multi-species dynamic occupancy analysis of four steppe bird species using eBird
 
 ## Overview
 
-This project fits **dynamic occupancy models** (`unmarked::colext`) to estimate occupancy, colonisation, and extinction probabilities for four threatened steppe bird species across Spain (2017-2022). Data come from the eBird Basic Dataset, with environmental covariates from WorldClim, MODIS (via Google Earth Engine), and TerraClimate. Model predictions are validated against the Spanish Biodiversity Atlas using spatial block cross-validation.
+This project fits **dynamic occupancy models** (`unmarked::colext`) to estimate occupancy, colonisation, and extinction probabilities for four threatened steppe bird species across Spain (2017-2022). Data come from the eBird Basic Dataset, with environmental covariates from WorldClim, MODIS (via Google Earth Engine), and TerraClimate. Model predictions are validated against the Spanish Biodiversity Atlas using spatial block cross-validation. Multiple pipeline variants (v2-v5) explore static covariates, dynamic climate, dynamic land cover, and lagged effects.
 
 ## Repository Structure
 
