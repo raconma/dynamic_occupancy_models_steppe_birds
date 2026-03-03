@@ -17,6 +17,8 @@ Adicionalmente, el **pipeline v3** expande el analisis con modelos que incluyen 
 
 Finalmente, el **pipeline v4** evalua el efecto de **covariables dinamicas** (NDVI, EVI, precipitacion, temperatura) exportadas desde Google Earth Engine como yearlySiteCovs en gamma y epsilon. **Resultado: las covariables dinamicas no mejoran sustancialmente el modelo** (deltaAIC < 2 vs. baseline estatico). La cobertura arborea sigue siendo el predictor dominante de extincion. Este resultado sugiere que, a la escala temporal analizada (2017-2022), la estructura del habitat importa mas que la variabilidad climatica interanual.
 
+Los **pipelines v4b y v5** exploran dos hipotesis adicionales. El **v4b** evalua covariables de **land cover dinamico** (MODIS MCD12Q1): proporcion anual de grassland, cropland y open shrubland por sitio. El **v5** evalua **efectos retardados (lag-1)**: covariables del ano t-1 prediciendo transiciones del ano t al t+1. **Resultado: ninguna de las dos aproximaciones mejora sustancialmente el modelo** (deltaAIC de -1.3 y -1.5 vs. baseline, respectivamente). Estos resultados refuerzan la conclusion de que la estructura del habitat (especialmente cobertura arborea) es el unico predictor robusto de extincion local de *O. tarda*, independientemente de la variabilidad interanual en clima o uso del suelo.
+
 ---
 
 ## 2. Contexto: que son los modelos de ocupacion dinamica
@@ -418,6 +420,132 @@ El hecho de que las covariables dinamicas no mejoren los modelos tiene varias ex
 
 ---
 
+## 6d. Resultados del Pipeline v4b (*Otis tarda*) — Land cover dinamico en gamma/epsilon
+
+### 6d.1 Objetivo
+
+El pipeline v4b explora si los **cambios interanuales en la cobertura del suelo** (land cover) predicen las transiciones de ocupacion. A diferencia de las variables climaticas del v4 (que varian rapidamente), los cambios de land cover reflejan transformaciones mas estructurales del habitat: conversion de pastizales a cultivos, avance de matorral, cambios de uso agricola, etc.
+
+### 6d.2 Variables dinamicas de land cover
+
+Las variables provienen de MODIS MCD12Q1 (clasificacion IGBP), exportadas por ano desde GEE. Se seleccionaron las 3 clases con mayor variabilidad interanual y relevancia ecologica para aves esteparias:
+
+| Variable | Clase IGBP | % sitios que varian | Variacion media | NAs |
+|----------|-----------|--------------------|-----------------|----|
+| `lc_grass` | 10 (Grassland) | 76% | 6.9 pp | 0 |
+| `lc_crop` | 12 (Cropland) | 53% | 4.0 pp | 0 |
+| `lc_shrub` | 7 (Open shrubland) | 31% | — | 0 |
+
+**Ventaja sobre v4**: 0 NAs en las variables de land cover (vs. 39 NAs en NDVI que requerian imputacion).
+
+### 6d.3 Bateria de modelos
+
+Se evaluaron 11 modelos, todos con la misma estructura base (psi = bio1 + bio2 + tree_cover + grass_cover + topo_elev; p = effort + observers + duration + time):
+
+| # | Modelo | Formula gamma | Formula epsilon | AIC | dAIC | Peso |
+|---|--------|--------------|-----------------|-----|------|------|
+| **m9** | **gam~lc_crop, eps~tree+lc_crop** | **~lc_crop** | **~tree+lc_crop** | **3575.6** | **0.0** | **0.155** |
+| m7 | gam~grass+crop | ~lc_grass+lc_crop | ~grass+tree | 3575.8 | 0.2 | 0.140 |
+| m6 | gam~lc_crop | ~lc_crop | ~grass+tree | 3576.0 | 0.4 | 0.127 |
+| m2 | eps~tree+lc_crop | ~1 | ~tree+lc_crop | 3576.2 | 0.6 | 0.115 |
+| m3 | eps~tree+lc_shrub | ~1 | ~tree+lc_shrub | 3576.4 | 0.8 | 0.104 |
+| m1 | eps~tree+lc_grass | ~1 | ~tree+lc_grass | 3576.8 | 1.2 | 0.085 |
+| m0 | Baseline estatico | ~1 | ~grass+tree | 3576.9 | 1.3 | 0.081 |
+| m10 | completo grass+crop | ~lc_grass+lc_crop | ~tree+lc_grass+lc_crop | 3577.1 | 1.5 | 0.073 |
+| m4 | eps~tree+grass+crop | ~1 | ~tree+lc_grass+lc_crop | 3578.1 | 2.5 | 0.044 |
+| m8 | ambos lc_grass | ~lc_grass | ~tree+lc_grass | 3578.2 | 2.6 | 0.042 |
+| m5 | gam~lc_grass | ~lc_grass | ~grass+tree | 3578.5 | 2.9 | 0.036 |
+
+Todos los modelos convergen.
+
+### 6d.4 Interpretacion
+
+**Resultado: el land cover dinamico NO mejora sustancialmente el modelo** (deltaAIC = -1.3 vs baseline).
+
+El cropland dinamico (`lc_crop`) aparece en los mejores modelos con efecto marginal en colonizacion (p=0.099) y no significativo en extincion (p=0.455). **tree_cover sigue siendo el unico predictor significativo de extincion** (p=0.012).
+
+### 6d.5 Coeficientes del mejor modelo (m9)
+
+#### Colonizacion (gamma):
+| Covariable | Estimacion | SE | z | p-valor |
+|------------|-----------|-----|---|---------|
+| Intercepto | -5.353 | 0.252 | -21.20 | <0.001 |
+| lc_crop | 0.359 | 0.217 | 1.65 | **0.099** |
+
+#### Extincion (epsilon):
+| Covariable | Estimacion | SE | z | p-valor |
+|------------|-----------|-----|---|---------|
+| Intercepto | -0.072 | 0.886 | -0.08 | 0.935 |
+| **tree_cover** | **2.589** | **1.031** | **2.51** | **0.012** |
+| lc_crop | -0.225 | 0.301 | -0.75 | 0.455 |
+
+---
+
+## 6e. Resultados del Pipeline v5 (*Otis tarda*) — Efectos retardados (lag-1)
+
+### 6e.1 Objetivo
+
+El pipeline v5 evalua si las condiciones ambientales del **ano anterior (t-1)** predicen las transiciones de ocupacion del ano t al t+1. La hipotesis es que los efectos del clima sobre poblaciones de una especie longeva como la avutarda no son inmediatos.
+
+### 6e.2 Construccion de las variables lag-1
+
+Se desplaza la matriz de covariables una columna: `lag_mat[,1] = mat[,1]` (sin lag real para 2017), `lag_mat[,t] = mat[,t-1]` para t >= 2.
+
+Variables evaluadas: NDVI_lag, pr_lag, tmmx_lag, lc_grass_lag, lc_crop_lag.
+
+### 6e.3 Bateria de modelos
+
+| # | Modelo | Formula gamma | Formula epsilon | AIC | dAIC | Peso |
+|---|--------|--------------|-----------------|-----|------|------|
+| **m2** | **eps~tree+pr_lag** | **~1** | **~tree+pr_lag** | **3575.4** | **0.0** | **0.230** |
+| m4 | eps~tree+lc_grass_lag | ~1 | ~tree+lc_grass_lag | 3576.7 | 1.3 | 0.120 |
+| m8 | ambos pr_lag | ~pr_lag | ~tree+pr_lag | 3576.8 | 1.4 | 0.114 |
+| m0 | Baseline estatico | ~1 | ~grass+tree | 3576.9 | 1.5 | 0.109 |
+| m1 | eps~tree+NDVI_lag | ~1 | ~tree+NDVI_lag | 3577.2 | 1.8 | 0.094 |
+| m3 | eps~tree+tmmx_lag | ~1 | ~tree+tmmx_lag | 3577.3 | 1.9 | 0.089 |
+| m10 | ambos lc_grass_lag | ~lc_grass_lag | ~tree+lc_grass_lag | 3578.0 | 2.6 | 0.063 |
+| m7 | gam~lc_grass_lag | ~lc_grass_lag | ~grass+tree | 3578.4 | 3.0 | 0.051 |
+| m5 | gam~NDVI_lag | ~NDVI_lag | ~grass+tree | 3578.7 | 3.3 | 0.044 |
+| m6 | gam~pr_lag | ~pr_lag | ~grass+tree | 3578.9 | 3.5 | 0.040 |
+| m9 | ambos NDVI_lag | ~NDVI_lag | ~tree+NDVI_lag | 3579.1 | 3.7 | 0.036 |
+| m11 | combinado lag | ~pr_lag+lc_grass_lag | ~tree+NDVI_lag+lc_grass_lag | 3581.8 | 6.4 | 0.009 |
+
+Todos los modelos convergen.
+
+### 6e.4 Interpretacion
+
+**Resultado: los efectos retardados NO mejoran sustancialmente el modelo** (deltaAIC = -1.5 vs baseline, borderline).
+
+La precipitacion lag-1 muestra la senal mas prometedora: mas lluvia el ano anterior -> menor extincion (p=0.197), ecologicamente coherente pero no significativa. **tree_cover sigue dominando** (p=0.003).
+
+### 6e.5 Coeficientes del mejor modelo (m2: eps~tree+pr_lag)
+
+#### Colonizacion (gamma):
+| Covariable | Estimacion | SE | z | p-valor |
+|------------|-----------|-----|---|---------|
+| Intercepto | -5.289 | 0.224 | -23.60 | <0.001 |
+
+#### Extincion (epsilon):
+| Covariable | Estimacion | SE | z | p-valor |
+|------------|-----------|-----|---|---------|
+| Intercepto | -0.008 | 0.742 | -0.01 | 0.992 |
+| **tree_cover** | **2.649** | **0.876** | **3.02** | **0.003** |
+| pr_lag | -0.309 | 0.239 | -1.29 | 0.197 |
+
+---
+
+## 6f. Sintesis de todos los pipelines dinamicos (v4, v4b, v5)
+
+| Pipeline | Hipotesis | Mejor modelo | dAIC vs baseline |
+|----------|----------|--------------|------------------|
+| v4 (clima) | NDVI/precipitacion/temperatura interanual | gam~pr | -1.4 |
+| v4b (land cover) | Cambios grassland/cropland/shrubland | gam~lc_crop, eps~tree+lc_crop | -1.3 |
+| v5 (lag-1) | Clima y land cover del ano anterior | eps~tree+pr_lag | -1.5 |
+
+**Conclusiones**: tree_cover es el unico predictor robusto de extincion en todos los pipelines (p < 0.013). Ninguna covariable dinamica supera el umbral de deltaAIC > 2. La estructura del habitat domina sobre la variabilidad interanual. 6 anos (2017-2022) son probablemente insuficientes para detectar efectos dinamicos en una especie longeva.
+
+---
+
 ## 7. Diagnostico de las otras 3 especies (modelos originales)
 
 Los diagnosticos de los modelos originales muestran el **mismo patron estructural** en las 4 especies:
@@ -456,7 +584,7 @@ Las 4 especies comparten exactamente el mismo problema:
 
 ### 8.2 Que se puede presentar
 
-Con los resultados de los pipelines v2, v3 y v4 se puede:
+Con los resultados de los pipelines v2, v3, v4, v4b y v5 se puede:
 
 1. **Describir el problema metodologico**: como la definicion de "sitio" en `filter_repeat_visits` afecta los modelos de ocupacion dinamica. Esto es una contribucion metodologica relevante para la comunidad de ecologia.
 
@@ -464,7 +592,7 @@ Con los resultados de los pipelines v2, v3 y v4 se puede:
 
 3. **Mostrar que la cobertura arborea es el principal predictor de extincion local** de la avutarda, con mapas espaciales de prediccion. Este resultado es ecologicamente relevante en el contexto de cambios de uso del suelo en la peninsula.
 
-4. **Demostrar que la variabilidad climatica interanual no afecta significativamente la dinamica de ocupacion** a la escala temporal analizada (2017-2022). Esto refuerza la importancia de la estructura del habitat por encima de la variabilidad climatica a corto plazo.
+4. **Demostrar que la variabilidad interanual (climatica, land cover, y retardada) no afecta significativamente la dinamica de ocupacion** a la escala temporal analizada (2017-2022). Tres aproximaciones independientes convergen en el mismo resultado.
 
 5. **Discutir las implicaciones para estudios con datos eBird**: muchos trabajos usan `filter_repeat_visits` sin considerar las implicaciones para modelos multi-temporales.
 
@@ -474,9 +602,11 @@ Con los resultados de los pipelines v2, v3 y v4 se puede:
 
 2. **Escala temporal limitada (6 anos)**: El periodo 2017-2022 puede ser insuficiente para detectar efectos climaticos en una especie longeva. Eventos extremos (sequia severa, olas de calor) podrian no estar bien representados.
 
-3. **Sin efectos retardados (lag)**: Los modelos v4 usan covariables del mismo ano. Un desfase temporal (e.g., sequia en ano t afecta ocupacion en ano t+1) podria revelar efectos dinamicos no detectados.
+3. ~~**Sin efectos retardados (lag)**~~: Evaluado en pipeline v5. Los efectos lag-1 no mejoran sustancialmente el modelo (dAIC = -1.5). Lags de 2-3 anos podrian ser necesarios para una especie longeva.
 
-4. **Covariables de land cover no exploradas como dinamicas**: El export de GEE incluye land cover por ano (MODIS MCD12Q1), pero no se ha evaluado como yearlySiteCov. Cambios de uso del suelo inter-anuales podrian ser mas relevantes que el clima.
+4. ~~**Covariables de land cover no exploradas como dinamicas**~~: Evaluado en pipeline v4b. Los cambios interanuales de land cover (MODIS MCD12Q1) no mejoran el modelo (dAIC = -1.3).
+
+5. **Periodo temporal corto para efectos dinamicos**: Los 3 pipelines dinamicos convergen en que 6 anos son insuficientes para detectar efectos robustos en una especie longeva.
 
 ---
 
@@ -487,9 +617,11 @@ Con los resultados de los pipelines v2, v3 y v4 se puede:
 - [x] **Pipeline v2**: Diagnostico y correccion de filtros para *Otis tarda*
 - [x] **Pipeline v3**: Modelos con covariables estaticas en gamma/epsilon + mapas espaciales
 - [x] **Pipeline v4**: Covariables dinamicas (NDVI, EVI, precipitacion, temperatura) en gamma/epsilon
-- [x] **Seleccion de modelos**: Tabla AIC con 8 modelos (v3) y 11 modelos (v4)
+- [x] **Pipeline v4b**: Land cover dinamico (grassland, cropland, shrubland) en gamma/epsilon
+- [x] **Pipeline v5**: Efectos retardados lag-1 (clima y land cover del ano anterior) en gamma/epsilon
+- [x] **Seleccion de modelos**: Tabla AIC con 8 modelos (v3), 11 (v4), 11 (v4b) y 12 (v5)
 - [x] **Mapas de prediccion**: Ocupacion inicial y extincion para la peninsula iberica
-- [x] **Evaluacion de covariables dinamicas**: Resultado negativo — no mejoran sustancialmente el modelo (dAIC < 2)
+- [x] **Evaluacion de covariables dinamicas**: Resultado negativo consistente en 3 pipelines (dAIC < 2)
 
 ### 9.1 Inmediatos
 
@@ -498,8 +630,8 @@ Con los resultados de los pipelines v2, v3 y v4 se puede:
 
 ### 9.2 Corto plazo
 
-3. **Explorar efectos retardados (lag)**: Evaluar si covariables del ano t-1 predicen transiciones en el ano t (e.g., sequia en 2019 afecta extincion en 2020). Requiere modificar la construccion de yearlySiteCovs.
-4. **Explorar land cover dinamico**: El export de GEE incluye MODIS MCD12Q1 (Land_Cover_Type_1) por ano. Cambios inter-anuales de uso del suelo podrian ser mas relevantes que variables climaticas.
+3. ~~**Explorar efectos retardados (lag)**~~: Completado en pipeline v5 (dAIC = -1.5, no sustancial).
+4. ~~**Explorar land cover dinamico**~~: Completado en pipeline v4b (dAIC = -1.3, no sustancial).
 5. **Seleccion de modelos final** con AIC/BIC para cada especie
 
 ### 9.3 Medio plazo
@@ -520,6 +652,8 @@ Con los resultados de los pipelines v2, v3 y v4 se puede:
 | `scripts/test_pipeline_v2_all_species.R` | Pipeline v2 multi-especie (pendiente de datos) |
 | `scripts/test_pipeline_v3_otitar.R` | **Pipeline v3**: modelos gamma/epsilon + mapas espaciales |
 | `scripts/test_pipeline_v4_dynamic_covs.R` | **Pipeline v4**: covariables dinamicas (NDVI, EVI, pr, temp) |
+| `scripts/test_pipeline_v4b_landcover_dynamic.R` | **Pipeline v4b**: land cover dinamico (grassland, cropland, shrubland) |
+| `scripts/test_pipeline_v5_lagged_effects.R` | **Pipeline v5**: efectos retardados lag-1 (clima + land cover) |
 | `scripts/diagnostic_models.R` | Script de diagnostico para los 4 modelos originales |
 | `scripts/test_filter_otitar.R` | Test inicial de filtros para otitar |
 | `scripts/test_filter_otitar_v2.R` | Test avanzado con filtros temporales |
@@ -528,6 +662,12 @@ Con los resultados de los pipelines v2, v3 y v4 se puede:
 | `results/otitar_v4_model_selection.csv` | Tabla AIC de 11 modelos (v4) con deltaAIC y pesos |
 | `results/otitar_v4_best_model_coefficients.csv` | Coeficientes del mejor modelo v4 |
 | `results/otitar_v4_dynamic_scaling_params.csv` | Parametros de escalado de variables dinamicas |
+| `results/otitar_v4b_model_selection.csv` | Tabla AIC de 11 modelos (v4b) |
+| `results/otitar_v4b_best_model_coefficients.csv` | Coeficientes del mejor modelo v4b |
+| `results/otitar_v4b_dynamic_scaling_params.csv` | Parametros de escalado land cover |
+| `results/otitar_v5_model_selection.csv` | Tabla AIC de 12 modelos (v5) |
+| `results/otitar_v5_best_model_coefficients.csv` | Coeficientes del mejor modelo v5 |
+| `results/otitar_v5_dynamic_scaling_params.csv` | Parametros de escalado variables lag |
 | `figs/otitar_v3_psi_map.png` | Mapa de ocupacion inicial (psi1) para *O. tarda* |
 | `figs/otitar_v3_epsilon_map.png` | Mapa de extincion (epsilon) para *O. tarda* |
 | `figs/otitar_v3_maps_combined.png` | Mapa combinado psi + epsilon |
@@ -566,6 +706,12 @@ source("scripts/test_pipeline_v3_otitar.R")
 
 # 4. Pipeline v4 - Otis tarda con covariables dinamicas (~15 min):
 source("scripts/test_pipeline_v4_dynamic_covs.R")
+
+# 5. Pipeline v4b - Otis tarda con land cover dinamico (~15 min):
+source("scripts/test_pipeline_v4b_landcover_dynamic.R")
+
+# 6. Pipeline v5 - Otis tarda con efectos retardados (~15 min):
+source("scripts/test_pipeline_v5_lagged_effects.R")
 ```
 
 **Requisitos:**
@@ -587,5 +733,15 @@ source("scripts/test_pipeline_v4_dynamic_covs.R")
 - `results/otitar_v4_model_selection.csv` — tabla AIC con deltaAIC y pesos de Akaike
 - `results/otitar_v4_best_model_coefficients.csv` — coeficientes del mejor modelo
 - `results/otitar_v4_dynamic_scaling_params.csv` — parametros de escalado (center, scale)
+
+**Outputs del pipeline v4b:**
+- `results/otitar_v4b_model_selection.csv` — tabla AIC (11 modelos)
+- `results/otitar_v4b_best_model_coefficients.csv` — coeficientes del mejor modelo
+- `results/otitar_v4b_dynamic_scaling_params.csv` — parametros de escalado land cover
+
+**Outputs del pipeline v5:**
+- `results/otitar_v5_model_selection.csv` — tabla AIC (12 modelos)
+- `results/otitar_v5_best_model_coefficients.csv` — coeficientes del mejor modelo
+- `results/otitar_v5_dynamic_scaling_params.csv` — parametros de escalado variables lag
 
 
