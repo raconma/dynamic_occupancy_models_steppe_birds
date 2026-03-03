@@ -259,22 +259,6 @@ La narrativa ha cambiado respecto al informe anterior. Ya no es "las covariables
 
 ## 7. Sobre incluir 2025
 
-**Pregunta de Raul: ¿merece la pena incluir 2025?**
-
-### Argumentos a favor
-- **Mas datos = mejor estimacion**: Un 7o ano anade una transicion mas (2024->2025), lo que podria ayudar especialmente con pteori (boundary persistente)
-- **Serie temporal mas larga**: 8 anos (2017-2025) vs 6 anos (2017-2022). Mas poder para detectar efectos dinamicos
-- **eBird crece exponencialmente**: 2023-2025 probablemente tiene mas observadores y mejor cobertura que 2017-2019
-- **Los datos de land cover MODIS y TerraClimate deberian estar disponibles** hasta 2024 al menos
-
-### Argumentos en contra
-- **Coste de reprocesamiento**: Hay que re-exportar variables dinamicas de GEE (NDVI, land cover, clima) para 2023-2025
-- **Closure assumption**: Si el periodo de cria ha cambiado con el cambio climatico, el supuesto de cierre anual podria ser menos valido en una serie mas larga
-- **Datos eBird post-COVID**: La pandemia altero los patrones de muestreo en 2020-2021; los anos 2023-2025 deberian ser mas normales
-- **MODIS MCD12Q1**: Verificar que los datos 2023-2025 estan publicados (suele haber ~1 ano de retraso)
-
-### Recomendacion
-
 **Si, merece la pena**, especialmente porque:
 1. Podria resolver el boundary de pteori (mas transiciones observadas)
 2. Mas poder estadistico para detectar efectos dinamicos que en otitar fueron borderline
@@ -306,3 +290,4 @@ La narrativa ha cambiado respecto al informe anterior. Ya no es "las covariables
 | tettet | v5 | SI | SI | SI |
 | tettet | validacion | SI | — | — |
 | otitar | sensibilidad | SI | — | — |
+
