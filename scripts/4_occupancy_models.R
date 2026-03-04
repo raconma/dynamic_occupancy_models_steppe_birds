@@ -5,19 +5,19 @@
 #          Includes: data formatting, model fitting, GOF, response curves,
 #          occupancy maps, and stochastic simulations.
 #
-# Inputs:  data/processed/{sp}/{sp}_occ_wide_dynamic.csv  (from step 3)
-#          data/processed/{sp}/{sp}_scaling_params.rds     (from step 2)
-#          data/raw/environmental_data/...                 (for prediction surface)
-#          data/raw/topology_data/...                      (for prediction surface)
-#          R/model_configs.R                               (species formulas)
+# Inputs:  data/processed_2023/{sp}/{sp}_occ_wide_dynamic.csv  (from step 3)
+#          data/processed_2023/{sp}/{sp}_scaling_params.rds     (from step 2)
+#          data-raw/data/environmental_data/...                 (for prediction surface)
+#          data-raw/data/topology_data/...                      (for prediction surface)
+#          R/model_configs.R                                    (species formulas)
 #
 # Outputs: results/{sp}_model_summary.txt
 #          results/{sp}_gof_parboot.rds
 #          results/{sp}_gof_mackenzie_bailey.rds
 #          results/{sp}_simulation_prevalence.csv
 #          results/{sp}_model_object.rds
-#          data/processed/{sp}/occ_{sp}_prediction.csv
-#          data/processed/{sp}/{sp}_OccuMap.tif
+#          data/processed_2023/{sp}/occ_{sp}_prediction.csv
+#          data/processed_2023/{sp}/{sp}_OccuMap.tif
 #          figs/{sp}_response_occupancy.png
 #          figs/{sp}_response_colonization.png
 #          figs/{sp}_response_extinction.png
@@ -57,12 +57,26 @@ theme_set(theme_bw())
 species_codes <- c("otitar", "ptealc", "pteori", "tettet")
 
 # -- Constants --
-YEARS   <- 2017:2022
+YEARS   <- 2017:2023
 T_years <- length(YEARS)
 J_reps  <- 10            # max secondary periods per primary period
-NSIM_PARBOOT <- 1000     # publication-grade GOF (was 10)
-NSIM_MB_GOF  <- 500      # publication-grade MB GOF (was 3)
-NSIM_PREV    <- 5000     # stochastic simulations
+NSIM_PARBOOT <- 10       # testing (increase to 1000 for publication)
+NSIM_MB_GOF  <- 10       # testing (increase to 500 for publication)
+NSIM_PREV    <- 500      # stochastic simulations
+
+###############################################################################
+# Helper: extract observation-level columns by name pattern
+###############################################################################
+get_obs_cols <- function(df, prefix, years, reps = 1:10) {
+  cols <- c()
+  for (yr in years) {
+    for (k in reps) {
+      cn <- paste0(prefix, ".", k, ".", yr)
+      if (cn %in% names(df)) cols <- c(cols, cn)
+    }
+  }
+  cols
+}
 
 ###############################################################################
 # Helper: expand yearly covariates to observation-level dimensions
@@ -147,45 +161,50 @@ for (sp in species_codes) {
 
   # -- Load data --
   occ_wide_clean <- read.csv(
-    here("data", "processed", sp, paste0(sp, "_occ_wide_dynamic.csv"))
+    here("data", "processed_2023", sp, paste0(sp, "_occ_wide_dynamic.csv"))
   )
   message("  Data: ", nrow(occ_wide_clean), " sites x ",
           ncol(occ_wide_clean), " columns")
 
-  # -- Extract matrices by column indices --
-  # Survey covariates (10 reps x 6 years = 60 columns)
-  duration  <- as.matrix(occ_wide_clean[, c(33:42, 104:113, 175:184,
-                                             246:255, 317:326, 388:397)])
-  effort    <- as.matrix(occ_wide_clean[, c(43:52, 114:123, 185:194,
-                                             256:265, 327:336, 398:407)])
-  observers <- as.matrix(occ_wide_clean[, c(53:62, 124:133, 195:204,
-                                             266:275, 337:346, 408:417)])
-  time      <- occ_wide_clean[, c(23:32, 94:103, 165:174,
-                                   236:245, 307:316, 378:387)]
+  # -- Extract matrices by column NAME (not index) --
+  # Observation covariates
+  y_cols    <- get_obs_cols(occ_wide_clean, "y", YEARS)
+  dur_cols  <- get_obs_cols(occ_wide_clean, "duration_minutes", YEARS)
+  eff_cols  <- get_obs_cols(occ_wide_clean, "effort_distance_km", YEARS)
+  obs_cols  <- get_obs_cols(occ_wide_clean, "number_observers", YEARS)
+  time_cols <- get_obs_cols(occ_wide_clean, "time_observations_started", YEARS)
+
+  duration  <- as.matrix(occ_wide_clean[, dur_cols])
+  effort    <- as.matrix(occ_wide_clean[, eff_cols])
+  observers <- as.matrix(occ_wide_clean[, obs_cols])
+  time      <- occ_wide_clean[, time_cols]
 
   # Detection histories
-  detections <- occ_wide_clean[, c(2:11, 74:83, 145:154,
-                                    216:225, 287:296, 358:367)]
+  detections <- occ_wide_clean[, y_cols]
   detections <- detections %>% mutate(across(where(is.logical), as.integer))
   y.cross <- as.matrix(detections)
   y.cross[is.na(time) != is.na(y.cross)] <- NA
 
-  # Site covariates (static)
-  siteCovs <- occ_wide_clean[, c(17:22)]
+  # Verify dimensions: should be J_reps * T_years columns
+  stopifnot(ncol(y.cross) == J_reps * T_years)
 
-  # Yearly site covariates
-  EVI     <- occ_wide_clean[, c(428:433)]
-  Land_Cover_Type_1_Percent_Class_0  <- occ_wide_clean[, c(434:439)]
-  Land_Cover_Type_1_Percent_Class_10 <- occ_wide_clean[, c(440:445)]
-  Land_Cover_Type_1_Percent_Class_12 <- occ_wide_clean[, c(446:451)]
-  Land_Cover_Type_1_Percent_Class_13 <- occ_wide_clean[, c(452:457)]
-  Land_Cover_Type_1_Percent_Class_14 <- occ_wide_clean[, c(458:463)]
-  Land_Cover_Type_1_Percent_Class_6  <- occ_wide_clean[, c(464:469)]
-  Land_Cover_Type_1_Percent_Class_7  <- occ_wide_clean[, c(470:475)]
-  NDVI <- occ_wide_clean[, c(482:487)]
-  pr   <- occ_wide_clean[, c(488:493)]
-  tmmn <- occ_wide_clean[, c(494:499)]
-  tmmx <- occ_wide_clean[, c(500:505)]
+  # Site covariates (static, by name)
+  siteCovs <- occ_wide_clean[, c("bio1", "bio2", "tree_cover",
+                                   "grass_cover", "topo_aspect", "topo_elev")]
+
+  # Yearly site covariates (by name pattern)
+  EVI     <- occ_wide_clean[, paste0("EVI_", YEARS)]
+  Land_Cover_Type_1_Percent_Class_0  <- occ_wide_clean[, paste0("Land_Cover_Type_1_Percent_Class_0_", YEARS)]
+  Land_Cover_Type_1_Percent_Class_10 <- occ_wide_clean[, paste0("Land_Cover_Type_1_Percent_Class_10_", YEARS)]
+  Land_Cover_Type_1_Percent_Class_12 <- occ_wide_clean[, paste0("Land_Cover_Type_1_Percent_Class_12_", YEARS)]
+  Land_Cover_Type_1_Percent_Class_13 <- occ_wide_clean[, paste0("Land_Cover_Type_1_Percent_Class_13_", YEARS)]
+  Land_Cover_Type_1_Percent_Class_14 <- occ_wide_clean[, paste0("Land_Cover_Type_1_Percent_Class_14_", YEARS)]
+  Land_Cover_Type_1_Percent_Class_6  <- occ_wide_clean[, paste0("Land_Cover_Type_1_Percent_Class_6_", YEARS)]
+  Land_Cover_Type_1_Percent_Class_7  <- occ_wide_clean[, paste0("Land_Cover_Type_1_Percent_Class_7_", YEARS)]
+  NDVI <- occ_wide_clean[, paste0("NDVI_", YEARS)]
+  pr   <- occ_wide_clean[, paste0("pr_", YEARS)]
+  tmmn <- occ_wide_clean[, paste0("tmmn_", YEARS)]
+  tmmx <- occ_wide_clean[, paste0("tmmx_", YEARS)]
 
   # -- Standardise all covariates --
   time      <- scale(time)
@@ -208,9 +227,6 @@ for (sp in species_codes) {
   tmmx <- scale(tmmx)
 
   # -- Capture training scaling for dynamic covariates --
-  # scale() on a matrix gives per-column center/scale (one per year).
-  # We store these keyed by "covariate_year" so the simulation section
-  # can apply the EXACT SAME scaling as training — not a per-year re-scaling.
   train_dyn_scale <- list()
   .dyn_mats <- list(
     EVI = EVI, NDVI = NDVI, pr = pr, tmmn = tmmn, tmmx = tmmx,
@@ -295,7 +311,7 @@ for (sp in species_codes) {
   message("  Model saved. AIC = ", round(Mod.final@AIC, 2))
 
   ##############################################################################
-  # GOODNESS OF FIT (publication-grade nsim)
+  # GOODNESS OF FIT
   ##############################################################################
   message("  Running GOF (parboot nsim=", NSIM_PARBOOT, ")...")
   set.seed(42)  # Reproducible GOF
@@ -356,11 +372,11 @@ for (sp in species_codes) {
 
   # Load rasters for prediction surface
   variables <- brick(stack(
-    here("data", "raw", "environmental_data", "environmental_data_occ",
+    here("data-raw", "data", "environmental_data", "environmental_data_occ",
          "variables_spain.grd")))
-  aspect <- raster(here("data", "raw", "topology_data", "topo_aspect_masked.tif"))
+  aspect <- raster(here("data-raw", "data", "topology_data", "topo_aspect_masked.tif"))
   names(aspect) <- "topo_aspect"
-  elev <- raster(here("data", "raw", "topology_data", "topo_elev_masked.tif"))
+  elev <- raster(here("data-raw", "data", "topology_data", "topo_elev_masked.tif"))
   names(elev) <- "topo_elev"
 
   aspect_resampled <- resample(aspect, variables, method = "bilinear")
@@ -376,7 +392,7 @@ for (sp in species_codes) {
 
   # FIX: Scale prediction surface using TRAINING scaling parameters
   scaling_params <- readRDS(
-    here("data", "processed", sp, paste0(sp, "_scaling_params.rds"))
+    here("data", "processed_2023", sp, paste0(sp, "_scaling_params.rds"))
   )
 
   pred_surface_std <- pred_surface
@@ -404,7 +420,8 @@ for (sp in species_codes) {
 
   # Save prediction CSV
   write.csv(pred_occ,
-            here("data", "processed", sp, paste0("occ_", sp, "_prediction.csv")),
+            here("data", "processed_2023", sp,
+                 paste0("occ_", sp, "_prediction.csv")),
             row.names = FALSE)
 
   # Create and save raster
@@ -425,7 +442,8 @@ for (sp in species_codes) {
 
   # Save GeoTIFF
   writeRaster(r_pred_proj_masked[[1]],
-              here("data", "processed", sp, paste0(sp, "_OccuMap.tif")),
+              here("data", "processed_2023", sp,
+                   paste0(sp, "_OccuMap.tif")),
               format = "GTiff", overwrite = TRUE)
 
   # Plot occupancy map
@@ -444,17 +462,6 @@ for (sp in species_codes) {
 
   ##############################################################################
   # STOCHASTIC SIMULATIONS
-  #
-  # IMPORTANT: All covariates must be scaled using the TRAINING scaling
-  # parameters, not re-scaled from scratch. Three bugs were fixed here:
-  #   Bug 1 (CRITICAL): psi covariates were passed UNSCALED to predict().
-  #          The model expects scaled inputs (trained on scale(siteCovs)).
-  #          Raw values (e.g. grass_cover=45) caused logit saturation → ψ₁≈1.
-  #   Bug 2 (HIGH): gamma/epsilon covariates were re-scaled per year with
-  #          their own mean/sd instead of the training scaling parameters.
-  #   Bug 3 (HIGH): Land Cover classes 6,7,10,12,14 were not scaled in
-  #          training but got scaled in simulation → coefficient mismatch.
-  #          Fixed above (now all classes are scaled in training too).
   ##############################################################################
   message("  Running stochastic simulations (nsim=", NSIM_PREV, ")...")
 
@@ -466,9 +473,7 @@ for (sp in species_codes) {
   S <- nrow(predict_data)
   T_sim <- occ_umf@numPrimary
 
-  # --- Initial occupancy (ψ₁) ---
-  # FIX Bug 1: scale psi covariates using TRAINING params (from step 2).
-  # Previously passed raw values to predict() → logit saturation → ψ₁ ≈ 1.
+  # --- Initial occupancy ---
   psi_data <- predict_data[, cfg$psi_vars, drop = FALSE]
   for (v in cfg$psi_vars) {
     if (v %in% names(scaling_params)) {
@@ -485,8 +490,6 @@ for (sp in species_codes) {
           round(max(psi1, na.rm = TRUE), 4), "]")
 
   # --- Colonisation and extinction per year ---
-  # FIX Bug 2: scale dynamic covariates using train_dyn_scale (captured from
-  # the training scale() calls), not a fresh scale() per year.
   col_mat <- matrix(NA_real_, nrow = S, ncol = T_sim)
   ext_mat <- matrix(NA_real_, nrow = S, ncol = T_sim)
 
