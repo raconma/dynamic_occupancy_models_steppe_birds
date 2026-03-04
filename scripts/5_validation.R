@@ -5,7 +5,7 @@
 #          Biodiversity Atlas using spatial block cross-validation.
 #          Computes AUC, TSS, RMSE, Spearman correlation, and Moran's I.
 #
-# Inputs:  data/processed/{sp}/occ_{sp}_prediction.csv   (from step 4)
+# Inputs:  data/processed_2023/{sp}/occ_{sp}_prediction.csv   (from step 4)
 #          data/raw/validation/atlas_biodiversidad/aves_spain.shp
 #
 # Outputs: results/{sp}_validation_cv.csv
@@ -96,7 +96,7 @@ for (sp in species_codes) {
   }
 
   # -- Load predictions --
-  pred_path <- here("data", "processed", sp,
+  pred_path <- here("data", "processed_2023", sp,
                      paste0("occ_", sp, "_prediction.csv"))
   if (!file.exists(pred_path)) {
     warning("  Prediction file not found: ", pred_path, ". Skipping ", sp)
