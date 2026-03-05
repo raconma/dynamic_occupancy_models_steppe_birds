@@ -42,7 +42,8 @@ library(tidyr)
 library(raster)
 library(terra)
 library(AICcmodavg)
-library(rmapshaper)
+has_rmapshaper <- requireNamespace("rmapshaper", quietly = TRUE)
+if (has_rmapshaper) library(rmapshaper)
 
 # Resolve namespace conflicts
 select <- dplyr::select
@@ -291,13 +292,22 @@ for (sp in species_codes) {
   ##############################################################################
   message("  Fitting colext model...")
 
-  Mod.final <- colext(
-    psiformula     = cfg$psi_formula,
-    gammaformula   = cfg$gamma_formula,
-    epsilonformula = cfg$epsilon_formula,
-    pformula       = cfg$p_formula,
-    data = occ_umf
+  Mod.final <- tryCatch(
+    colext(
+      psiformula     = cfg$psi_formula,
+      gammaformula   = cfg$gamma_formula,
+      epsilonformula = cfg$epsilon_formula,
+      pformula       = cfg$p_formula,
+      data = occ_umf
+    ),
+    error = function(e) {
+      message("  ERROR: colext() failed for ", sp, ": ", conditionMessage(e))
+      message("  Skipping remaining steps for this species.")
+      return(NULL)
+    }
   )
+
+  if (is.null(Mod.final)) next
 
   # Save model summary
   sink(here("results", paste0(sp, "_model_summary.txt")))
@@ -320,54 +330,70 @@ for (sp in species_codes) {
 
   message("  Running MacKenzie-Bailey GOF (nsim=", NSIM_MB_GOF, ")...")
   set.seed(42)
-  occ_gof <- mb.gof.test(Mod.final, nsim = NSIM_MB_GOF, plot.hist = FALSE)
-  saveRDS(occ_gof, here("results", paste0(sp, "_gof_mackenzie_bailey.rds")))
+  tryCatch({
+    occ_gof <- mb.gof.test(Mod.final, nsim = NSIM_MB_GOF, plot.hist = FALSE)
+    saveRDS(occ_gof, here("results", paste0(sp, "_gof_mackenzie_bailey.rds")))
+  }, error = function(e) {
+    message("  WARNING: mb.gof.test failed (", conditionMessage(e),
+            "). Skipping MB GOF for ", sp)
+  })
 
   ##############################################################################
   # RESPONSE VARIABLE PLOTS
   ##############################################################################
   message("  Generating response curves...")
 
-  # Occupancy
-  occ_formulas <- lapply(cfg$psi_vars, function(v) as.formula(paste0("~", v)))
-  p_occ <- plot_response_curves(occ_formulas, occ_umf, "psi",
-                                 as.data.frame(occ_umf@siteCovs),
-                                 "Probability of Site Occupancy",
-                                 "seagreen4", sp)
-  ggsave(here("figs", paste0(sp, "_response_occupancy.png")),
-         p_occ, width = 10, height = 6)
+  tryCatch({
+    # Occupancy
+    occ_formulas <- lapply(cfg$psi_vars, function(v) as.formula(paste0("~", v)))
+    p_occ <- plot_response_curves(occ_formulas, occ_umf, "psi",
+                                   as.data.frame(occ_umf@siteCovs),
+                                   "Probability of Site Occupancy",
+                                   "seagreen4", sp)
+    ggsave(here("figs", paste0(sp, "_response_occupancy.png")),
+           p_occ, width = 10, height = 6)
 
-  # Colonization
-  col_formulas <- lapply(cfg$gamma_vars, function(v) as.formula(paste0("~", v)))
-  p_col <- plot_response_curves(col_formulas, occ_umf, "col",
-                                 as.data.frame(occ_umf@yearlySiteCovs),
-                                 "Colonization Probability",
-                                 "royalblue3", sp)
-  ggsave(here("figs", paste0(sp, "_response_colonization.png")),
-         p_col, width = 10, height = 6)
+    # Colonization
+    col_formulas <- lapply(cfg$gamma_vars, function(v) as.formula(paste0("~", v)))
+    p_col <- plot_response_curves(col_formulas, occ_umf, "col",
+                                   as.data.frame(occ_umf@yearlySiteCovs),
+                                   "Colonization Probability",
+                                   "royalblue3", sp)
+    ggsave(here("figs", paste0(sp, "_response_colonization.png")),
+           p_col, width = 10, height = 6)
 
-  # Extinction
-  ext_formulas <- lapply(cfg$epsilon_vars, function(v) as.formula(paste0("~", v)))
-  p_ext <- plot_response_curves(ext_formulas, occ_umf, "ext",
-                                 as.data.frame(occ_umf@yearlySiteCovs),
-                                 "Extinction Probability",
-                                 "royalblue3", sp)
-  ggsave(here("figs", paste0(sp, "_response_extinction.png")),
-         p_ext, width = 10, height = 6)
+    # Extinction
+    ext_formulas <- lapply(cfg$epsilon_vars, function(v) as.formula(paste0("~", v)))
+    p_ext <- plot_response_curves(ext_formulas, occ_umf, "ext",
+                                   as.data.frame(occ_umf@yearlySiteCovs),
+                                   "Extinction Probability",
+                                   "royalblue3", sp)
+    ggsave(here("figs", paste0(sp, "_response_extinction.png")),
+           p_ext, width = 10, height = 6)
 
-  # Detection
-  det_var_names <- all.vars(cfg$p_formula)
-  det_formulas <- lapply(det_var_names, function(v) as.formula(paste0("~", v)))
-  p_det <- plot_response_curves(det_formulas, occ_umf, "det",
-                                 as.data.frame(occ_umf@obsCovs),
-                                 "Detection Probability",
-                                 "royalblue3", sp)
-  ggsave(here("figs", paste0(sp, "_response_detection.png")),
-         p_det, width = 10, height = 6)
+    # Detection
+    det_var_names <- all.vars(cfg$p_formula)
+    det_formulas <- lapply(det_var_names, function(v) as.formula(paste0("~", v)))
+    p_det <- plot_response_curves(det_formulas, occ_umf, "det",
+                                   as.data.frame(occ_umf@obsCovs),
+                                   "Detection Probability",
+                                   "royalblue3", sp)
+    ggsave(here("figs", paste0(sp, "_response_detection.png")),
+           p_det, width = 10, height = 6)
+  }, error = function(e) {
+    message("  WARNING: Response curves failed (", conditionMessage(e),
+            "). Skipping for ", sp)
+  })
+
+  # Load TRAINING scaling parameters (needed for map + simulations)
+  scaling_params <- readRDS(
+    here("data", "processed_2023", sp, paste0(sp, "_scaling_params.rds"))
+  )
 
   ##############################################################################
   # OCCUPANCY MAP (spatial prediction)
   ##############################################################################
+  tryCatch({
   message("  Building occupancy map...")
 
   # Load rasters for prediction surface
@@ -389,11 +415,6 @@ for (sp in species_codes) {
   names(pred_surface)[names(pred_surface) == "x"] <- "longitude"
   names(pred_surface)[names(pred_surface) == "y"] <- "latitude"
   pred_surface <- pred_surface %>% drop_na()
-
-  # FIX: Scale prediction surface using TRAINING scaling parameters
-  scaling_params <- readRDS(
-    here("data", "processed_2023", sp, paste0(sp, "_scaling_params.rds"))
-  )
 
   pred_surface_std <- pred_surface
   for (v in cfg$psi_vars) {
@@ -433,8 +454,14 @@ for (sp in species_codes) {
   r_pred <- r_pred[[c("occ_prob", "occ_se")]]
 
   spain <- ne_countries(country = "spain", scale = "medium", returnclass = "sf")
-  spain_crop <- ms_filter_islands(spain, min_area = 100000000000,
-                                   drop_null_geometries = TRUE)
+  if (has_rmapshaper) {
+    spain_crop <- ms_filter_islands(spain, min_area = 100000000000,
+                                     drop_null_geometries = TRUE)
+  } else {
+    # Fallback: keep only mainland polygon (largest by area)
+    spain_parts <- st_cast(spain, "POLYGON")
+    spain_crop <- spain_parts[which.max(st_area(spain_parts)), ]
+  }
 
   r_pred_proj <- projectRaster(r_pred, crs = map_proj, method = "ngb")
   r_pred_proj_crop <- crop(r_pred_proj, spain_crop)
@@ -459,6 +486,11 @@ for (sp in species_codes) {
     theme(panel.border = element_rect(color = "black", fill = "transparent"))
   ggsave(here("figs", paste0(sp, "_occupancy_map.png")),
          p_map, width = 10, height = 8)
+
+  }, error = function(e) {
+    message("  WARNING: Occupancy map failed (", conditionMessage(e),
+            "). Skipping for ", sp)
+  })
 
   ##############################################################################
   # STOCHASTIC SIMULATIONS

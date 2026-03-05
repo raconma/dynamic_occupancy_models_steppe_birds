@@ -72,6 +72,8 @@ RUN_PHASE_C <- FALSE   # <-- Change to TRUE when ready (6-24h per species)
 
 for (sp in species_codes) {
 
+  tryCatch({
+
   t_start_global <- Sys.time()
   cfg <- get_model_config(sp)
 
@@ -122,12 +124,6 @@ for (sp in species_codes) {
   cat("  X range:", round(range(coords[, 1]) / 1000), "km\n")
   cat("  Y range:", round(range(coords[, 2]) / 1000), "km\n")
 
-  # Maximum inter-site distance (needed for phi prior)
-  set.seed(1)
-  idx_sub <- sample(J, min(500, J))
-  max_dist <- max(dist(coords[idx_sub, ]))
-  cat("  Approx max distance:", round(max_dist / 1000), "km\n\n")
-
   # --- Occupancy covariates ---
   # Static (site-level): from model config psi_vars (already scaled)
   occ_covs <- list()
@@ -156,19 +152,74 @@ for (sp in species_codes) {
     occ_covs[[var_name]] <- mat
   }
 
+  # --- Remove sites with NA in any covariate (spOccupancy requirement) ---
+  na_sites <- rep(FALSE, J)
+  for (nm in names(occ_covs)) {
+    obj <- occ_covs[[nm]]
+    if (is.matrix(obj)) {
+      na_sites <- na_sites | apply(obj, 1, function(x) any(is.na(x)))
+    } else {
+      na_sites <- na_sites | is.na(obj)
+    }
+  }
+  # Also check coordinates
+  na_sites <- na_sites | is.na(coords[, 1]) | is.na(coords[, 2])
+
+  if (sum(na_sites) > 0) {
+    cat("  Removing", sum(na_sites), "sites with NA covariates (",
+        round(sum(na_sites) / J * 100, 1), "%)\n")
+    keep <- !na_sites
+    J <- sum(keep)
+    y_array <- y_array[keep, , ]
+    coords <- coords[keep, , drop = FALSE]
+    coords_lonlat <- coords_lonlat[keep, , drop = FALSE]
+    d <- d[keep, ]
+    for (nm in names(occ_covs)) {
+      obj <- occ_covs[[nm]]
+      if (is.matrix(obj)) {
+        occ_covs[[nm]] <- obj[keep, , drop = FALSE]
+      } else {
+        occ_covs[[nm]] <- obj[keep]
+      }
+    }
+    cat("  Sites after NA removal:", J, "\n\n")
+  }
+
+  # Impute remaining isolated NAs in dynamic covariates with column means
+  for (nm in c("NDVI", "tmmx")) {
+    if (nm %in% names(occ_covs) && is.matrix(occ_covs[[nm]])) {
+      mat <- occ_covs[[nm]]
+      for (col_i in 1:ncol(mat)) {
+        na_idx <- is.na(mat[, col_i])
+        if (any(na_idx)) {
+          mat[na_idx, col_i] <- mean(mat[, col_i], na.rm = TRUE)
+        }
+      }
+      occ_covs[[nm]] <- mat
+    }
+  }
+
+  # Maximum inter-site distance (needed for phi prior) — after NA removal
+  set.seed(1)
+  idx_sub <- sample(J, min(500, J))
+  max_dist <- max(dist(coords[idx_sub, ]))
+  cat("  Approx max distance:", round(max_dist / 1000), "km\n\n")
+
   cat("Occupancy covariates:\n")
   for (nm in names(occ_covs)) {
     obj <- occ_covs[[nm]]
     if (is.matrix(obj)) {
       cat("  ", nm, ": matrix", nrow(obj), "x", ncol(obj),
-          "| range:", round(range(obj, na.rm = TRUE), 2), "\n")
+          "| range:", round(range(obj, na.rm = TRUE), 2),
+          "| NAs:", sum(is.na(obj)), "\n")
     } else {
       cat("  ", nm, ": vector length", length(obj),
-          "| range:", round(range(obj, na.rm = TRUE), 2), "\n")
+          "| range:", round(range(obj, na.rm = TRUE), 2),
+          "| NAs:", sum(is.na(obj)), "\n")
     }
   }
 
-  # --- Detection covariates ---
+  # --- Detection covariates (using filtered J) ---
   det_covs <- list()
   for (var_base in c("duration_minutes", "number_observers")) {
     arr <- array(NA, dim = c(J, n_years, n_reps))
@@ -266,7 +317,7 @@ for (sp in species_codes) {
   saveRDS(fit_tpgocc, here("results", paste0(sp, "_spatial_tPGOcc.rds")))
 
   waic_A <- waicOcc(fit_tpgocc)
-  cat("\ntPGOcc WAIC:", waic_A$WAIC, "\n\n")
+  cat("\ntPGOcc WAIC:", waic_A["WAIC"], "\n\n")
 
 
   ###########################################################################
@@ -405,7 +456,7 @@ for (sp in species_codes) {
   }
 
   waic_B <- waicOcc(fit_sppgocc)
-  cat("spPGOcc WAIC (single year):", waic_B$WAIC, "\n\n")
+  cat("spPGOcc WAIC (single year):", waic_B["WAIC"], "\n\n")
 
   saveRDS(fit_sppgocc,
           here("results", paste0(sp, "_spatial_spPGOcc_", best_yr, ".rds")))
@@ -494,7 +545,7 @@ for (sp in species_codes) {
     }
 
     waic_C <- waicOcc(fit_stpgocc)
-    cat("\nstPGOcc WAIC:", waic_C$WAIC, "\n")
+    cat("\nstPGOcc WAIC:", waic_C["WAIC"], "\n")
 
     saveRDS(fit_stpgocc, here("results", paste0(sp, "_spatial_stPGOcc.rds")))
 
@@ -517,36 +568,27 @@ for (sp in species_codes) {
   cat("--- 1. MCMC Convergence ---\n\n")
 
   extract_mcmc_diag <- function(fit, model_name) {
-    s <- summary(fit)
+    # spOccupancy stores Rhat and ESS in fit$rhat and fit$ESS, not in summary()
     rows <- list()
-    if (!is.null(s$beta.samples)) {
-      b <- s$beta.samples
-      for (i in seq_len(nrow(b))) {
-        rows[[length(rows) + 1]] <- data.frame(
-          Model = model_name,
-          Parameter = paste0("beta[", rownames(b)[i], "]"),
-          Mean = b[i, "Mean"], Rhat = b[i, "Rhat"], ESS = b[i, "ESS"],
-          stringsAsFactors = FALSE)
-      }
-    }
-    if (!is.null(s$alpha.samples)) {
-      a <- s$alpha.samples
-      for (i in seq_len(nrow(a))) {
-        rows[[length(rows) + 1]] <- data.frame(
-          Model = model_name,
-          Parameter = paste0("alpha[", rownames(a)[i], "]"),
-          Mean = a[i, "Mean"], Rhat = a[i, "Rhat"], ESS = a[i, "ESS"],
-          stringsAsFactors = FALSE)
-      }
-    }
-    if (!is.null(s$theta.samples)) {
-      th <- s$theta.samples
-      for (i in seq_len(nrow(th))) {
-        rows[[length(rows) + 1]] <- data.frame(
-          Model = model_name,
-          Parameter = paste0("theta[", rownames(th)[i], "]"),
-          Mean = th[i, "Mean"], Rhat = th[i, "Rhat"], ESS = th[i, "ESS"],
-          stringsAsFactors = FALSE)
+    for (param_type in c("beta", "alpha", "theta")) {
+      samples_name <- paste0(param_type, ".samples")
+      if (!is.null(fit[[samples_name]])) {
+        samps <- fit[[samples_name]]
+        if (is.matrix(samps) || inherits(samps, "mcmc")) {
+          n_params <- ncol(samps)
+          p_names <- colnames(samps)
+          if (is.null(p_names)) p_names <- paste0(param_type, "_", seq_len(n_params))
+          means <- colMeans(samps)
+          rhats <- if (!is.null(fit$rhat[[param_type]])) fit$rhat[[param_type]] else rep(NA, n_params)
+          ess   <- if (!is.null(fit$ESS[[param_type]])) fit$ESS[[param_type]] else rep(NA, n_params)
+          for (i in seq_len(n_params)) {
+            rows[[length(rows) + 1]] <- data.frame(
+              Model = model_name,
+              Parameter = paste0(param_type, "[", p_names[i], "]"),
+              Mean = means[i], Rhat = rhats[i], ESS = ess[i],
+              stringsAsFactors = FALSE)
+          }
+        }
       }
     }
     if (length(rows) == 0) return(NULL)
@@ -696,7 +738,7 @@ for (sp in species_codes) {
 
   comp_rows[["tPGOcc"]] <- data.frame(
     Model = "tPGOcc",
-    WAIC = round(waic_A$WAIC, 1),
+    WAIC = round(waic_A["WAIC"], 1),
     Moran_I = if (!is.null(moran_A))
       round(moran_A$estimate["Moran I statistic"], 4) else NA,
     Moran_p = if (!is.null(moran_A)) signif(moran_A$p.value, 3) else NA,
@@ -713,7 +755,7 @@ for (sp in species_codes) {
   }
   comp_rows[["spPGOcc"]] <- data.frame(
     Model = paste0("spPGOcc (", best_yr, " only)"),
-    WAIC = round(waic_B$WAIC, 1),
+    WAIC = round(waic_B["WAIC"], 1),
     Moran_I = NA,   # not comparable (different site set)
     Moran_p = NA,
     Spatial_range_km = range_B,
@@ -725,7 +767,7 @@ for (sp in species_codes) {
   if (RUN_PHASE_C && !is.null(waic_C)) {
     comp_rows[["stPGOcc"]] <- data.frame(
       Model = "stPGOcc",
-      WAIC = round(waic_C$WAIC, 1),
+      WAIC = round(waic_C["WAIC"], 1),
       Moran_I = if (!is.null(moran_C))
         round(moran_C$estimate["Moran I statistic"], 4) else NA,
       Moran_p = if (!is.null(moran_C)) signif(moran_C$p.value, 3) else NA,
@@ -745,7 +787,7 @@ for (sp in species_codes) {
   cat("\n  Saved:", comp_path, "\n")
 
   if (RUN_PHASE_C && !is.null(waic_C)) {
-    delta_waic <- waic_A$WAIC - waic_C$WAIC
+    delta_waic <- waic_A["WAIC"] - waic_C["WAIC"]
     cat("\n  DELTA WAIC (tPGOcc - stPGOcc) =", round(delta_waic, 1))
     if (delta_waic > 10) {
       cat("  -> STRONG support for spatial model\n")
@@ -862,10 +904,10 @@ for (sp in species_codes) {
   }
 
   cat("\n--- Model selection (WAIC) ---\n")
-  cat("  tPGOcc WAIC: ", round(waic_A$WAIC, 1), "\n")
+  cat("  tPGOcc WAIC: ", round(waic_A["WAIC"], 1), "\n")
   if (RUN_PHASE_C && !is.null(waic_C)) {
-    cat("  stPGOcc WAIC:", round(waic_C$WAIC, 1), "\n")
-    delta <- waic_A$WAIC - waic_C$WAIC
+    cat("  stPGOcc WAIC:", round(waic_C["WAIC"], 1), "\n")
+    delta <- waic_A["WAIC"] - waic_C["WAIC"]
     cat("  DELTA WAIC:  ", round(delta, 1),
         if (delta > 10) " (strong)"
         else if (delta > 2) " (moderate)"
@@ -917,6 +959,11 @@ for (sp in species_codes) {
     cat("  results/", sp, "_spatial_stPGOcc.rds\n", sep = "")
   }
   cat("\n")
+
+  }, error = function(e) {
+    cat("\n  ERROR processing ", sp, ": ", conditionMessage(e), "\n")
+    cat("  Skipping to next species.\n")
+  })
 
 }  # end species loop
 
