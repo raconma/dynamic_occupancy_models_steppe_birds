@@ -462,3 +462,4 @@ Some covariates may have been pre-standardised in Google Earth Engine and then r
 
 *Report generated 2026-03-05. Pipeline executed on branch `analysis-2023`.*
 *For questions or discussion, contact Guillermo Fandos.*
+
