@@ -390,5 +390,6 @@ Several species exhibited complete or quasi-complete separation in their colonis
 
 ---
 
-*Report generated 2026-03-05. Pipeline executed on branch `claude/cranky-ardinghelli`.*
+*Report generated 2026-03-05.*
 *For questions or discussion, contact Guillermo Fandos.*
+
