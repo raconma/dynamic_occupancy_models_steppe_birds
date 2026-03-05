@@ -44,7 +44,7 @@ vars_to_scale <- c("bio1", "tree_cover", "bio2", "grass_cover",
 
 # -- Observation covariates for wide format --
 obs_covs <- c("time_observations_started", "duration_minutes",
-              "effort_distance_km", "number_observers", "protocol_type")
+              "effort_distance_km", "number_observers")
 
 # -- Site covariates for wide format --
 site_covs_wide <- c("locality_id", "n_observations", "cells",
