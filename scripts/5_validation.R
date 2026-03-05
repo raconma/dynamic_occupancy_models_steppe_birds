@@ -58,7 +58,8 @@ atlas_col_map <- c(
 )
 
 # -- Load atlas (shared across species) --
-atlas_path <- here("data", "raw", "validation", "atlas_biodiversidad", "aves_spain.shp")
+atlas_path <- here("data-raw", "data", "validation", "atlas_biodiversidad",
+                    "atlas_biodiversidad", "aves_spain.shp")
 if (!file.exists(atlas_path)) {
   stop("Validation shapefile not found: ", atlas_path,
        "\nSee data-raw/get_data.R for instructions.")
