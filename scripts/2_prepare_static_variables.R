@@ -5,16 +5,16 @@
 #          topographic covariates, standardise, convert to wide format.
 #          Produces the dataset needed before GEE dynamic variable extraction.
 #
-# Inputs:  data/processed/{sp}/ebd_{sp}_breeding_spain_zf.csv  (from step 1)
-#          data/raw/environmental_data/environmental_data_occ/variables_spain.grd
-#          data/raw/topology_data/topo_aspect.asc
-#          data/raw/topology_data/topo_elev.asc
-#          data/raw/topology_data/topo_slope.asc
+# Inputs:  data/processed_2023/{sp}/ebd_{sp}_breeding_spain_zf.csv  (from step 1)
+#          data-raw/data/environmental_data/environmental_data_occ/variables_spain.grd
+#          data-raw/data/topology_data/topo_aspect.asc
+#          data-raw/data/topology_data/topo_elev.asc
+#          data-raw/data/topology_data/topo_slope.asc
 #
-# Outputs: data/processed/{sp}/{sp}_occ_species_observed.csv
-#          data/processed/{sp}/{sp}_occ_wide_static.csv
-#          data/processed/{sp}/{sp}_occ_wide_latlong.csv
-#          data/processed/{sp}/{sp}_scaling_params.rds  <- NEW: for reproducible prediction
+# Outputs: data/processed_2023/{sp}/{sp}_occ_species_observed.csv
+#          data/processed_2023/{sp}/{sp}_occ_wide_static.csv
+#          data/processed_2023/{sp}/{sp}_occ_wide_latlong.csv
+#          data/processed_2023/{sp}/{sp}_scaling_params.rds
 #
 # Replaces: 2_prepare_static_variables_{otitar,ptealc,pteori,tettet}.R
 ###############################################################################
@@ -44,25 +44,25 @@ vars_to_scale <- c("bio1", "tree_cover", "bio2", "grass_cover",
 
 # -- Observation covariates for wide format --
 obs_covs <- c("time_observations_started", "duration_minutes",
-              "effort_distance_km", "number_observers", "protocol_type")
+              "effort_distance_km", "number_observers")
 
 # -- Site covariates for wide format --
 site_covs_wide <- c("locality_id", "n_observations", "cells",
                      "latitude", "longitude", vars_to_scale)
 
 # -- Years covered --
-years <- 2017:2022
+years <- 2017:2023
 
 # -- Load environmental rasters (shared across species) --
 message("Loading environmental rasters...")
 variables_environmental <- raster::stack(
-  here("data", "raw", "environmental_data", "environmental_data_occ", "variables_spain.grd"))
+  here("data-raw", "data", "environmental_data", "environmental_data_occ", "variables_spain.grd"))
 variables_aspect <- raster::stack(
-  here("data", "raw", "topology_data", "topo_aspect.asc"))
+  here("data-raw", "data", "topology_data", "topo_aspect.asc"))
 variables_elev <- raster::stack(
-  here("data", "raw", "topology_data", "topo_elev.asc"))
+  here("data-raw", "data", "topology_data", "topo_elev.asc"))
 variables_slope <- raster::stack(
-  here("data", "raw", "topology_data", "topo_slope.asc"))
+  here("data-raw", "data", "topology_data", "topo_slope.asc"))
 
 
 ###############################################################################
@@ -73,9 +73,9 @@ for (sp in species_codes) {
   message("\n=== Processing: ", sp, " ===")
 
   # -- Read zero-filled data from step 1 --
-  occ_raw <- read.csv(here("data", "processed", sp,
+  occ_raw <- read.csv(here("data", "processed_2023", sp,
                             paste0("ebd_", sp, "_breeding_spain_zf.csv")))
-  occ_raw <- occ_raw %>% filter(year >= 2017, year <= 2022)
+  occ_raw <- occ_raw %>% filter(year >= 2017, year <= 2023)
   message("  Raw records: ", nrow(occ_raw))
 
   # -- Filter repeat visits (auk) --
@@ -91,7 +91,7 @@ for (sp in species_codes) {
   # -- Save observed-only records --
   occ_species_observed <- occ %>% filter(species_observed == TRUE)
   write.csv(occ_species_observed,
-            here("data", "processed", sp, paste0(sp, "_occ_species_observed.csv")),
+            here("data", "processed_2023", sp, paste0(sp, "_occ_species_observed.csv")),
             row.names = FALSE)
 
   # -- Extract environmental variables at site locations --
@@ -122,7 +122,7 @@ for (sp in species_codes) {
 
   # Save scaling parameters for reuse in prediction (CRITICAL for consistency)
   saveRDS(scaling_params,
-          here("data", "processed", sp, paste0(sp, "_scaling_params.rds")))
+          here("data", "processed_2023", sp, paste0(sp, "_scaling_params.rds")))
   message("  Scaling parameters saved to: ", sp, "_scaling_params.rds")
 
   # -- Convert from long to wide format, year by year --
@@ -189,12 +189,12 @@ for (sp in species_codes) {
   # Sites for GEE upload
   occ_wide_latlong <- occ_wide_clean %>% select(cells, latitude, longitude)
   write.csv(occ_wide_latlong,
-            here("data", "processed", sp, paste0(sp, "_occ_wide_latlong.csv")),
+            here("data", "processed_2023", sp, paste0(sp, "_occ_wide_latlong.csv")),
             row.names = FALSE)
 
   # Full wide dataset with static variables
   write.csv(occ_wide_clean,
-            here("data", "processed", sp, paste0(sp, "_occ_wide_static.csv")),
+            here("data", "processed_2023", sp, paste0(sp, "_occ_wide_static.csv")),
             row.names = FALSE)
 
   message("  Step 2 complete for ", sp)
