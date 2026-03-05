@@ -292,7 +292,7 @@ for (sp in species_codes) {
     geom_sf(aes(fill = resid), color = NA) +
     scale_fill_gradient2(low = "blue", mid = "white", high = "red",
                          midpoint = 0) +
-    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44)) +
+    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44), crs = st_crs(4326)) +
     ggtitle(paste0(sp, ": Residuals (Predicted - Observed)")) +
     theme_minimal()
   ggsave(here("figs", paste0(sp, "_validation_residuals_map.png")),
@@ -315,7 +315,7 @@ for (sp in species_codes) {
                       name = "Prediction",
                       labels = c("Absence", "Presence"),
                       na.value = "grey90") +
-    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44)) +
+    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44), crs = st_crs(4326)) +
     ggtitle(paste0(sp, ": Model prediction")) + theme_bw()
 
   map_obs <- ggplot(atlas) +
@@ -323,7 +323,7 @@ for (sp in species_codes) {
     scale_fill_manual(values = c("grey80", "red"),
                       name = "Atlas",
                       labels = c("Absence", "Presence")) +
-    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44)) +
+    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44), crs = st_crs(4326)) +
     ggtitle(paste0(sp, ": Biodiversity Atlas")) + theme_bw()
 
   ggsave(here("figs", paste0(sp, "_validation_maps.png")),
