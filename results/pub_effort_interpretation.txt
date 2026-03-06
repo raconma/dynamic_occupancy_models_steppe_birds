@@ -1,0 +1,20 @@
+EFFORT CONFOUNDING ASSESSMENT
+Generated: 2026-03-07 00:33:58.053309 
+====================================================================== 
+
+Otis tarda (O. tarda)
+---------------------------------------- 
+eBird checklists changed by +256% between 2017 and 2023. Naive occupancy decreased by 0.2 percentage points (Spearman rho = -0.25, p = 0.5887). The Spearman correlation between year and total checklists was 0.964 (p = 5e-04). Mean model-estimated detection probability showed a decreasing trend over the study period (rho = -0.771). After controlling for log(checklists) in a binomial GLM, the year effect was 0.0964 (95% CI: [-0.0581, 0.2508], p = 0.2213). VERDICT: ambiguous.
+
+Pterocles alchata (P. alchata)
+---------------------------------------- 
+eBird checklists changed by +201% between 2017 and 2023. Naive occupancy decreased by 0.7 percentage points (Spearman rho = 0.324, p = 0.4779). The Spearman correlation between year and total checklists was 0.821 (p = 0.0234). Mean model-estimated detection probability remained relatively stable over the study period (rho = -0.029). After controlling for log(checklists) in a binomial GLM, the year effect was -0.1065 (95% CI: [-0.2549, 0.0419], p = 0.1595). VERDICT: likely confounded.
+
+Pterocles orientalis (P. orientalis)
+---------------------------------------- 
+eBird checklists changed by +201% between 2017 and 2023. Naive occupancy increased by 0.9 percentage points (Spearman rho = 0.643, p = 0.1194). The Spearman correlation between year and total checklists was 0.821 (p = 0.0234). Mean model-estimated detection probability showed a decreasing trend over the study period (rho = -0.314). After controlling for log(checklists) in a binomial GLM, the year effect was -0.0055 (95% CI: [-0.1524, 0.1414], p = 0.9414). VERDICT: ambiguous.
+
+Tetrax tetrax (T. tetrax)
+---------------------------------------- 
+eBird checklists changed by +256% between 2017 and 2023. Naive occupancy decreased by 0.6 percentage points (Spearman rho = 0.018, p = 0.9694). The Spearman correlation between year and total checklists was 0.964 (p = 5e-04). Mean model-estimated detection probability showed a decreasing trend over the study period (rho = -0.771). After controlling for log(checklists) in a binomial GLM, the year effect was 0.0444 (95% CI: [-0.144, 0.2328], p = 0.644). VERDICT: ambiguous.
+
