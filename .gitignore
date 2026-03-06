@@ -27,6 +27,10 @@ data-raw/data.rar
 figs/
 results/
 
+# === Exceptions: spatial model outputs for report figures ===
+!figs/pub_fig_spatial_*.png
+!results/pub_spatial_table*.csv
+
 # === Temporary / cache ===
 *.RData
 *.rds
