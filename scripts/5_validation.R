@@ -5,7 +5,7 @@
 #          Biodiversity Atlas using spatial block cross-validation.
 #          Computes AUC, TSS, RMSE, Spearman correlation, and Moran's I.
 #
-# Inputs:  data/processed/{sp}/occ_{sp}_prediction.csv   (from step 4)
+# Inputs:  data/processed_2023/{sp}/occ_{sp}_prediction.csv   (from step 4)
 #          data/raw/validation/atlas_biodiversidad/aves_spain.shp
 #
 # Outputs: results/{sp}_validation_cv.csv
@@ -58,7 +58,8 @@ atlas_col_map <- c(
 )
 
 # -- Load atlas (shared across species) --
-atlas_path <- here("data", "raw", "validation", "atlas_biodiversidad", "aves_spain.shp")
+atlas_path <- here("data-raw", "data", "validation", "atlas_biodiversidad",
+                    "atlas_biodiversidad", "aves_spain.shp")
 if (!file.exists(atlas_path)) {
   stop("Validation shapefile not found: ", atlas_path,
        "\nSee data-raw/get_data.R for instructions.")
@@ -96,7 +97,7 @@ for (sp in species_codes) {
   }
 
   # -- Load predictions --
-  pred_path <- here("data", "processed", sp,
+  pred_path <- here("data", "processed_2023", sp,
                      paste0("occ_", sp, "_prediction.csv"))
   if (!file.exists(pred_path)) {
     warning("  Prediction file not found: ", pred_path, ". Skipping ", sp)
@@ -119,9 +120,13 @@ for (sp in species_codes) {
   r_pred_proj <- project(r_pred, crs(atlas_full))
 
   # Extract median probability per atlas polygon
+  # NOTE: Atlas covers all Spain (incl. Canarias, ~150 polygons) but predictions
+  # cover mainland only (lon -9.2 to 3.3). Canarias (lon -18 to -13) get NA from
+  # extract() and are excluded by the filter(!is.na()) below. Metrics are thus
+  # computed on mainland + Baleares only (~5,200 polygons).
   atlas <- atlas_full
   ext_prob <- terra::extract(r_pred_proj, atlas, fun = median, na.rm = TRUE)
-  atlas$pred_prob_median <- ext_prob$occ_prob  # FIX: renamed (was pred_prob_mean)
+  atlas$pred_prob_median <- ext_prob$occ_prob
 
   atlas_valid <- atlas %>% filter(!is.na(pred_prob_median))
 
@@ -287,6 +292,7 @@ for (sp in species_codes) {
     geom_sf(aes(fill = resid), color = NA) +
     scale_fill_gradient2(low = "blue", mid = "white", high = "red",
                          midpoint = 0) +
+    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44), crs = st_crs(4326)) +
     ggtitle(paste0(sp, ": Residuals (Predicted - Observed)")) +
     theme_minimal()
   ggsave(here("figs", paste0(sp, "_validation_residuals_map.png")),
@@ -302,12 +308,14 @@ for (sp in species_codes) {
   ##############################################################################
   # PREDICTION vs ATLAS MAPS
   ##############################################################################
+  # Maps cropped to mainland + Baleares (exclude Canarias from display)
   map_pred <- ggplot(atlas) +
     geom_sf(aes(fill = factor(pred_bin_final))) +
     scale_fill_manual(values = c("white", "darkgreen"),
                       name = "Prediction",
                       labels = c("Absence", "Presence"),
                       na.value = "grey90") +
+    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44), crs = st_crs(4326)) +
     ggtitle(paste0(sp, ": Model prediction")) + theme_bw()
 
   map_obs <- ggplot(atlas) +
@@ -315,6 +323,7 @@ for (sp in species_codes) {
     scale_fill_manual(values = c("grey80", "red"),
                       name = "Atlas",
                       labels = c("Absence", "Presence")) +
+    coord_sf(xlim = c(-10, 5), ylim = c(35.5, 44), crs = st_crs(4326)) +
     ggtitle(paste0(sp, ": Biodiversity Atlas")) + theme_bw()
 
   ggsave(here("figs", paste0(sp, "_validation_maps.png")),
