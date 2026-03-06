@@ -31,6 +31,11 @@ results/
 !figs/pub_fig_spatial_*.png
 !results/pub_spatial_table*.csv
 
+# === Exceptions: effort confounding diagnostics ===
+!figs/pub_fig_effort_*.png
+!results/pub_effort_confounding_summary.csv
+!results/pub_effort_interpretation.txt
+
 # === Temporary / cache ===
 *.RData
 *.rds
