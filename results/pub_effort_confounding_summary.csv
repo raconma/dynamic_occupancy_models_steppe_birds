@@ -1,0 +1,5 @@
+"Species","rho_naive_occ","p_naive_occ","rho_checklists","p_checklists","GLM_year_coef","GLM_year_CI","GLM_year_p","GLM_log_effort_coef","GLM_log_effort_p","Verdict"
+"O. tarda",-0.25,0.5887,0.964,5e-04,0.0964,"[-0.0581, 0.2508]",0.2213,-0.4694,0.2752,"ambiguous"
+"P. alchata",0.324,0.4779,0.821,0.0234,-0.1065,"[-0.2549, 0.0419]",0.1595,0.8602,0.0496,"likely confounded"
+"P. orientalis",0.643,0.1194,0.821,0.0234,-0.0055,"[-0.1524, 0.1414]",0.9414,0.5426,0.2289,"ambiguous"
+"T. tetrax",0.018,0.9694,0.964,5e-04,0.0444,"[-0.144, 0.2328]",0.644,-0.2784,0.5934,"ambiguous"
