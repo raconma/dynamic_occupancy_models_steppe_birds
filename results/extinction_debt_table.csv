@@ -1,0 +1,5 @@
+"species","current_occupancy_pct","psi_star_pct","psi_star_lo","psi_star_hi","extinction_debt_pct","debt_fraction","recol_yr_med","vcov_ok"
+"otitar",0.6754,0.0205,4e-04,0.9328,0.6549,97,22648,TRUE
+"ptealc",0.8691,0.3117,0.0751,6.4979,0.5574,64.1,732,TRUE
+"pteori",1.1455,1e-04,0,0.1742,1.1454,100,2599962,TRUE
+"tettet",0.5213,0.4932,0.1577,1.6246,0.0281,5.4,1471,TRUE

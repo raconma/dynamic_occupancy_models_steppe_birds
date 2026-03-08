@@ -55,18 +55,19 @@ get_model_config <- function(species_code) {
     # FIX: Removed Class_7 and Class_13 from epsilon (quasi-complete separation:
     #      Class_13=0 in 43/44 transitions, estimate=+109; Class_7 near-zero
     #      at most occupied sites, estimate=-5.4 with NaN SE).
-    # FIX v4: Removed NDVI from epsilon. NDVI is ~50% climate-driven,
-    #      creating attribution ambiguity. Without NDVI, LC12 coefficient
-    #      should recover to a more negative value (currently -0.09),
-    #      strengthening the land-use signal. Decision: audit_gcb_v4.md.
+    # FIX v4: NDVI retained in epsilon (AIC-preferred by 60 units). NDVI is
+    #      ~50% climate-driven and is classified as "climate-adjacent" in the
+    #      attribution analysis. A sensitivity model without NDVI is stored
+    #      in results/pteori_epsilon_sensitivity_noNDVI.rds.
+    #      Decision record: decisions_gcb_v4.md (Decision 1, Option B).
     pteori = list(
       psi_formula     = ~ bio2 + tree_cover + grass_cover,
       gamma_formula   = ~ Land_Cover_Type_1_Percent_Class_7 + NDVI + tmmn + tmmx,
-      epsilon_formula = ~ Land_Cover_Type_1_Percent_Class_12 + pr,
+      epsilon_formula = ~ Land_Cover_Type_1_Percent_Class_12 + NDVI + pr,
       p_formula       = ~ time + duration + observers + pr_obs + topo_aspect_obs,
       psi_vars        = c("bio2", "tree_cover", "grass_cover"),
       gamma_vars      = c("Land_Cover_Type_1_Percent_Class_7", "NDVI", "tmmn", "tmmx"),
-      epsilon_vars    = c("Land_Cover_Type_1_Percent_Class_12", "pr")
+      epsilon_vars    = c("Land_Cover_Type_1_Percent_Class_12", "NDVI", "pr")
     ),
 
     # ---- Tetrax tetrax ----

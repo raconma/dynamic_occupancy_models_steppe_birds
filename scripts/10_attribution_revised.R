@@ -483,9 +483,9 @@ cat("  ATTRIBUTION SUMMARY (REVISED)\n")
 cat(strrep("=", 70), "\n\n")
 
 cat("Models used:\n")
-cat("  otitar:  original (NDVI retained in gamma)\n")
+cat("  otitar:  original (NDVI retained in gamma, classified as climate-adjacent)\n")
 cat("  ptealc:  REVISED (NDVI removed from gamma, gamma excluded from attribution)\n")
-cat("  pteori:  REVISED (NDVI removed from epsilon)\n")
+cat("  pteori:  original (NDVI retained in epsilon, classified as climate-adjacent)\n")
 cat("  tettet:  original (no NDVI in model)\n\n")
 
 cat("Scaling: Training parameters loaded from scripts/4 (train_dyn_scale.rds)\n")

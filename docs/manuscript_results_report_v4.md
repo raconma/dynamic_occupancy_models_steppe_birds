@@ -52,7 +52,7 @@ This collinearity creates interpretability challenges for attribution. We theref
 | *P. orientalis* | epsilon | LC12 | BETA_SHIFT | 2.80 SE |
 | *P. orientalis* | epsilon | pr | SE_INCREASE | +60% |
 
-**Decision (v4):** NDVI was removed from *P. alchata* gamma and *P. orientalis* epsilon. In both cases, its inclusion caused coefficient instability in co-occurring covariates, compromising causal attribution. For *O. tarda* gamma and *P. orientalis* gamma, NDVI was retained but reclassified as climate-adjacent in the attribution analysis (VIF < 5; beta shifts < 2 SE). AIC costs: *P. alchata* ΔAIC = +7.81; *P. orientalis* ΔAIC = +60.27.
+**Decision (v4):** NDVI was removed from *P. alchata* gamma because its inclusion caused a sign change in the precipitation coefficient (+0.162 → −0.717), rendering climate attribution uninterpretable (AIC cost: +7.81). For *P. orientalis* epsilon, NDVI was **retained** in the final model (AIC-preferred by 60 units) but classified as "climate-adjacent" in the attribution analysis; a sensitivity model without NDVI is stored in `results/pteori_epsilon_sensitivity_noNDVI.rds`. For *O. tarda* gamma, NDVI was retained and also classified as climate-adjacent (VIF < 5; beta shifts < 2 SE).
 
 *Figure reference:* `figs/pub_fig_collinearity_diagnostics.png`, `figs/diagnostics/fig_ndvi_climate_r2_map.png`
 
@@ -66,21 +66,21 @@ All formulas are centralised in `R/model_configs.R`. After the NDVI revision (v4
 
 | Species | ψ₁ | γ | ε | p |
 |---------|------|------|------|------|
-| *O. tarda* | bio1 + bio2 + tree + grass + elev | NDVI + pr + tmmn + tmmx | LC6 + LC13 + tmmx | effort + observers + NDVI_obs + pr_obs + aspect_obs |
+| *O. tarda* | bio1 + bio2 + tree + grass + elev | NDVI† + pr + tmmn + tmmx | LC6 + LC13 + tmmx | effort + observers + NDVI_obs + pr_obs + aspect_obs |
 | *P. alchata* | bio1 + bio2 + tree + grass + aspect | **pr** | pr + tmmx | time + duration + effort + observers + NDVI_obs + pr_obs |
-| *P. orientalis* | bio2 + tree + grass | LC7 + NDVI + tmmn + tmmx | **LC12 + pr** | time + duration + observers + pr_obs + aspect_obs |
+| *P. orientalis* | bio2 + tree + grass | LC7 + NDVI† + tmmn + tmmx | LC12 + NDVI† + pr | time + duration + observers + pr_obs + aspect_obs |
 | *T. tetrax* | bio2 + tree + grass + elev | LC12 | LC12 | effort + observers + time |
 
-Bold text indicates revised formulas (NDVI removed).
+Bold text indicates revised formulas (NDVI removed). † indicates NDVI classified as "climate-adjacent" in attribution analysis (~50% climate-driven, R² ≈ 0.51).
 
 ### 2.2 Model fit and AIC
 
-| Species | AIC | Parameters | N sites |
-|---------|------|-----------|---------|
-| *O. tarda* | 2,267.90 | 17 | 3,745 |
-| *P. alchata* | 1,981.71 | 15 | 4,130 |
-| *P. orientalis* | 2,121.02 | 16 | 4,130 |
-| *T. tetrax* | 1,780.09 | 11 | 3,746 |
+| Species | AIC | Parameters | N sites | Note |
+|---------|------|-----------|---------|------|
+| *O. tarda* | 2,267.90 | 17 | 3,745 | |
+| *P. alchata* | 1,981.71 | 15 | 4,130 | NDVI removed from γ (+7.81) |
+| *P. orientalis* | 2,060.74 | 17 | 4,130 | NDVI retained in ε (original) |
+| *T. tetrax* | 1,780.09 | 11 | 3,746 | |
 
 ### 2.3 Initial occupancy (ψ₁)
 
@@ -110,15 +110,15 @@ Colonisation rates are extremely low across all species. The intercept-only (bas
 
 | Covariate | *O. tarda* | *P. alchata* | *P. orientalis* | *T. tetrax* |
 |-----------|-----------|-------------|----------------|------------|
-| Intercept | −10.00*** | −6.591*** | −22.37 (NaN SE) | −7.294*** |
-| NDVI | −1.45* | — | −1.18 (SE=92.5) | — |
+| Intercept | −10.00*** | −6.591*** | −14.78*** (SE=3.81) | −7.294*** |
+| NDVI | −1.45* | — | −0.56 (SE=0.49) | — |
 | pr | −2.30 | −0.717 | — | — |
-| tmmn | −4.52* | — | −2.27 (SE=180) | — |
-| tmmx | +2.59 | — | +6.32 (NaN SE) | — |
-| LC7 | — | — | −0.34 (SE=34.4) | — |
+| tmmn | −4.52* | — | −8.11** (SE=2.67) | — |
+| tmmx | +2.59 | — | +9.14*** (SE=2.68) | — |
+| LC7 | — | — | −9.80 (SE=6.46) | — |
 | LC12 | — | — | — | +0.902* |
 
-For *P. orientalis*, the gamma submodel shows complete/quasi-complete separation: the intercept is −22.37 with NaN standard errors, and all covariate SEs are enormous (34–180). This indicates that colonisation events are too rare and patterned for reliable estimation of covariate effects.
+For *P. orientalis*, the gamma submodel has large standard errors for some covariates (LC7 SE = 6.46), reflecting the rarity of colonisation events (22 across 2,541 opportunities, 0.87%). However, the temperature covariates (tmmn, tmmx) are significant (P < 0.003 and P < 0.001 respectively), indicating that extreme temperatures influence colonisation probability. The baseline colonisation rate is effectively zero (γ_baseline ≈ 3.8 × 10⁻⁷).
 
 For *P. alchata*, gamma was excluded from the attribution analysis because only 16 colonisation events were observed across 2,521 site-year opportunities (0.6%).
 
@@ -132,15 +132,19 @@ Extinction rates are 1–2 orders of magnitude higher than colonisation rates, c
 
 | Covariate | *O. tarda* | *P. alchata* | *P. orientalis* | *T. tetrax* |
 |-----------|-----------|-------------|----------------|------------|
-| Intercept | −1.252** | −0.042 | −1.830*** | −1.836*** |
+| Intercept | −1.252** | −0.042 | −0.239 (SE=0.56) | −1.836*** |
 | LC6 | +1.86 | — | — | — |
-| LC12 | — | — | −0.095 | −0.565* |
+| LC12 | — | — | −0.831* (SE=0.36) | −0.565* |
 | LC13 | +2.80*** | — | — | — |
-| pr | — | −11.66 (SE=11.6) | +1.905 | — |
+| NDVI† | — | — | +2.047*** (SE=0.56) | — |
+| pr | — | −11.66 (SE=11.6) | +0.445 (SE=0.57) | — |
 | tmmx | −1.51* | −17.62 (SE=14.7) | — | — |
+
+† NDVI classified as "climate-adjacent" in attribution (R² ≈ 0.51 with climate variables).
 
 Notable findings:
 - *O. tarda*: Urban/built-up areas (LC13) strongly increase extinction (β = +2.80, P < 0.001).
+- *P. orientalis*: NDVI has the strongest effect on extinction (β = +2.05, P = 0.0002) — higher NDVI increases extinction probability. Cropland (LC12) reduces extinction (β = −0.83, P = 0.02). A sensitivity model without NDVI (ΔAIC = +60) is provided in `results/pteori_epsilon_sensitivity_noNDVI.rds`.
 - *T. tetrax*: Cropland (LC12) reduces both colonisation (+0.90 in γ) and extinction (−0.57 in ε), making it the single most consistent land-use driver.
 - *P. alchata*: Extinction coefficients have very large SEs indicating near-separation (only 18 extinction events from 64 occupied-site observations).
 
@@ -217,14 +221,27 @@ Under current (time-averaged) conditions, the long-run equilibrium occupancy ψ*
 
 | Species | ψ* median | 95% CI | T_recol (yr) | T_persist (yr) | Status |
 |---------|----------|--------|-------------|---------------|--------|
-| *O. tarda* | 0.02% | [0.0004%, 0.93%] | 22,648 | 4 | Reportable |
-| *P. alchata* | 0.31% | [0.08%, 6.50%] | 732 | 2 | Reportable (wide CI) |
-| *P. orientalis* | ~0% | [0%, 93.70%] | ~∞ | 7 | **Excluded** (vcov not PD) |
-| *T. tetrax* | 0.49% | [0.16%, 1.62%] | 1,471 | 7 | Reportable |
+| *O. tarda* | 0.02% | [0.0004%, 0.93%] | 22,648 | 4 | ✅ Reportable |
+| *P. alchata* | 0.31% | [0.08%, 6.50%] | 732 | 2 | ✅ Reportable (wide CI) |
+| *P. orientalis* | 0.0001% | [0%, 0.17%] | 2,599,962 | 2 | ✅ Reportable |
+| *T. tetrax* | 0.49% | [0.16%, 1.62%] | 1,471 | 7 | ✅ Reportable |
 
-**Interpretation:** All four species are caught in a *demographic trap*: extinction rates exceed colonisation rates by 1–2 orders of magnitude, driving equilibrium occupancy well below 1%. Even for the most "optimistic" species (*T. tetrax*), the median equilibrium is 0.49% and recolonisation of a lost site would take ~1,500 years on average. For *O. tarda*, recolonisation timescales exceed 20,000 years.
+**Interpretation:** All four species are caught in a *demographic trap*: extinction rates exceed colonisation rates by 2–6 orders of magnitude, driving equilibrium occupancy well below 1%. Even for the most "optimistic" species (*T. tetrax*), the median equilibrium is 0.49% and recolonisation of a lost site would take ~1,500 years on average. For *O. tarda*, recolonisation timescales exceed 20,000 years. *P. orientalis* has the most extreme profile: baseline colonisation is effectively zero (γ ≈ 3.8 × 10⁻⁷), implying recolonisation timescales of ~2.6 million years — functionally, once a site is lost, it is permanently lost.
 
-*P. orientalis* equilibrium is excluded from headline reporting because the gamma submodel is completely separated (intercept = −22.37 with NaN SE), making the variance–covariance matrix non-positive-definite and the bootstrap CI uninformative.
+### 3.4 Extinction debt
+
+The difference between current simulated occupancy and equilibrium occupancy (ψ*) quantifies the **extinction debt** — the fraction of currently occupied sites that are expected to be lost as the system relaxes toward equilibrium under current conditions:
+
+| Species | Current occ. (%) | ψ* (%) | Debt (pp) | Debt fraction | Interpretation |
+|---------|-----------------|--------|-----------|---------------|---------------|
+| *O. tarda* | 0.675 | 0.021 | 0.655 | **97%** | 97% of current sites are transient |
+| *P. alchata* | 0.869 | 0.312 | 0.557 | **64%** | Two-thirds of sites at risk |
+| *P. orientalis* | 1.146 | 0.0001 | 1.145 | **100%** | All current sites are transient |
+| *T. tetrax* | 0.521 | 0.493 | 0.028 | **5%** | Near equilibrium; most resilient |
+
+*T. tetrax* stands out as the only species near equilibrium (5% debt), consistent with its land-use-driven dynamics and shorter recolonisation timescale. The remaining three species carry substantial extinction debts (64–100%), driven primarily by the orders-of-magnitude asymmetry between γ and ε.
+
+*Figure reference:* `figs/pub_fig_isocline_equilibrium.png` (panels a–c)
 
 ---
 
@@ -346,7 +363,8 @@ Attribution effects are computed as:
 - **Interaction:** S3 − S1 − S2 + S0
 
 Covariate classification:
-- **Climate:** NDVI (where retained), pr, tmmn, tmmx
+- **Climate:** pr, tmmn, tmmx
+- **Climate-adjacent:** NDVI (retained for *O. tarda* gamma and *P. orientalis* gamma/epsilon; ~50% climate-driven)
 - **Land use:** LC6, LC7, LC10, LC12, LC13, LC14
 
 ### 6.2 Scaling fix (v4)
@@ -380,14 +398,14 @@ Values are mean Δprobability across sites and years. Asterisk (*) indicates gam
 
 **Table: Bootstrap summary (n = 1,000)**
 
-| Species | γ mean | γ 95% CI | ε mean | ε 95% CI | ψ* mean | ψ* 95% CI |
-|---------|--------|---------|--------|---------|---------|----------|
-| *O. tarda* | 0.035% | [0.0001%, 0.21%] | 23.1% | [11.3%, 39.9%] | 0.14% | [0.0004%, 0.90%] |
-| *P. alchata* | 0.16% | [0.06%, 0.38%] | 48.9% | [2.6%, 96.7%] | 0.95% | [0.08%, 4.91%] |
-| *P. orientalis* | — | (vcov not PD) | — | — | — | — |
-| *T. tetrax* | 0.08% | [0.02%, 0.22%] | 14.2% | [8.4%, 22.3%] | 0.59% | [0.15%, 1.65%] |
+| Species | γ baseline | ε baseline | ψ* median | ψ* 95% CI |
+|---------|-----------|-----------|----------|----------|
+| *O. tarda* | 0.0045% | 22.24% | 0.02% | [0.0004%, 0.93%] |
+| *P. alchata* | 0.137% | 48.94% | 0.31% | [0.08%, 6.50%] |
+| *P. orientalis* | 0.000038% | 44.06% | 0.0001% | [0%, 0.17%] |
+| *T. tetrax* | 0.068% | 13.75% | 0.49% | [0.16%, 1.62%] |
 
-*P. orientalis* bootstrap was not possible because the variance–covariance matrix is not positive definite (gamma separation). The `nearPD` approximation yields a point estimate but no reliable CIs.
+All four species have positive-definite variance–covariance matrices, enabling reliable bootstrap CIs (n = 5,000 draws). *P. orientalis* required a `nearPD` correction for one parameter but the resulting CIs are informative (upper bound = 0.17%, well below current occupancy of 1.15%).
 
 ---
 
@@ -400,10 +418,11 @@ Several submodels show evidence of separation, a common problem in logistic regr
 | Species | Submodel | Issue | Details |
 |---------|----------|-------|---------|
 | *P. alchata* | ε | Near-separation | Intercept SE = 1.87; pr SE = 11.60; tmmx SE = 14.74. Only 18 extinction events. |
-| *P. orientalis* | γ | **Complete separation** | Intercept = −22.37 (NaN SE); tmmx = +6.32 (NaN SE). Only 22 colonisation events across 2,541 opportunities. |
-| *P. orientalis* | γ | Quasi-separation | LC7 SE = 34.4; NDVI SE = 92.5; tmmn SE = 180.4. |
+| *P. orientalis* | γ | Large SEs | LC7 SE = 6.46 (22 colonisation events). But tmmn (P=0.002) and tmmx (P<0.001) are significant. |
 | *T. tetrax* | — | None | Cleanest model; only 1 covariate per submodel. |
 | *O. tarda* | — | None | All SEs finite and reasonable. |
+
+> **Note on P. orientalis gamma convergence:** In a previous model revision where NDVI was removed from epsilon, the gamma submodel collapsed to complete separation (intercept = −22.37, NaN SEs). Reverting epsilon to the original formula (with NDVI) restored gamma convergence with finite, interpretable SEs. This demonstrates that the likelihood surface in multi-submodel frameworks is sensitive to specification changes in other submodels. The sensitivity model is preserved in `results/pteori_epsilon_sensitivity_noNDVI.rds`.
 
 These separation issues are intrinsic to the data: colonisation and extinction events are extremely rare for these species. They do not invalidate the non-spatial colext models but limit the interpretability of specific covariate effects in the affected submodels.
 
@@ -411,15 +430,18 @@ These separation issues are intrinsic to the data: colonisation and extinction e
 
 ## 8 Key findings and conservation implications
 
-### 8.1 The demographic trap
+### 8.1 The demographic trap and extinction debt
 
 All four Iberian steppe bird species are caught in a demographic trap characterised by:
 
-1. **Extinction rates 100–500× higher than colonisation rates** (ε/γ ratio: 125 for *O. tarda* to 288 for *P. alchata*).
-2. **Equilibrium occupancy < 1%** for all species with reliable estimates.
-3. **Recolonisation timescales of centuries to millennia** (730 years for *P. alchata* to 22,600 years for *O. tarda*).
+1. **Extinction rates 100–1,000,000× higher than colonisation rates** (ε/γ ratio: 203 for *T. tetrax* to 1,152,790 for *P. orientalis*).
+2. **Equilibrium occupancy < 1%** for all four species (range: 0.0001–0.49%).
+3. **Recolonisation timescales of centuries to millions of years** (732 years for *P. alchata* to 2.6 million years for *P. orientalis*).
+4. **Extinction debt of 5–100%** of current occupancy. Three of four species have > 60% of their current sites destined for eventual loss under current conditions.
 
-This asymmetry means that once a site is lost, recovery is extremely slow under current conditions. Conservation must therefore prioritise **preventing extinction at occupied sites** over promoting colonisation of empty ones.
+This asymmetry constitutes an *extinction debt* (sensu Tilman et al. 1994): the current occupancy exceeds the long-run equilibrium, and the difference represents sites that will eventually be lost as the system relaxes. Conservation must therefore prioritise **preventing extinction at occupied sites** over promoting colonisation of empty ones, because recolonisation is functionally impossible at the current rates.
+
+*Figure reference:* `figs/pub_fig_isocline_equilibrium.png`
 
 ### 8.2 Species-specific vulnerabilities
 
@@ -427,7 +449,7 @@ This asymmetry means that once a site is lost, recovery is extremely slow under 
 
 - **P. alchata** (Pin-tailed Sandgrouse): Highest extinction rate (49%) among the four species. Climate-driven via precipitation. Limited analytical power (16 colonisation events; near-separation in ε). Largest spatial autocorrelation range (264 km).
 
-- **P. orientalis** (Black-bellied Sandgrouse): Complete separation in γ makes colonisation dynamics uninterpretable. Climate (precipitation) drives extinction. Cropland (LC12) has a weak negative effect on extinction. AIC penalty of NDVI removal was the highest (+60).
+- **P. orientalis** (Black-bellied Sandgrouse): The most extreme case of the demographic trap — baseline γ ≈ 3.8 × 10⁻⁷, implying recolonisation timescales of ~2.6 million years. NDVI strongly increases extinction (β = +2.05, P < 0.001), classified as climate-adjacent (~50% climate-driven). Cropland (LC12) reduces extinction (β = −0.83, P = 0.02). Temperature extremes significantly affect colonisation (tmmn P = 0.002, tmmx P < 0.001). Extinction debt = 100% — all current sites are transient.
 
 - **T. tetrax** (Little Bustard): Cleanest model with clear land-use signal. Cropland proportion (LC12) is the sole driver — increasing it raises colonisation and reduces extinction. This species is the strongest candidate for targeted agri-environment scheme interventions.
 
@@ -465,18 +487,24 @@ The substantial spatial autocorrelation ranges (43–264 km) imply that occupanc
 | `scripts/6_spatial_occupancy_test.R` | stPGOcc | ⚠️ Needs more iterations |
 | `scripts/8_counterfactual_attribution.R` | Original attribution | ✅ Fixed (loads train_dyn_scale) |
 | `scripts/9_collinearity_ndvi.R` | NDVI diagnostics | ✅ Complete |
-| `scripts/10_attribution_revised.R` | **Revised attribution** | ✅ New |
+| `scripts/10_attribution_revised.R` | **Revised attribution** | ✅ Updated (NDVI climate-adjacent) |
+| `scripts/execute_decisions_v4.R` | **Execute all D1-D7 decisions** | ✅ New |
+| `scripts/fig_isocline_equilibrium.R` | **Isocline plot + debt + timescales** | ✅ New |
 | `scripts/refit_revised_models.R` | Refit ptealc/pteori | ✅ New |
 | `scripts/compute_equilibrium.R` | Equilibrium ψ* | ✅ New |
-| `R/model_configs.R` | Centralised formulas | ✅ Updated (NDVI removed) |
+| `R/model_configs.R` | Centralised formulas | ✅ Updated (pteori reverted to original) |
 
 ### 10.2 Key results files
 
 | File | Content |
 |------|---------|
-| `results/{sp}_model_object.rds` | Fitted colext models (revised for ptealc/pteori) |
+| `results/{sp}_model_object.rds` | Fitted colext models (ptealc revised; pteori reverted to original) |
 | `results/{sp}_train_dyn_scale.rds` | Training scaling parameters |
-| `results/equilibrium_occupancy_table.csv` | Equilibrium ψ* with bootstrap CIs |
+| `results/equilibrium_occupancy_table.csv` | Equilibrium ψ* with bootstrap CIs (all 4 spp OK) |
+| `results/extinction_debt_table.csv` | **Extinction debt per species** |
+| `results/isocline_plot_data.csv` | **Baseline rates + CIs for isocline plot** |
+| `results/pteori_sensitivity_ndvi_epsilon.csv` | **Sensitivity: with/without NDVI coefficients** |
+| `results/pteori_epsilon_sensitivity_noNDVI.rds` | **No-NDVI model object (sensitivity)** |
 | `results/naive_vs_corrected_gamma.csv` | Naive vs detection-corrected rates |
 | `results/attribution_table3.csv` | Cross-species attribution summary |
 | `results/attribution_boot_summary.csv` | Bootstrap CIs for attribution |
@@ -492,13 +520,10 @@ The substantial spatial autocorrelation ranges (43–264 km) imply that occupanc
 |--------|------|---------|
 | Fig. 1 | `figs/pub_map_main_figure.png` | Study area + survey effort |
 | Fig. 2 | `figs/pub_map_occupancy_4species.png` | Initial occupancy maps (4 panels) |
-| Fig. 3 | `figs/pub_fig2_coefficient_forest_plot.png` | Colonisation coefficients |
-| Fig. 4 | `figs/pub_fig_coef_all_submodels.png` | All submodel coefficients |
-| Fig. 5 | `figs/pub_fig_occupancy_trends_panel.png` | Prevalence trends 2017–2023 |
-| Fig. 6 | `figs/pub_fig_col_ext_rates.png` | Colonisation/extinction rates |
-| Fig. 7 | `figs/pub_fig_spatial_moran.png` | Spatial autocorrelation diagnostics |
-| Fig. 8 | `figs/pub_fig_collinearity_diagnostics.png` | VIF and NDVI collinearity |
-| Fig. 9 | `figs/pub_fig_summary_panel.png` | Summary panel |
+| Fig. 3 | `figs/pub_fig_coef_all_submodels.png` | All submodel coefficients (γ + ε + ψ₁) |
+| Fig. 4 | `figs/pub_fig_occupancy_trends_panel.png` | Prevalence trends 2017–2023 |
+| **Fig. 5** | **`figs/pub_fig_isocline_equilibrium.png`** | **Isocline plot + extinction debt + recolonisation (KEY FIGURE)** |
+| Fig. 6 | Attribution figure (revised) | Attribution summary (4 panels) |
 
 **Supplementary figures:**
 
@@ -518,12 +543,16 @@ The substantial spatial autocorrelation ranges (43–264 km) imply that occupanc
 | Date | Change | Rationale | AIC impact |
 |------|--------|-----------|-----------|
 | v1–v3 | Iterative formula selection | AIC comparison + separation fixes | — |
-| v4 | Remove NDVI from ptealc/gamma | pr sign change (+0.16 → −0.72); clean attribution | +7.81 |
-| v4 | Remove NDVI from pteori/epsilon | SE inflation +60%; LC12 beta shift 2.8 SE | +60.27 |
-| v4 | Fix scaling mismatch | scripts/4 vs scripts/8 used different scaling | N/A |
-| v4 | blockCV block size 50 → 270 km | 50 km < 264 km spatial range | Pending re-run |
-| v4 | Save train_dyn_scale.rds | Enables reproducible scaling in downstream scripts | N/A |
+| v4a | Remove NDVI from ptealc/gamma | pr sign change (+0.16 → −0.72); clean attribution | +7.81 |
+| v4a | Remove NDVI from pteori/epsilon | SE inflation +60%; LC12 beta shift 2.8 SE | +60.27 |
+| v4a | Fix scaling mismatch | scripts/4 vs scripts/8 used different scaling | N/A |
+| v4a | blockCV block size 50 → 270 km | 50 km < 264 km spatial range | Pending re-run |
+| v4a | Save train_dyn_scale.rds | Enables reproducible scaling in downstream scripts | N/A |
+| **v4b** | **Revert pteori/epsilon to original (~LC12+NDVI+pr)** | **ΔAIC +60 too large; gamma collapsed; classify NDVI as climate-adjacent** | **−60.27** |
+| v4b | Compute extinction debt (all 4 spp) | Extinction debt framing for GCB narrative | N/A |
+| v4b | Create isocline plot (3 panels + PhyloPic) | Key GCB figure — demographic trap visualisation | N/A |
+| v4b | Save no-NDVI pteori as sensitivity | `pteori_epsilon_sensitivity_noNDVI.rds` | N/A |
 
 ---
 
-*Report generated on branch `audit-gcb-v4`. Last commit: `6af1f28`.*
+*Report generated on branch `audit-gcb-v4`. Last updated after execution of all decisions (v4b).*

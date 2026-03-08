@@ -1,0 +1,8 @@
+"model","AIC","parameter","estimate","SE"
+"With NDVI (primary)",2060.74,"ext(Int)",-0.2386,0.349
+"With NDVI (primary)",2060.74,"ext(Land_Cover_Type_1_Percent_Class_12)",-0.8311,0.2631
+"With NDVI (primary)",2060.74,"ext(NDVI)",2.0466,0.5567
+"With NDVI (primary)",2060.74,"ext(pr)",1.6874,0.734
+"Without NDVI (sensitivity)",2121.02,"ext(Int)",-1.8298,NA
+"Without NDVI (sensitivity)",2121.02,"ext(Land_Cover_Type_1_Percent_Class_12)",-0.0948,NA
+"Without NDVI (sensitivity)",2121.02,"ext(pr)",1.9051,NA
