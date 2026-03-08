@@ -428,13 +428,189 @@ These separation issues are intrinsic to the data: colonisation and extinction e
 
 ---
 
+## 7b NDVI decomposition sensitivity (Task A)
+
+### 7b.1 Rationale
+
+NDVI is ~50% climate-driven (mean site-level R² = 0.51 from lm(NDVI ~ pr + tmmn + tmmx)). To test whether attribution results are sensitive to this dual nature, we decomposed NDVI into a climate-predicted component (NDVI_climate) and a residual land-use component (NDVI_residual) for all affected submodels, refitted the colext models, and recomputed the factorial attribution.
+
+### 7b.2 Model comparison (original vs decomposed NDVI)
+
+| Species | AIC original | AIC decomposed | ΔAIC | Interpretation |
+|---------|-------------|---------------|------|---------------|
+| *O. tarda* | 2,267.90 | 2,246.8 | **−21.1** | Decomposition preferred (significant improvement) |
+| *P. orientalis* | 2,060.74 | 2,066.4 | +5.7 | Original preferred (modest penalty) |
+
+### 7b.3 Decomposed NDVI coefficients
+
+**O. tarda gamma:**
+| Component | β | SE | P |
+|-----------|------|------|------|
+| NDVI_climate | −1.009 | 0.766 | 0.19 |
+| NDVI_residual | −0.668 | 0.476 | 0.16 |
+
+Both components have similar negative direction, suggesting NDVI's effect on colonisation operates through both climate and land-use pathways.
+
+**P. orientalis gamma:**
+| Component | β | SE | P |
+|-----------|------|------|------|
+| NDVI_climate | −0.672 | 0.533 | 0.21 |
+| NDVI_residual | +0.270 | 0.377 | 0.47 |
+
+**P. orientalis epsilon:**
+| Component | β | SE | P |
+|-----------|------|------|------|
+| NDVI_climate | +2.051 | 0.649 | **0.002** |
+| NDVI_residual | +0.600 | 0.363 | 0.098 |
+
+For *P. orientalis* epsilon, the climate component of NDVI is the dominant driver (β = +2.05, P = 0.002), while the residual is marginal — confirming the "climate-adjacent" classification.
+
+### 7b.4 Attribution comparison (original vs decomposed)
+
+| Species | Submodel | Pathway | Original | Decomposed | Delta |
+|---------|----------|---------|----------|-----------|-------|
+| *O. tarda* | gamma | climate | −6.1×10⁻⁴ | −6.4×10⁻⁴ | −2.7×10⁻⁵ |
+| *O. tarda* | gamma | land-use | 0 | +6.9×10⁻⁴ | +6.9×10⁻⁴ |
+| *O. tarda* | epsilon | climate | +7.4×10⁻⁴ | +3.7×10⁻⁵ | −7.0×10⁻⁴ |
+| *O. tarda* | epsilon | land-use | −1.1×10⁻³ | −4.6×10⁻³ | −3.5×10⁻³ |
+| *P. orientalis* | gamma | climate | −3.4×10⁻⁴ | −3.9×10⁻⁴ | −4.7×10⁻⁵ |
+| *P. orientalis* | gamma | land-use | −1.8×10⁻⁴ | −2.3×10⁻⁵ | +1.5×10⁻⁴ |
+| *P. orientalis* | epsilon | climate | +5.7×10⁻³ | **+1.8×10⁻²** | +1.2×10⁻² |
+| *P. orientalis* | epsilon | land-use | −2.1×10⁻⁴ | −2.3×10⁻³ | −2.1×10⁻³ |
+
+**Key finding:** Decomposition amplifies the climate signal for *P. orientalis* extinction (3× increase), because NDVI_climate captures the climate-driven portion of NDVI's strong extinction effect. The overall dominant-driver classification (climate for 3 species, land-use for *T. tetrax*) is unchanged.
+
+*Script:* `scripts/10b_attribution_ndvi_decomposed.R`
+*Output files:* `results/attribution_ndvi_decomposed_table.csv`, `results/attribution_comparison_ndvi.csv`, `results/attribution_ndvi_decomposed_boot.csv`
+
+---
+
+## 7c ε/γ ratio bootstrap analysis
+
+### 7c.1 Method
+
+We used parametric bootstrap (n = 5,000 draws from mvrnorm(coef, vcov)) to estimate the ε/γ ratio and its uncertainty for each species. For each draw, γ = plogis(col_intercept) and ε = plogis(ext_intercept) at mean covariate values (i.e., baseline rates).
+
+### 7c.2 Results
+
+**Table: ε/γ ratio with bootstrap 95% CIs**
+
+| Species | ε/γ median | 95% CI | P(ε/γ > 100) | P(ε/γ > 1000) |
+|---------|-----------|--------|--------------|---------------|
+| *O. tarda* | **4,870** | [106, 250,691] | 97.7% | 79.4% |
+| *P. alchata* | **319** | [14, 1,335] | 81.4% | 6.3% |
+| *P. orientalis* | **1,054,932** | [778, 2.2×10⁹] | 99.3% | 97.0% |
+| *T. tetrax* | **201** | [65, 654] | 89.0% | 0.3% |
+
+**Interpretation:** All four species have ε/γ ratios overwhelmingly > 1, confirming the demographic trap. The posterior probability that ε exceeds γ by at least 100-fold ranges from 81% (*P. alchata*) to 99% (*P. orientalis*). *P. orientalis* has a median ratio > 10⁶, meaning extinction is a million times faster than colonisation — functionally, lost sites are permanently lost.
+
+*Script:* `scripts/11_ratio_bootstrap.R`
+*Output files:* `results/ratio_bootstrap.csv`, `results/bootstrap_draws_5000.rds`
+
+---
+
+## 7d Delta-γ analysis (colonisation multiplier)
+
+### 7d.1 Method
+
+For each species, we computed the colonisation rate required to achieve a target equilibrium occupancy: γ_required = ψ*_target × ε / (1 − ψ*_target). The multiplier = γ_required / γ_current quantifies how many times colonisation must increase to reach the target.
+
+### 7d.2 Results
+
+**Table: Colonisation multiplier for target ψ* = 10%**
+
+| Species | γ_required (median) | Multiplier (median) | 95% CI |
+|---------|--------------------|--------------------|--------|
+| *O. tarda* | 0.025 | **541×** | [12, 27,855] |
+| *P. alchata* | 0.055 | **35×** | [2, 148] |
+| *P. orientalis* | 0.049 | **117,215×** | [86, 244.5M] |
+| *T. tetrax* | 0.015 | **22×** | [7, 73] |
+
+**For ψ* = 5%:**
+
+| Species | Multiplier (median) | 95% CI |
+|---------|--------------------| -------|
+| *O. tarda* | 256× | [6, 13,194] |
+| *P. alchata* | 17× | [1, 70] |
+| *P. orientalis* | 55,523× | [41, 115.8M] |
+| *T. tetrax* | 11× | [3, 34] |
+
+**Interpretation:** Even the most achievable target (ψ* = 5% for *T. tetrax*) requires an 11-fold increase in colonisation. For *O. tarda*, reaching 10% occupancy would require 541× higher colonisation — far beyond what any conceivable management intervention could deliver. This confirms that conservation must focus on reducing extinction rather than boosting colonisation.
+
+*Script:* `scripts/12_delta_gamma.R`
+*Output files:* `results/delta_gamma.csv`
+
+---
+
+## 7e Naive vs corrected transition rates (with bootstrap CIs)
+
+### 7e.1 Updated results
+
+Naive transition rates were computed directly from detection histories (occupied = detected at least once in a year). Detection-corrected estimates come from the fitted colext models, with bootstrap CIs from the 5,000 draws.
+
+**Table: Naive vs detection-corrected rates**
+
+| Species | Naive γ | Corrected γ (median) | 95% CI | Ratio (naive/corrected) |
+|---------|---------|---------------------|--------|------------------------|
+| *O. tarda* | 0.894% | 0.004% | [0.0001%, 0.23%] | **203×** |
+| *P. alchata* | 0.635% | 0.138% | [0.05%, 0.37%] | **4.6×** |
+| *P. orientalis* | 0.866% | 0.00004% | [~0%, 0.054%] | **21,839×** |
+| *T. tetrax* | 0.567% | 0.067% | [0.02%, 0.21%] | **8.5×** |
+
+| Species | Naive ε | Corrected ε (median) | 95% CI | Ratio |
+|---------|---------|---------------------|--------|-------|
+| *O. tarda* | 44.6% | 22.3% | [10.9%, 39.5%] | 2.0 |
+| *P. alchata* | 28.1% | 49.8% | [2.3%, 97.4%] | 0.56 |
+| *P. orientalis* | 34.1% | 43.9% | [28.4%, 60.9%] | 0.78 |
+| *T. tetrax* | 36.0% | 13.8% | [8.0%, 22.3%] | 2.6 |
+
+**Key findings:**
+1. Naive colonisation overestimates true rates by 5–22,000× depending on species. The largest bias is for *P. orientalis*, where the true corrected γ is essentially zero.
+2. The discrepancy reflects the severity of imperfect detection: false absences followed by true detections masquerade as colonisations.
+3. Extinction bias varies by species: corrected ε is lower than naive for *O. tarda* and *T. tetrax* (missed detections inflate apparent extinction) but higher for *P. alchata* (near-separation inflates the corrected estimate).
+
+*Script:* `scripts/13_naive_corrected.R`
+*Output files:* `results/naive_vs_corrected_full.csv`
+
+---
+
+## 7f Calibration curves (spatial block cross-validation)
+
+### 7f.1 Method
+
+We assessed calibration of the initial occupancy predictions (ψ₁) against independent presence/absence data from the Spanish Biodiversity Atlas. Predictions were validated using spatially-blocked 5-fold cross-validation (block size = 270 km, exceeding the maximum spatial autocorrelation range of 264 km for *P. alchata*). Calibration slopes were estimated on the logit scale via logistic regression; a slope of 1 indicates perfect calibration.
+
+### 7f.2 Results
+
+**Table: Calibration slopes**
+
+| Species | Slope | SE | p (H₀: slope = 1) | Interpretation |
+|---------|-------|-----|-------------------|---------------|
+| *O. tarda* | 0.609 | 0.030 | < 10⁻³⁷ | Overdispersed predictions |
+| *P. alchata* | 0.575 | 0.033 | < 10⁻³⁸ | Overdispersed predictions |
+| *P. orientalis* | 0.623 | 0.029 | < 10⁻³⁷ | Overdispersed predictions |
+| *T. tetrax* | 0.598 | 0.022 | < 10⁻⁷¹ | Overdispersed predictions |
+
+All slopes are significantly < 1 (range: 0.575–0.623), indicating that model predictions are overdispersed relative to the atlas validation data: the models assign too much probability mass to the extremes (very high and very low predictions) relative to observed outcomes. This is a common pattern for dynamic occupancy models validated against snapshot data, because:
+1. Predicted ψ₁ is a first-year (2017) estimate, while the atlas integrates multi-year presence.
+2. Temporal mismatch between prediction and validation reduces apparent calibration.
+3. Spatial covariates may be insufficient to capture fine-scale habitat suitability.
+
+Despite the miscalibration, discrimination remains good (AUC > 0.82 for all species), indicating that the models correctly rank sites by occupancy probability even if the absolute values are not perfectly calibrated.
+
+*Script:* `scripts/14_calibration.R`
+*Output files:* `results/calibration_slopes.csv`, `figs/{sp}_calibration_curve.png`
+*Figure reference:* `figs/otitar_calibration_curve.png`, `figs/ptealc_calibration_curve.png`, `figs/pteori_calibration_curve.png`, `figs/tettet_calibration_curve.png`
+
+---
+
 ## 8 Key findings and conservation implications
 
 ### 8.1 The demographic trap and extinction debt
 
 All four Iberian steppe bird species are caught in a demographic trap characterised by:
 
-1. **Extinction rates 100–1,000,000× higher than colonisation rates** (ε/γ ratio: 203 for *T. tetrax* to 1,152,790 for *P. orientalis*).
+1. **Extinction rates 100–1,000,000× higher than colonisation rates** (ε/γ ratio with bootstrap CIs: 201 [65–654] for *T. tetrax* to 1,054,932 [778–2.2×10⁹] for *P. orientalis*; probability of ε/γ > 100 ranges from 81–99%).
 2. **Equilibrium occupancy < 1%** for all four species (range: 0.0001–0.49%).
 3. **Recolonisation timescales of centuries to millions of years** (732 years for *P. alchata* to 2.6 million years for *P. orientalis*).
 4. **Extinction debt of 5–100%** of current occupancy. Three of four species have > 60% of their current sites destined for eventual loss under current conditions.
@@ -488,6 +664,11 @@ The substantial spatial autocorrelation ranges (43–264 km) imply that occupanc
 | `scripts/8_counterfactual_attribution.R` | Original attribution | ✅ Fixed (loads train_dyn_scale) |
 | `scripts/9_collinearity_ndvi.R` | NDVI diagnostics | ✅ Complete |
 | `scripts/10_attribution_revised.R` | **Revised attribution** | ✅ Updated (NDVI climate-adjacent) |
+| `scripts/10b_attribution_ndvi_decomposed.R` | **NDVI decomposition attribution** | ✅ New (v4c) |
+| `scripts/11_ratio_bootstrap.R` | **ε/γ ratio bootstrap (n=5000)** | ✅ New (v4c) |
+| `scripts/12_delta_gamma.R` | **Delta-γ colonisation multiplier** | ✅ New (v4c) |
+| `scripts/13_naive_corrected.R` | **Naive vs corrected with bootstrap CIs** | ✅ New (v4c) |
+| `scripts/14_calibration.R` | **Calibration curves (270 km blocks)** | ✅ New (v4c) |
 | `scripts/execute_decisions_v4.R` | **Execute all D1-D7 decisions** | ✅ New |
 | `scripts/fig_isocline_equilibrium.R` | **Isocline plot + debt + timescales** | ✅ New |
 | `scripts/refit_revised_models.R` | Refit ptealc/pteori | ✅ New |
@@ -509,6 +690,16 @@ The substantial spatial autocorrelation ranges (43–264 km) imply that occupanc
 | `results/attribution_table3.csv` | Cross-species attribution summary |
 | `results/attribution_boot_summary.csv` | Bootstrap CIs for attribution |
 | `results/attribution_revised_predictions.rds` | Full counterfactual predictions |
+| `results/ratio_bootstrap.csv` | **ε/γ ratio bootstrap results (all 4 spp)** |
+| `results/bootstrap_draws_5000.rds` | **5000 parametric bootstrap draws** |
+| `results/delta_gamma.csv` | **Colonisation multiplier for target ψ*** |
+| `results/naive_vs_corrected_full.csv` | **Naive vs corrected with bootstrap CIs** |
+| `results/calibration_slopes.csv` | **Calibration slopes (270 km blocks)** |
+| `results/attribution_comparison_ndvi.csv` | **Original vs decomposed NDVI attribution** |
+| `results/attribution_ndvi_decomposed_table.csv` | **Decomposed NDVI attribution results** |
+| `results/attribution_ndvi_decomposed_boot.csv` | **Decomposed attribution bootstrap CIs** |
+| `results/{sp}_ndvi_decomp_scale.rds` | **NDVI component scaling params** |
+| `results/{sp}_model_ndvi_decomposed.rds` | **Refitted models with decomposed NDVI** |
 | `results/diagnostics/vif_summary.csv` | VIF diagnostics |
 | `results/diagnostics/coefficient_stability.csv` | NDVI stability analysis |
 
@@ -534,7 +725,8 @@ The substantial spatial autocorrelation ranges (43–264 km) imply that occupanc
 | S3 | `figs/pub_fig_spatial_range.png` | Spatial correlation ranges |
 | S4 | `figs/pub_fig_spatial_occupancy_trends.png` | stPGOcc occupancy trends |
 | S5 | `figs/{sp}_validation_calibration.png` | CV calibration plots (4 panels) |
-| S6 | `figs/pub_fig_spatial_w_maps.png` | Spatial random effect maps |
+| **S6** | **`figs/{sp}_calibration_curve.png`** | **Calibration curves with 270-km blocks (4 panels)** |
+| S7 | `figs/pub_fig_spatial_w_maps.png` | Spatial random effect maps |
 
 ---
 
@@ -553,6 +745,13 @@ The substantial spatial autocorrelation ranges (43–264 km) imply that occupanc
 | v4b | Create isocline plot (3 panels + PhyloPic) | Key GCB figure — demographic trap visualisation | N/A |
 | v4b | Save no-NDVI pteori as sensitivity | `pteori_epsilon_sensitivity_noNDVI.rds` | N/A |
 
+| **v4c** | **ε/γ ratio bootstrap (n=5000)** | **Quantify demographic asymmetry with CIs** | N/A |
+| v4c | Delta-γ colonisation multiplier | Colonisation increase needed for target ψ* | N/A |
+| v4c | Naive vs corrected with bootstrap CIs | Quantify detection bias on transition rates | N/A |
+| v4c | Calibration curves (270 km blocks) | Validate ψ₁ against atlas (logit-scale slopes) | N/A |
+| v4c | NDVI decomposition sensitivity | Separate climate/land-use pathways of NDVI | ΔAIC −21.1 (otitar), +5.7 (pteori) |
+| v4c | Fix isocline figure (zone labels + legend) | Readable at 300 DPI; bordered legend box | N/A |
+
 ---
 
-*Report generated on branch `audit-gcb-v4`. Last updated after execution of all decisions (v4b).*
+*Report generated on branch `audit-gcb-v4`. Last updated: v4c analytical additions (March 2026).*

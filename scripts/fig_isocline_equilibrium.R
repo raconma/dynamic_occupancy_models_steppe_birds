@@ -143,25 +143,28 @@ p_a <- ggplot() +
   # On log-log axes the γ=ε diagonal runs at 45°; arrows point
   # away from the diagonal into each zone.
   #
-  # Decline arrow (upper-left zone: ε > γ → net occupancy loss)
+  # Decline arrow + label (upper-left zone: ε > γ → net occupancy loss)
+  # Large, readable labels per Task C spec (fontsize ≥ 11pt = size ≥ 3.9)
   annotate("segment",
            x = 3e-5, y = 0.08,
            xend = 3e-6, yend = 0.35,
-           colour = "#E57373", linewidth = 0.7, alpha = 0.55,
-           arrow = arrow(length = unit(0.20, "cm"), type = "closed")) +
-  annotate("text", x = 8e-7, y = 0.5,
-           label = "Decline", colour = "#C62828", size = 3.3,
-           fontface = "italic", alpha = 0.65) +
+           colour = "#E57373", linewidth = 0.8, alpha = 0.5,
+           arrow = arrow(length = unit(0.22, "cm"), type = "closed")) +
+  annotate("label", x = 8e-7, y = 0.55,
+           label = "Decline", colour = "#C62828", size = 4.2,
+           fontface = "bold.italic", fill = alpha("white", 0.8),
+           linewidth = 0, label.padding = unit(0.2, "lines")) +
 
-  # Growth arrow (lower-right zone: γ > ε → net occupancy gain)
+  # Growth arrow + label (lower-right zone: γ > ε → net occupancy gain)
   annotate("segment",
            x = 0.008, y = 0.06,
            xend = 0.08, yend = 0.015,
-           colour = "#81C784", linewidth = 0.7, alpha = 0.55,
-           arrow = arrow(length = unit(0.20, "cm"), type = "closed")) +
-  annotate("text", x = 0.15, y = 0.012,
-           label = "Growth", colour = "#2E7D32", size = 3.3,
-           fontface = "italic", alpha = 0.65) +
+           colour = "#81C784", linewidth = 0.8, alpha = 0.5,
+           arrow = arrow(length = unit(0.22, "cm"), type = "closed")) +
+  annotate("label", x = 0.15, y = 0.013,
+           label = "Growth", colour = "#2E7D32", size = 4.2,
+           fontface = "bold.italic", fill = alpha("white", 0.8),
+           linewidth = 0, label.padding = unit(0.2, "lines")) +
 
   # 95% CI crosshairs
   geom_errorbar(data = plot_data,
@@ -208,12 +211,33 @@ p_a <- ggplot() +
     breaks = 10^seq(-2, 0),
     labels = trans_format("log10", math_format(10^.x))
   ) +
-  scale_colour_manual(values = sp_colours) +
-  scale_shape_manual(values = sp_shapes) +
+  scale_colour_manual(
+    values = sp_colours,
+    labels = c("otitar" = expression(italic("O. tarda")),
+               "ptealc" = expression(italic("P. alchata")),
+               "pteori" = expression(italic("P. orientalis")),
+               "tettet" = expression(italic("T. tetrax"))),
+    guide = guide_legend(order = 1)
+  ) +
+  scale_shape_manual(
+    values = sp_shapes,
+    labels = c("otitar" = expression(italic("O. tarda")),
+               "ptealc" = expression(italic("P. alchata")),
+               "pteori" = expression(italic("P. orientalis")),
+               "tettet" = expression(italic("T. tetrax"))),
+    guide = guide_legend(order = 1)
+  ) +
 
-  # Theme — clean
+  # Theme — clean, with bordered species legend inside panel
   theme(
-    legend.position = "none",
+    legend.position = c(0.82, 0.18),
+    legend.justification = c(0.5, 0.5),
+    legend.background = element_rect(fill = "white", colour = "grey40",
+                                     linewidth = 0.4),
+    legend.margin = margin(4, 6, 4, 6),
+    legend.key.size = unit(0.4, "cm"),
+    legend.text = element_text(size = 9),
+    legend.title = element_blank(),
     panel.grid.minor = element_blank(),
     panel.grid.major = element_line(colour = "grey94", linewidth = 0.3),
     plot.margin = margin(8, 12, 8, 8)
