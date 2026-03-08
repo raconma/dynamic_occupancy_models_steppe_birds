@@ -17,7 +17,7 @@
 | Counterfactual attribution (original models) | ⚠️ Preliminary | Pending model revisions | Raúl (cluster) |
 | stPGOcc convergence | ❌ Not converged | **YES** — blocks §8, Fig 5–6 | Raúl (cluster) |
 | parboot GoF (nsim = 10) | ❌ Not reportable | **YES** — blocks Methods 2.4 | Raúl (cluster) |
-| Equilibrium occupancy ψ* with bootstrap CI | ❌ Missing | **YES** — blocks Abstract, §3.3, Fig 1B | Claude Code |
+| Equilibrium occupancy ψ* with bootstrap CI | ❌ Missing | **YES** — blocks Abstract, §3.3, Fig 1B | Guillermo Fandos |
 | Attribution revised (scripts/10) | ❌ Missing | **YES** — blocks §3.7, Fig 7 | Raúl (cluster) |
 
 ---
@@ -403,12 +403,12 @@ Attribution: Δclimate = S1−S0; Δlanduse = S2−S0; Δinteraction = S3−S1�
 
 | Task | What | Output | Status | Executor |
 |---|---|---|---|---|
-| Task 0 | Generate NDVI_climate and NDVI_residual objects | `results/ndvi_decomp_objects.rds` | ❌ Pending | Claude Code |
-| Task 1 (**BLOCKING**) | Reestimate pteori/ε without NDVI; verify LC12 stability (shift < 0.5 SE) | `results/pteori_epsilon_revised.rds` | ❌ Pending | Raúl/Claude Code |
-| Task 2 | Reestimate otitar/γ with NDVI_climate + NDVI_residual | `results/otitar_gamma_revised.rds` | ❌ Pending | Claude Code |
-| Task 3 | Full attribution with revised models (4 scenarios × 4 species) | `results/attribution_scenarios.rds` | ❌ Pending | Claude Code |
+| Task 0 | Generate NDVI_climate and NDVI_residual objects | `results/ndvi_decomp_objects.rds` | ❌ Pending | Guillermo Fandos |
+| Task 1 (**BLOCKING**) | Reestimate pteori/ε without NDVI; verify LC12 stability (shift < 0.5 SE) | `results/pteori_epsilon_revised.rds` | ❌ Pending | Raúl/Guillermo Fandos |
+| Task 2 | Reestimate otitar/γ with NDVI_climate + NDVI_residual | `results/otitar_gamma_revised.rds` | ❌ Pending | Guillermo Fandos |
+| Task 3 | Full attribution with revised models (4 scenarios × 4 species) | `results/attribution_scenarios.rds` | ❌ Pending | Guillermo Fandos |
 | Task 4 | Bootstrap n = 1,000 (mvrnorm on coefficient vectors) | `results/attribution_boot_summary.csv` | ❌ Pending | Raúl (cluster) |
-| Task 5 | Cross-species summary table | `results/attribution_table3.csv` | ❌ Pending | Claude Code |
+| Task 5 | Cross-species summary table | `results/attribution_table3.csv` | ❌ Pending | Guillermo Fandos |
 
 **Note:** Tasks 3–5 cannot run until Task 1 is resolved and the pteori/ε revision decision is made.
 
@@ -501,8 +501,8 @@ stPGOcc(
 | Item | What it unblocks | Who | Expected output |
 |---|---|---|---|
 | **Decision: ptealc/γ NDVI removal (Opción A vs B)** | Tasks 1–5 of scripts/10; attribution figures | Guillermo | Decision recorded |
-| **Equilibrium occupancy ψ* with bootstrap CI** | Abstract, Results 3.3, Figure 1B, Figure 3 | Claude Code | `results/equilibrium_occupancy_table.csv` |
-| **pteori/ε reestimation without NDVI (Task 1)** | Prerequisite for attribution; unblocks Tasks 3–5 | Raúl or Claude Code | `results/pteori_epsilon_revised.rds` |
+| **Equilibrium occupancy ψ* with bootstrap CI** | Abstract, Results 3.3, Figure 1B, Figure 3 | Guillermo Fandos | `results/equilibrium_occupancy_table.csv` |
+| **pteori/ε reestimation without NDVI (Task 1)** | Prerequisite for attribution; unblocks Tasks 3–5 | Raúl or Guillermo Fandos | `results/pteori_epsilon_revised.rds` |
 | **stPGOcc convergence (100,000 iterations)** | Results 3.5, Figure 5, Figure 6, Discussion 4.3 | Raúl (cluster) | Rhat < 1.3 for φ, σ²_t |
 | **Bootstrap attribution n = 1,000 (scripts/10)** | Results 3.7, Figure 7, Discussion 4.2 | Raúl (cluster) | `results/attribution_boot_summary.csv` |
 | **parboot GoF nsim = 500** | Methods 2.4, c-hat reportable | Raúl (cluster) | `results/gof/pb_*_nsim500.rds` |

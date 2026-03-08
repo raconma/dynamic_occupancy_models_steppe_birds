@@ -1,7 +1,7 @@
 # Technical Audit Report — Iberian Steppe Birds Occupancy Dynamics
 **Version:** v4 — March 2026
 **Target journal:** Global Change Biology
-**Auditor:** Claude Code (Opus 4.6), acting as quantitative ecology co-author
+**Author:** Guillermo Fandos
 **Repository:** `dynamic_occupancy_models_steppe_birds`
 **Branch:** `audit-gcb-v4`
 
@@ -384,12 +384,12 @@ NSIM_MB_GOF  <- 500
 | # | Item | Unblocks | Who | Output |
 |---|------|----------|-----|--------|
 | 1.1 | **Decision: ptealc/gamma NDVI removal** | scripts/10, attribution | Guillermo | Decision recorded |
-| 1.2 | **Fix scaling bug in scripts/8** (use train_dyn_scale from scripts/4) | Attribution correctness | Claude Code | Corrected scripts/8 or scripts/10 |
-| 1.3 | **Refit pteori/epsilon without NDVI** (Task 1 of scripts/10) | Attribution, Table 9 | Raul or Claude Code | results/pteori_epsilon_revised.rds |
-| 1.4 | **Create scripts/10_attribution_revised.R** with Tasks 0-5 | Results 3.7, Fig 9 | Claude Code + Raul (cluster for bootstrap) | Multiple outputs |
+| 1.2 | **Fix scaling bug in scripts/8** (use train_dyn_scale from scripts/4) | Attribution correctness | Guillermo Fandos | Corrected scripts/8 or scripts/10 |
+| 1.3 | **Refit pteori/epsilon without NDVI** (Task 1 of scripts/10) | Attribution, Table 9 | Raul or Guillermo Fandos | results/pteori_epsilon_revised.rds |
+| 1.4 | **Create scripts/10_attribution_revised.R** with Tasks 0-5 | Results 3.7, Fig 9 | Guillermo Fandos + Raul (cluster for bootstrap) | Multiple outputs |
 | 1.5 | **stPGOcc convergence** (100,000 iterations) | Results 3.5, Fig 7 | Raul (cluster) | Rhat < 1.3 |
 | 1.6 | **parboot GoF** (fix formlist bug + nsim=500) | Methods 2.4 | Raul (cluster) | results/gof/pb_*_nsim500.rds |
-| 1.7 | **Increase blockCV block size to >= 264 km** | Validation integrity | Claude Code | Re-run scripts/5 |
+| 1.7 | **Increase blockCV block size to >= 264 km** | Validation integrity | Guillermo Fandos | Re-run scripts/5 |
 
 ### LEVEL 2 — STRONGLY RECOMMENDED (without this, review will be harsh)
 

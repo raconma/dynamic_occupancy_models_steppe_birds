@@ -120,11 +120,6 @@ plot_data$lbl_y <- plot_data$epsilon_baseline * plot_data$dy
 # --- Build plot ---
 p_a <- ggplot() +
 
-  # Decline zone shading (above diagonal: ε > γ → net loss)
-  annotate("rect",
-           xmin = x_lo, xmax = x_hi, ymin = y_lo, ymax = y_hi,
-           fill = "#FFF0F0", alpha = 1) +
-
   # ψ* isocline contours
   geom_line(data = iso_df,
             aes(x = gamma, y = epsilon, group = psi_label),
@@ -144,14 +139,29 @@ p_a <- ggplot() +
            label = expression(gamma == epsilon),
            colour = "grey30", size = 3.5, angle = 42) +
 
-  # Zone annotation — decline (top-left corner, away from data)
-  annotate("label", x = 2e-8, y = 0.85,
-           label = "Net decline",
-           colour = "#B71C1C", fill = "white", linewidth = 0,
-           size = 3.8, fontface = "bold", alpha = 0.85) +
-  annotate("text", x = 2e-8, y = 0.58,
-           label = expression(epsilon > gamma),
-           colour = "#B71C1C", size = 3.2, fontface = "italic") +
+  # --- Zone arrows: subtle arrows perpendicular to the diagonal ---
+  # On log-log axes the γ=ε diagonal runs at 45°; arrows point
+  # away from the diagonal into each zone.
+  #
+  # Decline arrow (upper-left zone: ε > γ → net occupancy loss)
+  annotate("segment",
+           x = 3e-5, y = 0.08,
+           xend = 3e-6, yend = 0.35,
+           colour = "#E57373", linewidth = 0.7, alpha = 0.55,
+           arrow = arrow(length = unit(0.20, "cm"), type = "closed")) +
+  annotate("text", x = 8e-7, y = 0.5,
+           label = "Decline", colour = "#C62828", size = 3.3,
+           fontface = "italic", alpha = 0.65) +
+
+  # Growth arrow (lower-right zone: γ > ε → net occupancy gain)
+  annotate("segment",
+           x = 0.008, y = 0.06,
+           xend = 0.08, yend = 0.015,
+           colour = "#81C784", linewidth = 0.7, alpha = 0.55,
+           arrow = arrow(length = unit(0.20, "cm"), type = "closed")) +
+  annotate("text", x = 0.15, y = 0.012,
+           label = "Growth", colour = "#2E7D32", size = 3.3,
+           fontface = "italic", alpha = 0.65) +
 
   # 95% CI crosshairs
   geom_errorbar(data = plot_data,
