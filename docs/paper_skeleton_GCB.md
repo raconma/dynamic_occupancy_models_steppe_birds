@@ -38,9 +38,9 @@ Structure: Context > Gap > Approach > Key Results > Implications
 
 3. **Approach** (3 sentences): We analysed seven years (2017-2023) of eBird citizen science data for four steppe bird species (*Otis tarda*, *Pterocles alchata*, *P. orientalis*, *Tetrax tetrax*) across >4000 5-km grid cells spanning the Iberian Peninsula. We integrated two complementary occupancy modelling frameworks: dynamic occupancy models (colext) estimating colonisation and extinction as explicit functions of climate and land-use covariates, and spatio-temporal Bayesian occupancy models (stPGOcc) incorporating nearest-neighbour Gaussian process spatial random effects. A factorial counterfactual analysis decomposed the observed occupancy dynamics into contributions from climate trends, land-use change, and their interaction.
 
-4. **Key results** (3 sentences): Colonisation rates were uniformly low (<0.3% per site-year) and spatially homogeneous for all species, while extinction rates were moderate to high (15-48%) and varied with land-cover composition and climate. The 2017-2023 covariate trends produced only marginal attribution effects (<0.01 probability units), with climate dominating for three species and land use for *T. tetrax*. Spatial autocorrelation in occupancy was substantial (Moran's I = 0.14-0.24) and was reduced by 59-82% with spatial random effects, revealing effective spatial ranges of 23-334 km.
+4. **Key results** (3 sentences): Extinction rates exceeded colonisation rates by 200–1,000,000× (bootstrap ε/γ medians; P(ε/γ > 100) = 81–99%), creating an extinction debt of 5–100% of current occupancy and recolonisation timescales of centuries to millions of years. Climate trends dominated attribution for three species while land-use change drove *T. tetrax*; NDVI decomposition sensitivity confirmed these classifications, with the climate-driven NDVI component amplifying extinction effects for *P. orientalis*. Detection correction revealed that naive colonisation estimates overestimate true rates by 5–22,000×, while calibration slopes (0.58–0.62) indicate moderate prediction overdispersion validated against an independent atlas.
 
-5. **Implications** (2 sentences): The asymmetry between very low colonisation and moderate-to-high extinction implies that range contractions, once initiated, will be difficult to reverse. Conservation should prioritise preventing extinctions at currently occupied sites -- particularly by maintaining cropland mosaics and limiting urban expansion -- rather than relying on natural recolonisation of lost habitat.
+5. **Implications** (2 sentences): The extreme asymmetry between colonisation and extinction implies that range contractions are effectively irreversible: even achieving 10% equilibrium occupancy would require 22–117,000× increases in colonisation, far beyond any management intervention. Conservation must prioritise preventing extinctions at currently occupied sites -- particularly by maintaining cropland mosaics and limiting urban expansion -- rather than relying on natural recolonisation of lost habitat.
 
 ---
 
@@ -178,7 +178,43 @@ Structure: Context > Gap > Approach > Key Results > Implications
 - Mean and SD across sites and years
 - Figure concept: "Attribution decomposition diagram" showing the factorial logic
 
-**2.7 Cross-framework validation** (~150 words)
+*2.6.4 NDVI decomposition sensitivity*
+- NDVI is ~50% climate-driven (mean R² = 0.51 from lm(NDVI ~ pr + tmmn + tmmx))
+- Site-level regression yields NDVI_climate (fitted) and NDVI_residual (residuals)
+- Each component z-scored separately using training-set statistics
+- Affected submodels: O. tarda gamma, P. orientalis gamma/epsilon
+- Attribution recomputed with Climate pathway = (pr, tmmn, tmmx, NDVI_climate) and Land-use pathway = (LC vars, NDVI_residual)
+- Provides sensitivity check on dominant-driver classification
+
+**2.7 Demographic asymmetry quantification** (~200 words)
+
+*2.7.1 ε/γ ratio with bootstrap CIs*
+- Parametric bootstrap (n = 5,000 draws from mvrnorm(coef, vcov))
+- γ = plogis(col_intercept), ε = plogis(ext_intercept) at mean covariates
+- Report median ratio with 95% percentile CIs
+- Report P(ε/γ > 100) and P(ε/γ > 1000) as measures of demographic asymmetry
+
+*2.7.2 Delta-γ analysis (colonisation multiplier)*
+- γ_required = ψ*_target × ε / (1 − ψ*_target)
+- Multiplier = γ_required / γ_current
+- Computed for ψ* targets of 5% and 10%
+- Bootstrap CIs from the same 5,000 draws
+- Quantifies how much colonisation must increase for population recovery
+
+*2.7.3 Naive vs detection-corrected comparison*
+- Naive γ/ε from raw detection histories (occupied = detected ≥ 1 time)
+- Corrected γ/ε from fitted colext models with bootstrap CIs
+- Ratio = naive/corrected quantifies detection bias
+
+**2.8 Model validation** (~200 words)
+
+*2.8.1 Calibration curves*
+- Spatially-blocked 5-fold cross-validation (blockCV, 270 km blocks)
+- Calibration slope estimated on logit scale via logistic regression
+- H₀: slope = 1 (perfect calibration)
+- Validated against independent Spanish Biodiversity Atlas
+
+**2.9 Cross-framework validation** (~150 words)
 - stPGOcc-derived colonisation/extinction hotspots from posterior z-samples
 - Pearson correlation between attribution maps and stPGOcc hotspots
 - Interpretation: high correlation = drivers explain spatial turnover; low = unmeasured factors dominate
@@ -259,29 +295,51 @@ Structure: Context > Gap > Approach > Key Results > Implications
 - Few individual site trends are significant over the 7-year window
 - Figure 8: Trend maps for key covariates (6-panel: NDVI, pr, tmmn, tmmx, LC12, LC13)
 
-**3.5 Counterfactual attribution** (~400 words)
+**3.5 Demographic asymmetry and extinction debt** (~400 words)
+- ε/γ ratio quantifies the fundamental demographic trap: median ratios 201–1,054,932 across species
+- Bootstrap 95% CIs confirm: P(ε/γ > 100) = 81–99% for all species
+- Delta-γ analysis: even modest recovery (ψ* = 10%) requires 22× (T. tetrax) to 117,215× (P. orientalis) increase in colonisation
+- Extinction debt: 5% (T. tetrax) to 100% (P. orientalis) of current sites are transient
+- Figure: Isocline plot (γ vs ε on log-log axes) with equilibrium contours + extinction debt bars
+  - `figs/pub_fig_isocline_equilibrium.png` (KEY FIGURE)
+- Table: ε/γ ratios, equilibrium ψ*, recolonisation timescales, extinction debt fractions
+
+**3.6 Counterfactual attribution** (~400 words)
 - Based on colext fitted models: predictions under factorial frozen/observed covariate scenarios
 - Effects are small in absolute terms (<0.01 probability units) but informative in relative terms
 - Climate dominates for O. tarda, P. alchata, P. orientalis; land use for T. tetrax
 - Interaction terms negligible (<5x10^-4 for all species)
+- NDVI decomposition sensitivity: decomposition amplifies climate signal for P. orientalis epsilon (3×) but does not change dominant-driver classification
 - Spatial patterns: climate effects diffuse, land-use effects concentrated at transition zones
-- Figure 9: Attribution summary maps (4x4 panel: species x attribution component)
-- Table 9: Cross-species attribution summary (the publication table)
+- Table: Cross-species attribution summary (original + decomposed NDVI comparison)
 
-**3.6 Cross-framework consistency** (~150 words)
+**3.7 Detection bias and model validation** (~300 words)
+- Naive colonisation overestimates corrected by 5–22,000×; largest for P. orientalis
+- Naive extinction typically lower than corrected (ratios 0.56–2.6)
+- Calibration slopes: 0.575–0.623 (all significantly < 1), indicating overdispersed predictions
+- Despite miscalibration, discrimination is good (AUC > 0.82)
+- Temporal mismatch (ψ₁ 2017 vs multi-year atlas) partly explains calibration bias
+- Figure: Calibration curves (4 panels, one per species)
+  - `figs/{sp}_calibration_curve.png`
+- Table: Calibration slopes with SEs and p-values
+
+**3.8 Cross-framework consistency** (~150 words)
 - Weak correlations (|r| < 0.15) between colext-derived attribution maps and stPGOcc-derived turnover hotspots
 - Interpretation: spatial random effects capture drivers orthogonal to measured covariates
 - This is itself informative: measured climate and land-use covariates explain *temporal* variation (via colext) but not *spatial* variation in turnover
-- Table 10: Correlation matrix
+- Table: Correlation matrix
 
 ---
 
 ### 4. DISCUSSION
 
 **4.1 The colonisation-extinction asymmetry** (~400 words)
-- **Key finding**: Colonisation rates are 1-2 orders of magnitude lower than extinction rates across all species
+- **Key finding**: Extinction rates exceed colonisation by 200–1,000,000× (ε/γ bootstrap medians with 95% CIs)
+- Probability that ε/γ > 100 ranges from 81% (P. alchata) to 99% (P. orientalis)
+- Delta-γ analysis: achieving even 10% equilibrium occupancy requires 22–117,000× more colonisation
 - This asymmetry is the dominant feature of steppe bird dynamics
 - Implications: range contractions are effectively irreversible on decadal timescales
+- Naive estimates mask the true severity: detection correction reveals colonisation 5–22,000× lower than apparent
 - Comparison with other taxa showing similar asymmetries (large-bodied birds, habitat specialists)
 - Link to dispersal limitation, Allee effects, conspecific attraction in steppe birds
 - This paragraph should be the "memorable finding" of the paper
@@ -348,19 +406,20 @@ Structure: Context > Gap > Approach > Key Results > Implications
 
 ---
 
-### FIGURES (9 main + supplements)
+### FIGURES (10 main + supplements)
 
-1. **Fig 1**: Study area map with site locations, coloured by survey effort
-2. **Fig 2**: Initial occupancy probability maps (4-panel, one per species)
-3. **Fig 3**: Colonisation coefficient forest plot (4 species, standardised betas +/- 95% CI)
-4. **Fig 4**: Extinction coefficient forest plot (4 species, standardised betas +/- 95% CI)
-5. **Fig 5**: Predicted colonisation and extinction probability maps (4x2 panel: species x process)
-6. **Fig 6**: Prevalence trends 2017-2023 with confidence intervals (4-panel)
-7. **Fig 7**: Spatial diagnostics (Moran's I reduction, effective spatial range estimates)
-8. **Fig 8**: Covariate trend maps (6-panel: NDVI, pr, tmmn, tmmx, LC12, LC13)
-9. **Fig 9**: Attribution summary (4-species x 4-component panel)
+1. **Fig 1**: Study area map with site locations, coloured by survey effort (`figs/pub_map_main_figure.png`)
+2. **Fig 2**: Initial occupancy probability maps (4-panel) (`figs/pub_map_occupancy_4species.png`)
+3. **Fig 3**: All submodel coefficients (γ + ε + ψ₁) forest plot (`figs/pub_fig_coef_all_submodels.png`)
+4. **Fig 4**: Detection probability diagnostics (`figs/pub_fig4_detection_comparison.png`)
+5. **Fig 5**: Prevalence trends 2017-2023 (`figs/pub_fig_occupancy_trends_panel.png`)
+6. **Fig 6 (KEY)**: Isocline plot (γ vs ε log-log) + extinction debt bars (`figs/pub_fig_isocline_equilibrium.png`)
+7. **Fig 7**: Spatial diagnostics (Moran's I reduction, spatial range) (`figs/pub_fig_spatial_moran.png`)
+8. **Fig 8**: Covariate trend maps (NDVI, pr, tmmn, tmmx, LC12, LC13)
+9. **Fig 9**: Attribution summary (4-species, original + NDVI-decomposed comparison)
+10. **Fig 10**: Calibration curves (4 panels) (`figs/{sp}_calibration_curve.png`)
 
-### TABLES (10 main)
+### TABLES (13 main)
 
 1. Study species overview (IUCN status, population estimates, habitat)
 2. Covariate descriptions with sources and temporal resolution
@@ -368,10 +427,13 @@ Structure: Context > Gap > Approach > Key Results > Implications
 4. Detection model coefficients across species
 5. Colonisation model coefficients (beta, SE, z, P)
 6. Extinction model coefficients (beta, SE, z, P)
-7. Model fit and validation statistics (chi-sq, P, AUC, TSS, RMSE)
-8. Spatial model comparison (tPGOcc vs stPGOcc: Moran's I, spatial range)
-9. Attribution summary (cross-species delta-gamma, delta-epsilon)
-10. Cross-framework correlation matrix
+7. **ε/γ ratio with bootstrap CIs** (median, 95% CI, P(>100), P(>1000)) — `results/ratio_bootstrap.csv`
+8. **Equilibrium occupancy, extinction debt, recolonisation timescales** — `results/equilibrium_occupancy_table.csv`, `results/extinction_debt_table.csv`
+9. **Delta-γ colonisation multiplier** (for ψ*=5% and 10%) — `results/delta_gamma.csv`
+10. Attribution summary (cross-species delta-gamma, delta-epsilon) — `results/attribution_table3.csv`
+11. **NDVI decomposition comparison** (original vs decomposed attribution) — `results/attribution_comparison_ndvi.csv`
+12. **Naive vs corrected transition rates** — `results/naive_vs_corrected_full.csv`
+13. **Calibration slopes** (270 km blocks) — `results/calibration_slopes.csv`
 
 ### SUPPLEMENTARY
 
@@ -382,5 +444,8 @@ Structure: Context > Gap > Approach > Key Results > Implications
 - S5: Full covariate trend statistics per site
 - S6: Individual attribution maps (all 24)
 - S7: MCMC diagnostics for stPGOcc (traceplots, Rhat, ESS)
-- S8: Sensitivity analysis for NDVI classification (climate vs land use)
+- S8: **NDVI decomposition sensitivity** (decomposed coefficients, model comparison) — `results/attribution_ndvi_decomposed_table.csv`
 - S9: Complete separation diagnostics for P. alchata and T. tetrax
+- S10: **Naive vs corrected rates** (full table with n events/opportunities) — `results/naive_vs_corrected_full.csv`
+- S11: Spatial model comparison (tPGOcc vs stPGOcc: Moran's I, spatial range)
+- S12: Cross-framework correlation matrix
