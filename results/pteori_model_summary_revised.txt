@@ -1,0 +1,46 @@
+Species: pteori (REVISED - NDVI removed from epsilon)
+Date: 2026-03-08 18:50:00.944282 
+Original AIC: 2060.74 
+Revised AIC: 2121.02 
+Delta AIC: 60.27 
+
+
+Call:
+colext(psiformula = pteori_data$cfg$psi_formula, gammaformula = pteori_data$cfg$gamma_formula, 
+    epsilonformula = pteori_data$cfg$epsilon_formula, pformula = pteori_data$cfg$p_formula, 
+    data = pteori_data$umf)
+
+Initial (logit-scale):
+            Estimate    SE      z  P(>|z|)
+(Intercept)   -5.790 0.463 -12.51 6.60e-36
+bio2           0.819 0.207   3.95 7.68e-05
+tree_cover    -3.870 0.476  -8.13 4.41e-16
+grass_cover    0.613 0.131   4.68 2.83e-06
+
+Colonization (logit-scale):
+                                  Estimate    SE        z P(>|z|)
+(Intercept)                        -22.373   NaN      NaN     NaN
+Land_Cover_Type_1_Percent_Class_7   -0.341  34.4 -0.00991   0.992
+NDVI                                -1.184  92.5 -0.01279   0.990
+tmmn                                -2.268 180.4 -0.01257   0.990
+tmmx                                 6.324   NaN      NaN     NaN
+
+Extinction (logit-scale):
+                                   Estimate    SE      z  P(>|z|)
+(Intercept)                         -1.8298 0.525 -3.488 0.000486
+Land_Cover_Type_1_Percent_Class_12  -0.0948 0.414 -0.229 0.818729
+pr                                   1.9051 1.176  1.620 0.105213
+
+Detection (logit-scale):
+                Estimate     SE       z  P(>|z|)
+(Intercept)       -1.688 0.1576 -10.708 9.35e-27
+time              -0.236 0.0688  -3.426 6.13e-04
+duration           0.369 0.0777   4.752 2.01e-06
+observers         -0.012 0.0690  -0.175 8.61e-01
+pr_obs            -0.391 0.1762  -2.219 2.65e-02
+topo_aspect_obs   -0.142 0.0896  -1.579 1.14e-01
+
+AIC: 2121.016 
+Number of sites: 4130
+ID of sites removed due to NA: 3245
+
