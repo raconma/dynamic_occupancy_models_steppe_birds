@@ -106,107 +106,85 @@ iso_label_pos <- iso_df %>%
   slice_max(gamma, n = 1) %>%
   ungroup()
 
-# --- Species label nudges (hand-tuned to avoid overlap) ---
-label_nudge <- data.frame(
-  species = c("otitar", "ptealc", "pteori", "tettet"),
-  dx = c(  6,    4,   0.15, 4),   # multipliers on log-scale
-  dy = c(1.5,  1.6, 0.35,  1.8),  # multipliers on log-scale
-  stringsAsFactors = FALSE
+# --- Zone shading polygons (data coordinates, log-transformed by ggplot) ---
+# Decline zone: upper-left triangle where ε > γ
+decline_poly <- data.frame(
+  x = c(x_lo, y_lo, y_hi, x_lo),
+  y = c(y_lo, y_lo, y_hi, y_hi)
 )
-plot_data <- plot_data %>% left_join(label_nudge, by = "species")
-plot_data$lbl_x <- plot_data$gamma_baseline * plot_data$dx
-plot_data$lbl_y <- plot_data$epsilon_baseline * plot_data$dy
+# Growth zone: lower-right triangle where γ > ε
+growth_poly <- data.frame(
+  x = c(y_lo, x_hi, x_hi),
+  y = c(y_lo, y_lo, y_hi)
+)
 
 # --- Build plot ---
 p_a <- ggplot() +
 
+  # Zone shading (drawn first, behind everything)
+  geom_polygon(data = decline_poly, aes(x = x, y = y),
+               fill = "#FFEBEE", alpha = 0.5) +
+  geom_polygon(data = growth_poly, aes(x = x, y = y),
+               fill = "#E8F5E9", alpha = 0.5) +
+
+  # Zone labels (clean text, no arrows, no boxes)
+  # "decline" label: upper-left, away from P. orientalis (γ≈3.8e-7, ε≈0.44)
+  annotate("text", x = 1e-7, y = 0.8,
+           label = expression(epsilon > gamma ~ "(decline)"),
+           colour = "#B71C1C", size = 3.8, fontface = "italic",
+           alpha = 0.6) +
+  # "growth" label: bottom-right, below and right of legend
+  annotate("text", x = 0.5, y = 0.013,
+           label = expression(gamma > epsilon ~ "(growth)"),
+           colour = "#1B5E20", size = 3.8, fontface = "italic",
+           alpha = 0.6) +
+
   # ψ* isocline contours
   geom_line(data = iso_df,
             aes(x = gamma, y = epsilon, group = psi_label),
-            colour = "grey70", linewidth = 0.35, linetype = "dashed") +
+            colour = "grey55", linewidth = 0.35, linetype = "dashed") +
 
   # Isocline labels (ψ* values) — use parse = TRUE for Greek letters
   geom_text(data = iso_label_pos,
             aes(x = gamma, y = epsilon, label = psi_expr),
-            colour = "grey50", size = 2.5, hjust = 1, vjust = -0.5,
+            colour = "grey45", size = 2.5, hjust = 1, vjust = -0.5,
             parse = TRUE) +
 
   # γ = ε diagonal (net zero line)
   geom_abline(slope = 1, intercept = 0,
-              colour = "grey30", linewidth = 0.6) +
-  # Diagonal label
-  annotate("text", x = 0.07, y = 0.12,
+              colour = "grey30", linewidth = 0.7) +
+  annotate("text", x = 0.055, y = 0.12,
            label = expression(gamma == epsilon),
            colour = "grey30", size = 3.5, angle = 42) +
-
-  # --- Zone arrows: subtle arrows perpendicular to the diagonal ---
-  # On log-log axes the γ=ε diagonal runs at 45°; arrows point
-  # away from the diagonal into each zone.
-  #
-  # Decline arrow + label (upper-left zone: ε > γ → net occupancy loss)
-  # Large, readable labels per Task C spec (fontsize ≥ 11pt = size ≥ 3.9)
-  annotate("segment",
-           x = 3e-5, y = 0.08,
-           xend = 3e-6, yend = 0.35,
-           colour = "#E57373", linewidth = 0.8, alpha = 0.5,
-           arrow = arrow(length = unit(0.22, "cm"), type = "closed")) +
-  annotate("label", x = 8e-7, y = 0.55,
-           label = "Decline", colour = "#C62828", size = 4.2,
-           fontface = "bold.italic", fill = alpha("white", 0.8),
-           linewidth = 0, label.padding = unit(0.2, "lines")) +
-
-  # Growth arrow + label (lower-right zone: γ > ε → net occupancy gain)
-  annotate("segment",
-           x = 0.008, y = 0.06,
-           xend = 0.08, yend = 0.015,
-           colour = "#81C784", linewidth = 0.8, alpha = 0.5,
-           arrow = arrow(length = unit(0.22, "cm"), type = "closed")) +
-  annotate("label", x = 0.15, y = 0.013,
-           label = "Growth", colour = "#2E7D32", size = 4.2,
-           fontface = "bold.italic", fill = alpha("white", 0.8),
-           linewidth = 0, label.padding = unit(0.2, "lines")) +
 
   # 95% CI crosshairs
   geom_errorbar(data = plot_data,
                 aes(x = gamma_baseline,
                     ymin = epsilon_lo, ymax = epsilon_hi,
                     colour = species),
-                width = 0, linewidth = 0.4, alpha = 0.5) +
+                width = 0, linewidth = 0.45, alpha = 0.45) +
   geom_errorbar(data = plot_data,
                 aes(y = epsilon_baseline,
                     xmin = gamma_lo, xmax = gamma_hi,
                     colour = species),
-                width = 0, linewidth = 0.4, alpha = 0.5,
+                width = 0, linewidth = 0.45, alpha = 0.45,
                 orientation = "y") +
 
   # Species points
   geom_point(data = plot_data,
              aes(x = gamma_baseline, y = epsilon_baseline,
                  colour = species, shape = species),
-             size = 3.5, stroke = 0.8) +
-
-  # Direct species labels (italic, coloured, with leader segments)
-  geom_segment(data = plot_data,
-               aes(x = gamma_baseline, y = epsilon_baseline,
-                   xend = lbl_x, yend = lbl_y,
-                   colour = species),
-               linewidth = 0.3, alpha = 0.4) +
-  geom_label(data = plot_data,
-             aes(x = lbl_x, y = lbl_y, label = label, colour = species),
-             size = 3, fontface = "italic",
-             fill = alpha("white", 0.85), linewidth = 0.2,
-             label.padding = unit(0.15, "lines"),
-             show.legend = FALSE) +
+             size = 4, stroke = 0.9) +
 
   # Scales
   scale_x_log10(
-    name = expression("Colonisation rate,"~gamma~"(probability per year)"),
+    name = expression("Colonisation rate,"~gamma~"(yr"^{-1}*")"),
     limits = c(x_lo, x_hi),
     breaks = 10^seq(-8, 0, by = 2),
     labels = trans_format("log10", math_format(10^.x))
   ) +
   scale_y_log10(
-    name = expression("Extinction rate,"~epsilon~"(probability per year)"),
+    name = expression("Extinction rate,"~epsilon~"(yr"^{-1}*")"),
     limits = c(y_lo, y_hi),
     breaks = 10^seq(-2, 0),
     labels = trans_format("log10", math_format(10^.x))
@@ -216,30 +194,28 @@ p_a <- ggplot() +
     labels = c("otitar" = expression(italic("O. tarda")),
                "ptealc" = expression(italic("P. alchata")),
                "pteori" = expression(italic("P. orientalis")),
-               "tettet" = expression(italic("T. tetrax"))),
-    guide = guide_legend(order = 1)
+               "tettet" = expression(italic("T. tetrax")))
   ) +
   scale_shape_manual(
     values = sp_shapes,
     labels = c("otitar" = expression(italic("O. tarda")),
                "ptealc" = expression(italic("P. alchata")),
                "pteori" = expression(italic("P. orientalis")),
-               "tettet" = expression(italic("T. tetrax"))),
-    guide = guide_legend(order = 1)
+               "tettet" = expression(italic("T. tetrax")))
   ) +
 
-  # Theme — clean, with bordered species legend inside panel
+  # Theme — clean, legend in lower-right (empty growth zone)
   theme(
-    legend.position = c(0.82, 0.18),
+    legend.position = c(0.92, 0.22),
     legend.justification = c(0.5, 0.5),
-    legend.background = element_rect(fill = "white", colour = "grey40",
-                                     linewidth = 0.4),
-    legend.margin = margin(4, 6, 4, 6),
-    legend.key.size = unit(0.4, "cm"),
-    legend.text = element_text(size = 9),
+    legend.background = element_rect(fill = alpha("white", 0.92),
+                                     colour = "grey50", linewidth = 0.3),
+    legend.margin = margin(4, 8, 4, 4),
+    legend.key.size = unit(0.45, "cm"),
+    legend.text = element_text(size = 9.5),
     legend.title = element_blank(),
     panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(colour = "grey94", linewidth = 0.3),
+    panel.grid.major = element_line(colour = "grey92", linewidth = 0.3),
     plot.margin = margin(8, 12, 8, 8)
   )
 
@@ -281,9 +257,7 @@ p_b <- ggplot(debt_plot) +
     breaks = seq(0, 1.5, 0.5)
   ) +
   labs(y = NULL,
-       subtitle = expression(
-         "Extinction debt:"~frac(psi[current] - psi*"*", psi[current]) %*% 100
-       )) +
+       subtitle = "Extinction debt") +
   # Legend annotation inside plot
   annotate("rect", xmin = 0.85, xmax = 0.97, ymin = 0.55, ymax = 0.72,
            fill = "#66BB6A") +
