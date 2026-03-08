@@ -1,5 +1,5 @@
 "species","vcov_ok","gamma_intercept","epsilon_intercept","gamma_baseline_pct","epsilon_baseline_pct","psi_star_med","psi_star_lo","psi_star_hi","recol_yr_med","recol_yr_lo","recol_yr_hi","persist_yr_med","persist_yr_lo","persist_yr_hi"
 "otitar",TRUE,-9.9981,-1.2518,0.0045,22.2391,0.0205,4e-04,0.9328,22648,427,1168912,4,3,9
 "ptealc",TRUE,-6.5907,-0.0424,0.1371,48.9399,0.3117,0.0751,6.4979,732,262,1971,2,1,44
-"pteori",FALSE,-22.3726,-1.8298,0,13.8268,0,0,93.6993,1304656373,1,8.56469489905785e+94,7,3,19
+"pteori",TRUE,-14.777,-0.2386,0,44.063,1e-04,0,0.1742,2599962,1234,5442842137,2,2,3
 "tettet",TRUE,-7.2942,-1.8361,0.0679,13.7514,0.4932,0.1577,1.6246,1471,462,4630,7,4,13
