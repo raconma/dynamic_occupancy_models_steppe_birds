@@ -155,7 +155,7 @@ for (sp in species_codes) {
   sb <- cv_spatial(
     x = sf_cv,
     column = atlas_col,
-    size = 50000,
+    size = 270000,  # 270 km (> 264 km, the largest spatial range from P. alchata)
     k = 5,
     selection = "random",
     iteration = 100,
