@@ -206,7 +206,7 @@ p_a <- ggplot() +
 
   # Theme — clean, legend in lower-right (empty growth zone)
   theme(
-    legend.position = c(0.18, 0.82),
+    legend.position = c(0.18, 0.22),
     legend.justification = c(0.5, 0.5),
     legend.background = element_rect(fill = "white", color = "grey40", linewidth = 0.4),
     legend.margin = margin(4, 6, 4, 6),

@@ -77,9 +77,9 @@ The study covers mainland Spain (494,011 km^2^), divided into a regular 5-km UTM
 
 The mobility gradient is directly relevant to the closure assumption (Section 2.4): the sandgrouse species are semi-nomadic and their within-season movements may partially violate the assumption that sites are closed to occupancy change during the sampling window. We address this explicitly in Section 4.6 (Limitations). We include all four species despite differences in data quality (see Section 2.4 for *P. alchata* separation diagnostics) because the guild-level comparison is central to our inference about species-specific drivers, and because directional results for data-limited species remain informative even when point estimates carry wide uncertainty.
 
-![Study area map](../figs/pub_map_main_figure.png)
+![Detection correction](../figs/pub_fig1_naive_vs_corrected.png)
 
-**Figure 1.** Study area: mainland Spain 5-km grid coloured by total eBird checklist count (2017-2023), showing the 256% increase in total survey effort over the study period.
+**Figure 1.** Detection correction changes the qualitative conclusion. Naive vs detection-corrected transition rates (log scale) for colonisation (gamma, top) and extinction (epsilon, bottom) across the four study species. Fold-reduction annotations show the magnitude of detection bias on each rate. *P. orientalis* corrected gamma falls below the detection floor. File: `figs/pub_fig1_naive_vs_corrected.png`.
 
 ## 2.2 eBird data and filtering
 
@@ -116,7 +116,7 @@ Model selection used AIC over candidate covariate sets for each submodel, with t
 
 Abbreviations: bio1 = mean annual temperature; bio2 = mean diurnal range; tree/grass = tree/herbaceous cover; elev = elevation; LC6 = closed shrubland; LC7 = open shrubland; LC12 = cropland; LC13 = urban/built-up; tmmn/tmmx = min/max temperature; pr = cumulative precipitation. + NDVI classified as "climate-adjacent" in attribution analysis (R^2^ ~ 0.51 with climate variables). *P. alchata* gamma excluded from attribution (separation; 16 events). *P. alchata* epsilon reported with caution (near-separation; 18 events, SE > 11).
 
-![Coefficient forest plot](../figs/pub_fig_forest_gamma_epsilon.png)
+![Coefficient forest plot](../figs/pub_fig2_forest_3submodels.png)
 
 **Figure 2.** Environmental drivers of colonisation (left) and extinction (right). Standardised regression coefficients with 95% CI for all four species. Colour encodes driver category: blue = climate (TerraClimate), orange = land use (MODIS land cover), teal = climate-adjacent (NDVI). Coefficients with |z| < 1.96 shown in grey. *P. alchata* gamma excluded.
 
@@ -258,7 +258,7 @@ The cross-species pattern reveals a fundamental partitioning of driver effects: 
 
 **Figure 6.** Predicted initial occupancy (psi_1, 2017) for the four species across mainland Spain, 5-km grid. Colour scale: white (psi_1 = 0) to dark navy (psi_1 = 1).
 
-![Occupancy trends](../figs/pub_fig_prevalence_trends.png)
+![Occupancy trends](../figs/pub_fig7_prevalence_trends_A.png)
 
 **Figure 7.** Model-simulated mean annual occupancy prevalence (% of grid cells occupied) with 95% CI from parametric bootstrap, 2017-2023. Prevalence is conditional on the full sampling grid (including unsuitable cells); absolute values are low but within-species temporal trends and cross-species comparisons are ecologically interpretable. Horizontal dashed lines indicate psi* for each species.
 
@@ -416,25 +416,27 @@ The Iberian steppe bird guild is caught in a demographic trap: extinction procee
 
 # Figure Legends
 
-**Figure 1. Study area and survey effort.** Map of mainland Spain showing the 5-km grid coloured by total eBird checklist count (2017-2023). File: `figs/pub_map_main_figure.png`.
+**Figure 1. Detection correction changes the qualitative conclusion.** Naive vs detection-corrected transition rates (log scale) for colonisation (gamma, top) and extinction (epsilon, bottom) across the four species. Fold-reduction annotations quantify the magnitude of detection bias. *P. orientalis* corrected gamma falls below the detection floor. File: `figs/pub_fig1_naive_vs_corrected.png`.
 
-**Figure 2. Environmental drivers of colonisation and extinction.** Coefficient forest plots for the gamma (left) and epsilon (right) submodels of all four species. Standardised regression coefficients with 95% CI. Colour: blue = climate (TerraClimate), orange = land use (MODIS land cover), teal = climate-adjacent (NDVI). Coefficients with |z| < 1.96 shown in grey. *P. alchata* gamma excluded. File: `figs/pub_fig_forest_gamma_epsilon.png`.
+**Figure 2. Environmental drivers of occupancy dynamics.** Three-panel forest plot of standardised coefficients for (A) initial occupancy psi_1, (B) colonisation gamma, and (C) extinction epsilon. Species distinguished by shape and colour (Wong palette). Non-significant coefficients (|z| < 1.96) shown with reduced opacity. *P. alchata* gamma excluded (separation, n = 16 events). File: `figs/pub_fig2_forest_3submodels.png`.
 
-**Figure 3. Spatial diagnostics (stPGOcc).** Left: residual Moran's I before (colext) and after (stPGOcc) accounting for spatial random effects, per species and year. Right: effective spatial range estimates (phi in km) with 95% credible intervals. File: `figs/pub_fig_spatial_moran.png`.
+**Figure 3. Spatial risk map: extinction-colonisation imbalance.** Cell-level log_10(epsilon/gamma) from stPGOcc predictions across the Iberian Peninsula. Red = decline zone (epsilon > gamma), blue = growth zone (epsilon < gamma), centred at 0 (equilibrium). All four species show predominantly red landscapes. File: `figs/pub_fig3_bivariate_risk_map.png`.
 
-**Figure 4. Detection probability diagnostics.** Detection probability by survey effort covariates across the four species. File: `figs/pub_fig4_detection_comparison.png`.
+**Figure 4. Forest plot with coefficient summary heatmap.** **(A-C)** Forest plots as in Figure 2. **(D)** Heatmap showing direction and significance of all gamma/epsilon coefficients across species. Dark colours = significant; light = non-significant; white = not in model. File: `figs/pub_fig4_forest_heatmap_combined.png`.
 
 **Figure 5. Demographic asymmetry: the isocline plot (KEY FIGURE).** **(a)** Scatter plot of gamma vs epsilon on log_10 axes, with psi* isoclines and the gamma = epsilon line. All species fall deep in the decline zone. 95% CI crosshairs from parametric bootstrap (n = 5,000). **(b)** Extinction debt bars: green = psi*, pink = transient occupancy. Percentage labels show extinction debt fraction. File: `figs/pub_fig_isocline_equilibrium.png`.
 
-**Figure 6. Occupancy maps.** Predicted initial occupancy (psi_1, 2017) for the four species across mainland Spain. File: `figs/pub_fig_maps_3process_4species.png`.
+**Figure 6. Spatial hotspots.** 4-column (species) x 3-row (psi_1, gamma, epsilon) panel map. Binary classification: top 25% of predicted values coloured, remainder grey. File: `figs/pub_fig1_hotspots_4species.png`.
 
-**Figure 7. Occupancy trends.** Model-simulated annual prevalence 2017-2023 with 95% bootstrap CI. Horizontal dashed lines indicate psi* per species. File: `figs/pub_fig_prevalence_trends.png`.
+**Figure 7. Occupancy maps.** Predicted initial occupancy (psi_1, 2017) for the four species across mainland Spain. File: `figs/pub_fig_maps_3process_4species.png`.
 
-**Figure 8. Spatial range (stPGOcc).** [Conditional on convergence.] Effective spatial range estimates (phi in km) with 95% credible intervals per species, with reference lines from published dispersal data. File: `figs/pub_fig_spatial_range.png`.
+**Figure 8. Occupancy prevalence trends.** Model-simulated annual prevalence 2017-2023 with 95% bootstrap CI. Horizontal dashed lines indicate equilibrium occupancy psi* per species. No naive overlay. File: `figs/pub_fig7_prevalence_trends_A.png`.
 
-**Figure 9. Response curves for key driver-process combinations.** Six panels showing predicted probability as a function of standardised covariate value with 95% CI (delta method). Panel 1: *T. tetrax* -- LC12 (cropland) effect on both gamma (solid) and epsilon (dashed). Panel 2: *O. tarda* -- LC13 (urban) effect on epsilon. Panel 3: *P. orientalis* -- NDVI effect on epsilon. Panel 4: *T. tetrax* -- LC12 on gamma with rug plot. Panels 5-6: *O. tarda* -- tmmx on gamma and epsilon. File: `figs/pub_fig_response_curves.png`.
+**Figure 9. Response curves: single-lever and cross-species comparison.** Row 1: *T. tetrax* LC12 (cropland) effect on both gamma (solid orange) and epsilon (dashed red) with 95% CI ribbons and rug plot. Row 2: comparison panels for *O. tarda* (tmmx on gamma), *P. alchata* (precipitation on epsilon), *P. orientalis* (NDVI on epsilon). File: `figs/pub_fig5_response_curves.png`.
 
-**Figure 10. Calibration curves.** Observed vs predicted occupancy by decile with calibration slopes. Files: `figs/{sp}_calibration_curve.png`.
+**Figure 10. Spatial diagnostics (stPGOcc).** Left: residual Moran's I before (colext) and after (stPGOcc) accounting for spatial random effects, per species and year. Right: effective spatial range estimates. [Conditional on convergence.] File: `figs/pub_fig_spatial_moran.png`.
+
+**Figure 11. Calibration curves.** Observed vs predicted occupancy by decile with calibration slopes. Files: `figs/{sp}_calibration_curve.png`.
 
 ---
 
@@ -480,6 +482,6 @@ The Iberian steppe bird guild is caught in a demographic trap: extinction procee
 
 ---
 
-*Skeleton v9 -- Guillermo Fandos / Raul Contreras-Martin -- March 2026*
+*Skeleton v10 -- Guillermo Fandos / Raul Contreras-Martin -- March 2026*
 
-*Blocking: stPGOcc convergence, parboot GOF. All other analyses complete.*
+*Blocking: stPGOcc convergence, parboot GOF. All other analyses and figures complete.*
