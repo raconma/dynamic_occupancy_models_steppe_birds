@@ -100,7 +100,7 @@ NDVI presents a collinearity challenge: at the site level, approximately 50% of 
 
 We used the colext framework (MacKenzie et al. 2003) implemented in the `unmarked` R package (Fiske & Chandler 2011, Kellner et al. 2023) to estimate four simultaneous processes: initial occupancy (psi_1), colonisation probability (gamma), extinction probability (epsilon), and detection probability (p). The state process follows a first-order Markov chain: psi_{i,t+1} = (1 - psi_{it}) * gamma_i + psi_{it} * (1 - epsilon_i). Detection is modelled as a Bernoulli trial conditional on occupancy, with visit-level survey effort covariates (duration, transect length, number of observers, time of day, observation-period NDVI, and precipitation) to account for heterogeneous detectability across eBird checklists.
 
-Model selection used AIC over candidate covariate sets for each submodel, with the constraint that static WorldClim covariates could enter only psi_1 and dynamic annual covariates could enter only gamma and epsilon. Complete separation was diagnosed in the *P. alchata* colonisation submodel (16 observed colonisation events across 2,521 site-year opportunities, 0.6%); this submodel is excluded from the counterfactual attribution analysis. Near-separation was diagnosed in the *P. alchata* extinction submodel (18 events; SE > 11) and is reported with explicit caveats.
+Model selection used AIC over candidate covariate sets for each submodel, with the constraint that static WorldClim covariates could enter only psi_1 and dynamic annual covariates could enter only gamma and epsilon. Complete separation was diagnosed in the *P. alchata* colonisation submodel (16 observed colonisation events across 2,521 site-year opportunities, 0.6%); this submodel is excluded from the counterfactual attribution analysis. Near-separation was diagnosed in the *P. alchata* extinction submodel (18 events; SE > 11) and is reported with explicit caveats. Model fit was assessed using parametric bootstrap goodness-of-fit (parboot, n = 500 simulations); all four species showed adequate fit (P = 0.28--0.93; Table 2b).
 
 | Species | psi_1 covariates | gamma covariates | epsilon covariates | AIC | N sites |
 |---|---|---|---|---|---|
@@ -110,6 +110,15 @@ Model selection used AIC over candidate covariate sets for each submodel, with t
 | *T. tetrax* | bio2, tree, grass, elev | LC12 | LC12 | 1780.1 | 3,746 |
 
 **Table 2.** Best-fit colext models per species with AIC-selected covariates and sample sizes. + NDVI classified as "climate-adjacent" in attribution analysis (R^2^ ~ 0.51 with climate variables). *P. alchata* gamma excluded from attribution (separation; 16 events). *P. alchata* epsilon reported with caution (near-separation; 18 events, SE > 11).
+
+| Species | AIC | chi-sq (obs) | chi-sq (sim) | parboot P | Fit |
+|---|---|---|---|---|---|
+| *O. tarda* | 2267.9 | 352.4 | 333.6 | 0.28 | Adequate |
+| *P. alchata* | 1981.7 | 363.4 | 364.6 | 0.52 | Adequate |
+| *P. orientalis* | 2060.7 | 276.0 | 330.6 | 0.93 | Adequate |
+| *T. tetrax* | 1780.1 | 290.9 | 307.9 | 0.66 | Adequate |
+
+**Table 2b.** Parametric bootstrap goodness-of-fit (parboot, nsim = 500). P-values >> 0.05 indicate adequate model fit for all species; the null hypothesis of correct model specification is not rejected. Source: `results/parboot_summary.csv`, `results/{sp}_gof_parboot.rds`.
 
 ![Coefficient forest plot](../figs/pub_fig_coef_all_submodels.png)
 **Figure 2.** Environmental drivers of colonisation (left) and extinction (right). Standardised regression coefficients with 95% CI for all four species. Colour encodes driver category: blue = climate (TerraClimate), orange = land use (MODIS land cover), teal = climate-adjacent (NDVI). Coefficients with |z| < 1.96 shown in grey. *P. alchata* gamma excluded.
@@ -383,7 +392,7 @@ Observed vs predicted occupancy by decile with calibration slopes. Files: `figs/
 | S1 | Detection probability coefficients -- all species, all covariates | Pending write-up |
 | S2 | Full coefficient tables: psi_1, gamma, epsilon with SE and z | Pending write-up |
 | S3 | AIC model selection tables -- all species, all candidate models | Pending write-up |
-| S4 | Full attribution table -- all scenarios, bootstrap CIs (n = 1,000) | Pending bootstrap |
+| S4 | Full attribution table -- all scenarios, bootstrap CIs (n = 1,000) | Complete |
 | S5 | Validation: calibration curves, full AUC/TSS, blockCV design map | Complete |
 | S6 | Annual occupancy trend plots and simulation details | Pending write-up |
 | S7 | Predicted gamma/epsilon maps (annual, 2017--2023) | Pending write-up |
@@ -399,12 +408,12 @@ Observed vs predicted occupancy by decile with calibration slopes. Files: `figs/
 
 ## Blocking -- must be resolved before submission
 
-| Item | What it unblocks | Script | Responsible |
+| Item | What it unblocks | Script | Status |
 |---|---|---|---|
-| stPGOcc convergence (Rhat < 1.1, ESS > 100 for phi) | Results 3.6, Figure 8, Discussion 4.4 | `scripts/6_spatial_occupancy_test.R` | Raul -- cluster |
-| parboot GOF n = 500 in same R session | Methods 2.4 -- c-hat reportable | `scripts/4_occupancy_models.R` | Raul -- cluster |
-| blockCV re-run with block >= 270 km | Table 10 validity | `scripts/5_validation.R` | Raul -- local |
-| Attribution bootstrap n = 1,000 | Figure attribution, Discussion 4.3 | `scripts/10_attribution_revised.R` | Raul -- cluster |
+| stPGOcc convergence (Rhat < 1.1, ESS > 100 for phi) | Results 3.6, Figure 8, Discussion 4.4 | `scripts/6_spatial_occupancy_test.R` | **PENDING -- cluster** |
+| parboot GOF n = 500 | Methods 2.4 -- c-hat reportable | `scripts/15_parboot_publication.R` | **DONE** (P = 0.28--0.93) |
+| blockCV re-run with block >= 270 km | Table 10 validity | `scripts/5_validation.R` | **DONE** (270 km) |
+| Attribution bootstrap n = 1,000 | Figure attribution, Discussion 4.3 | `scripts/10_attribution_revised.R` | **DONE** (n = 1,000) |
 
 ## Strongly recommended
 
