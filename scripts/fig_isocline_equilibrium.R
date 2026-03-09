@@ -130,14 +130,14 @@ p_a <- ggplot() +
   # Zone labels (clean text, no arrows, no boxes)
   # "decline" label: upper-left, away from P. orientalis (γ≈3.8e-7, ε≈0.44)
   annotate("text", x = 1e-7, y = 0.8,
-           label = expression(epsilon > gamma ~ "(decline)"),
-           colour = "#B71C1C", size = 3.8, fontface = "italic",
-           alpha = 0.6) +
+           label = "Decline",
+           colour = "#666666", size = 4.5, fontface = "bold.italic",
+           alpha = 0.7) +
   # "growth" label: bottom-right, below and right of legend
   annotate("text", x = 0.5, y = 0.013,
-           label = expression(gamma > epsilon ~ "(growth)"),
-           colour = "#1B5E20", size = 3.8, fontface = "italic",
-           alpha = 0.6) +
+           label = "Growth",
+           colour = "#666666", size = 4.5, fontface = "bold.italic",
+           alpha = 0.7) +
 
   # ψ* isocline contours
   geom_line(data = iso_df,
@@ -206,11 +206,10 @@ p_a <- ggplot() +
 
   # Theme — clean, legend in lower-right (empty growth zone)
   theme(
-    legend.position = c(0.92, 0.22),
+    legend.position = c(0.18, 0.82),
     legend.justification = c(0.5, 0.5),
-    legend.background = element_rect(fill = alpha("white", 0.92),
-                                     colour = "grey50", linewidth = 0.3),
-    legend.margin = margin(4, 8, 4, 4),
+    legend.background = element_rect(fill = "white", color = "grey40", linewidth = 0.4),
+    legend.margin = margin(4, 6, 4, 6),
     legend.key.size = unit(0.45, "cm"),
     legend.text = element_text(size = 9.5),
     legend.title = element_blank(),
