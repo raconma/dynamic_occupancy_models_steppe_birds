@@ -116,19 +116,24 @@ df_ext <- sort_covs(filter(df, process == "ext"))
 # ── Helper: forest plot ──────────────────────────────────────────────────────
 make_forest <- function(d, title, annotate_ptealc_gamma = FALSE) {
 
-  p <- ggplot(d, aes(x = estimate, y = label)) +
+  dodge <- position_dodge(width = 0.6)
+
+  p <- ggplot(d, aes(x = estimate, y = label, group = species)) +
     geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
     # non-sig error bars in grey
     geom_errorbarh(data = filter(d, !sig),
                    aes(xmin = estimate - 1.96 * se, xmax = estimate + 1.96 * se),
-                   height = 0, colour = "grey70", linewidth = 0.4) +
+                   height = 0, colour = "grey70", linewidth = 0.4,
+                   position = dodge) +
     # sig error bars in dark
     geom_errorbarh(data = filter(d, sig),
                    aes(xmin = estimate - 1.96 * se, xmax = estimate + 1.96 * se),
-                   height = 0, colour = "grey20", linewidth = 0.4) +
+                   height = 0, colour = "grey20", linewidth = 0.4,
+                   position = dodge) +
     geom_point(aes(shape = species, fill = species,
                    alpha = sig), colour = "grey20",
-               size = 3, stroke = 0.4) +
+               size = 3, stroke = 0.4,
+               position = dodge) +
     scale_shape_manual(
       values = sp_pch, labels = sp_labels, name = "Species"
     ) +
