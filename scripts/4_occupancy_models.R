@@ -252,6 +252,10 @@ for (sp in species_codes) {
   }
   rm(.dyn_mats, .nm, .ctrs, .scls, .yi)
 
+  # Save training scaling parameters for use by attribution scripts (8, 10)
+  saveRDS(train_dyn_scale,
+          here("results", paste0(sp, "_train_dyn_scale.rds")))
+
   # -- Build year factor --
   n <- nrow(occ_wide_clean)
   years_df <- data.frame(matrix(rep(YEARS, each = n), n, T_years))

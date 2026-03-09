@@ -1,0 +1,46 @@
+Species: ptealc (REVISED - NDVI removed from gamma)
+Date: 2026-03-08 18:49:53.280642 
+Original AIC: 1973.9 
+Revised AIC: 1981.71 
+Delta AIC: 7.81 
+
+
+Call:
+colext(psiformula = ptealc_data$cfg$psi_formula, gammaformula = ptealc_data$cfg$gamma_formula, 
+    epsilonformula = ptealc_data$cfg$epsilon_formula, pformula = ptealc_data$cfg$p_formula, 
+    data = ptealc_data$umf)
+
+Initial (logit-scale):
+            Estimate    SE      z  P(>|z|)
+(Intercept)   -6.434 0.745 -8.638 5.71e-18
+bio1          -0.569 0.193 -2.955 3.13e-03
+bio2           1.207 0.261  4.621 3.82e-06
+tree_cover    -4.545 0.758 -5.993 2.06e-09
+grass_cover    0.484 0.144  3.366 7.62e-04
+topo_aspect   -0.123 0.124 -0.994 3.20e-01
+
+Colonization (logit-scale):
+            Estimate    SE      z  P(>|z|)
+(Intercept)   -6.591 0.510 -12.93 3.18e-38
+pr            -0.717 0.463  -1.55 1.21e-01
+
+Extinction (logit-scale):
+            Estimate    SE       z P(>|z|)
+(Intercept)  -0.0424  1.87 -0.0227   0.982
+pr          -11.6569 11.60 -1.0048   0.315
+tmmx        -17.6189 14.74 -1.1949   0.232
+
+Detection (logit-scale):
+            Estimate     SE     z  P(>|z|)
+(Intercept)   -1.075 0.2124 -5.06 4.23e-07
+time          -0.367 0.0713 -5.15 2.63e-07
+duration       0.896 0.0940  9.53 1.55e-21
+effort         0.196 0.0746  2.64 8.40e-03
+observers      0.110 0.0765  1.44 1.49e-01
+NDVI_obs      -0.159 0.1377 -1.15 2.49e-01
+pr_obs        -0.292 0.1866 -1.56 1.18e-01
+
+AIC: 1981.707 
+Number of sites: 4130
+ID of sites removed due to NA: 3245
+

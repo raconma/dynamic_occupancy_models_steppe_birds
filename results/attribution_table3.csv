@@ -1,0 +1,5 @@
+"Species","Gamma_climate","Gamma_landuse","Gamma_interaction","Epsilon_climate","Epsilon_landuse","Epsilon_interaction","Climate_frac_gamma","Landuse_frac_gamma","Climate_frac_epsilon","Landuse_frac_epsilon","Dominant_driver","N_gamma_covs","N_epsilon_covs","Note"
+"Otis tarda","-0.000614 (0.005488)","0 (0)","0 (0)","0.000737 (0.01748)","-0.001103 (0.053954)","-4.7e-05 (0.001924)",100,0,-178.5,267.1,"Climate","NDVI, pr, tmmn, tmmx","Land_Cover_Type_1_Percent_Class_6, Land_Cover_Type_1_Percent_Class_13, tmmx",""
+"Pterocles alchata","0 (0)","0 (0)","0 (0)","-0.001262 (0.24855)","0 (0)","0 (0)",NA,NA,100,0,"Climate*","pr","pr, tmmx","gamma excluded (16 events)"
+"Pterocles orientalis","-0.000339 (0.00336)","-0.000177 (0.002302)","6.2e-05 (0.000962)","0.005732 (0.11261)","-0.000212 (0.00665)","-0.000493 (0.003948)",74.5,38.9,114,-4.2,"Climate","Land_Cover_Type_1_Percent_Class_7, NDVI, tmmn, tmmx","Land_Cover_Type_1_Percent_Class_12, NDVI, pr",""
+"Tetrax tetrax","0 (0)","-1e-06 (0.000112)","0 (0)","0 (0)","9e-06 (0.00525)","0 (0)",0,100,0,100,"Land use","Land_Cover_Type_1_Percent_Class_12","Land_Cover_Type_1_Percent_Class_12",""

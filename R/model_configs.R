@@ -36,13 +36,18 @@ get_model_config <- function(species_code) {
     #      at occupied sites, coefficients diverged to ±930).
     #      Removed Class_13 from gamma (only 2/16 colonization events had >0).
     #      Removed tmmn from epsilon (r=0.81 with tmmx, only 18 extinction events).
+    # FIX v4: Removed NDVI from gamma. NDVI is ~50% climate-driven; its
+    #      inclusion caused pr coefficient sign change (+0.162 → -0.717),
+    #      making climate attribution uninterpretable. AIC cost = +8.
+    #      Without NDVI, pr is the sole climate covariate in gamma and its
+    #      sign is ecologically consistent. Decision record: audit_gcb_v4.md.
     ptealc = list(
       psi_formula     = ~ bio1 + bio2 + tree_cover + grass_cover + topo_aspect,
-      gamma_formula   = ~ NDVI + pr,
+      gamma_formula   = ~ pr,
       epsilon_formula = ~ pr + tmmx,
       p_formula       = ~ time + duration + effort + observers + NDVI_obs + pr_obs,
       psi_vars        = c("bio1", "bio2", "tree_cover", "grass_cover", "topo_aspect"),
-      gamma_vars      = c("NDVI", "pr"),
+      gamma_vars      = c("pr"),
       epsilon_vars    = c("pr", "tmmx")
     ),
 
@@ -50,8 +55,11 @@ get_model_config <- function(species_code) {
     # FIX: Removed Class_7 and Class_13 from epsilon (quasi-complete separation:
     #      Class_13=0 in 43/44 transitions, estimate=+109; Class_7 near-zero
     #      at most occupied sites, estimate=-5.4 with NaN SE).
-    #      Kept Class_12 (real variation: ext mean=60 vs persist mean=75),
-    #      NDVI (p=0.016), pr (p<0.001).
+    # FIX v4: NDVI retained in epsilon (AIC-preferred by 60 units). NDVI is
+    #      ~50% climate-driven and is classified as "climate-adjacent" in the
+    #      attribution analysis. A sensitivity model without NDVI is stored
+    #      in results/pteori_epsilon_sensitivity_noNDVI.rds.
+    #      Decision record: decisions_gcb_v4.md (Decision 1, Option B).
     pteori = list(
       psi_formula     = ~ bio2 + tree_cover + grass_cover,
       gamma_formula   = ~ Land_Cover_Type_1_Percent_Class_7 + NDVI + tmmn + tmmx,

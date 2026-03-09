@@ -115,24 +115,42 @@ load_species_data <- function(sp) {
   # Drop sites with missing NDVI (same filter as script 4)
   predict_data <- occ_wide %>% drop_na(paste0("NDVI_", YEARS))
 
-  # Extract raw dynamic covariate matrices and compute training scaling
+  # FIX v4: Load training scaling from scripts/4 instead of recomputing.
+  # scripts/4 scales on ALL rows before drop_na filtering; recomputing here
+  # on filtered rows produced a subtle mismatch in attribution predictions.
+  train_scale_path <- here("results", paste0(sp, "_train_dyn_scale.rds"))
+  if (file.exists(train_scale_path)) {
+    train_scale <- readRDS(train_scale_path)
+    message("  Loaded training scaling from: ", train_scale_path)
+  } else {
+    # Fallback: recompute (matches scripts/4 which scales all rows)
+    warning("  train_dyn_scale not found for ", sp,
+            " — recomputing on filtered rows (legacy behaviour)")
+    train_scale <- list()
+    all_covs <- unique(c(CLIMATE_COVS, LANDUSE_COVS))
+    for (cov in all_covs) {
+      cols <- paste0(cov, "_", YEARS)
+      if (all(cols %in% names(predict_data))) {
+        mat <- as.matrix(predict_data[, cols])
+        scaled_mat <- scale(mat)
+        ctrs <- attr(scaled_mat, "scaled:center")
+        scls <- attr(scaled_mat, "scaled:scale")
+        for (yi in seq_along(YEARS)) {
+          train_scale[[paste0(cov, "_", YEARS[yi])]] <- list(
+            center = ctrs[yi], scale = scls[yi]
+          )
+        }
+      }
+    }
+  }
+
+  # Extract raw dynamic covariate matrices (unscaled)
   all_covs <- unique(c(CLIMATE_COVS, LANDUSE_COVS))
   raw_matrices <- list()
-  train_scale  <- list()
-
   for (cov in all_covs) {
     cols <- paste0(cov, "_", YEARS)
     if (all(cols %in% names(predict_data))) {
-      mat <- as.matrix(predict_data[, cols])
-      scaled_mat <- scale(mat)
-      ctrs <- attr(scaled_mat, "scaled:center")
-      scls <- attr(scaled_mat, "scaled:scale")
-      raw_matrices[[cov]] <- mat
-      for (yi in seq_along(YEARS)) {
-        train_scale[[paste0(cov, "_", YEARS[yi])]] <- list(
-          center = ctrs[yi], scale = scls[yi]
-        )
-      }
+      raw_matrices[[cov]] <- as.matrix(predict_data[, cols])
     }
   }
 

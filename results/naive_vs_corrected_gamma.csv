@@ -1,0 +1,5 @@
+"species","naive_gamma","corrected_gamma","gamma_ratio","naive_epsilon","corrected_epsilon","epsilon_ratio","n_col_events","n_col_opportunities","n_ext_events","n_ext_opportunities"
+"otitar",0.0089,0.0021,0.23,0.4462,0.2643,0.59,17,1901,29,65
+"ptealc",0.0063,0.0017,0.27,0.2812,0.4851,1.72,16,2521,18,64
+"pteori",0.0087,0,0,0.3409,0.2343,0.69,22,2541,15,44
+"tettet",0.0057,0.0011,0.19,0.36,0.1502,0.42,11,1941,9,25
