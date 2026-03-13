@@ -63,7 +63,7 @@ years <- 2017:2023
 n_years <- length(years)
 n_reps  <- 10
 batch_len <- 25
-RUN_PHASE_C <- FALSE   # <-- Change to TRUE when ready (6-24h per species)
+RUN_PHASE_C <- TRUE    # Production run: 100K iterations per chain
 
 
 ###############################################################################
@@ -498,10 +498,10 @@ for (sp in species_codes) {
       phi.unif       = phi_prior
     )
 
-    # Production MCMC settings
-    n_batch_C  <- 800      # 20,000 samples per chain
-    n_burn_C   <- 10000
-    n_thin_C   <- 20
+    # Publication MCMC settings: 100,000 iterations per chain
+    n_batch_C  <- 4000     # 4000 * 25 = 100,000 samples per chain
+    n_burn_C   <- 50000    # 50% burn-in
+    n_thin_C   <- 50       # keep 1,000 per chain -> 3,000 total posterior samples
     n_chains_C <- 3
 
     cat("  Fitting stPGOcc (NNGP, n.neighbors=5, ar1=TRUE)...\n")
