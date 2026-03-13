@@ -43,6 +43,8 @@ The study covers mainland Spain (494,011 km²), divided into a regular 5-km UTM 
 
 The mobility gradient is directly relevant to the closure assumption: within-season movements by the semi-nomadic sandgrouse may partially violate the assumption that sites are closed to occupancy change during the sampling window (see Section 4, Limitations).
 
+![Figure 1. Study area and sampling effort.](../figs/pub_fig1_study_area_v2.png)
+
 ### 2.2 eBird data and filtering
 
 Occurrence data were obtained from the eBird Basic Dataset (Sullivan et al. 2009) for mainland Spain, 2017–2023. Following Johnston et al. (2021), we filtered checklists to ≤5 hours duration, ≤5 km distance, and ≤10 observers, retaining only complete checklists to allow valid zero-filling. Each checklist was assigned to its corresponding 5-km grid cell; repeat visits within the same cell and breeding season formed the detection histories used for occupancy estimation. The number of eBird checklists in Spain increased by 256% between 2017 and 2023. We tested for effort confounding by computing Spearman correlations between naive cell-level occupancy and annual checklist count; no significant correlation was detected for three of four species (rho = −0.25 to 0.37, all P > 0.10). For *P. alchata*, a marginally significant correlation was observed (rho = 0.64, P = 0.05); this species' colonisation submodel is treated with additional caution throughout.
@@ -126,6 +128,8 @@ Without detection correction, apparent colonisation rates (0.57–0.89% per site
 
 The critical inference is not the magnitude of correction itself but its qualitative consequence: naive gamma values fall in a range that could appear demographically manageable, whereas corrected values are unambiguously insufficient to offset observed extinction. Without detection correction, the demographic trap is invisible (H3 supported).
 
+![Figure 2. Uncorrected occupancy models overstate colonisation potential by 5- to 22,000-fold.](../figs/pub_fig1_naive_vs_corrected.png)
+
 ### 3.3 The demographic trap: extinction dominates colonisation by orders of magnitude
 
 Across all four species, detection-corrected extinction rates exceeded colonisation rates by two to six orders of magnitude (Table 5; Fig. 3). The asymmetry was robust across the full bootstrap distribution: even at the lower 95% CI of epsilon and the upper 95% CI of gamma, the ratio remained above 14 for every species, confirming a structural demographic constraint rather than a precision artefact. The probability that the ratio exceeds 100, a threshold below which some metapopulation recovery remains theoretically possible, ranged from 81.4% (*P. alchata*) to 99.3% (*P. orientalis*).
@@ -169,15 +173,23 @@ Recolonisation time = 1/gamma (years). Prevalence values integrate over the full
 
 Model-simulated mean occupancy declined over the study period for all four species. *P. orientalis* showed the steepest decline (−37.9%), followed by *P. alchata* (−27.3%), *O. tarda* (−11.7%), and *T. tetrax* (−3.1%), consistent with the ranking of demographic asymmetry.
 
+![Figure 3. Demographic state space and extinction debt.](../figs/pub_fig_isocline_equilibrium.png)
+
 ### 3.4 Spatial expression of the demographic trap
 
 The colonisation-extinction imbalance is not uniformly distributed across the Iberian Peninsula (Fig. 4). Cell-level log₁₀(epsilon/gamma) maps reveal species-specific geographic concentrations of demographic risk. For *O. tarda*, the highest ratios cluster around expanding urban peripheries of central meseta cities, consistent with the strong LC13 effect on extinction. For *P. orientalis*, near-total demographic failure extends across the species' entire range, with the southwestern populations facing the most extreme ratios. For *P. alchata*, the Ebro valley concentrations carry the highest extinction pressure. *T. tetrax* shows the most spatially uniform pattern, with lower and more moderate ratios reflecting its near-equilibrium state. The spatial juxtaposition of high predicted initial occupancy (psi₁) with high extinction risk identifies specific regions where currently occupied habitat faces the greatest demographic pressure, the operational targets for extinction-prevention interventions.
+
+![Figure 4a. Predicted initial occupancy across the Iberian Peninsula.](../figs/pub_map_occupancy_4species.png)
+
+![Figure 4b. Spatial expression of the demographic trap: log₁₀(epsilon/gamma).](../figs/pub_fig3_bivariate_risk_map.png)
 
 ### 3.5 Environmental drivers by demographic process
 
 Environmental drivers showed clear species-specific signatures (Fig. 5; full coefficients in Supplementary S2), but a cross-species pattern partitions drivers by demographic process.
 
 Climate variables dominated the colonisation submodels for three of four species. For *O. tarda*, NDVI (climate-adjacent; beta = −1.45, P < 0.05) and minimum temperature (beta = −4.52, P < 0.05) constrain colonisation, suggesting that vegetation encroachment and cold-season severity limit establishment at new sites. For *P. orientalis*, minimum temperature strongly reduced colonisation (beta = −8.11, P = 0.002) while maximum temperature increased it (beta = +9.14, P < 0.001), indicating sensitivity to the diurnal temperature range during the breeding season. *T. tetrax* was the exception: cropland (LC12) was the sole significant colonisation driver (beta = +0.90, P < 0.05), with no climate variable retained.
+
+![Figure 5. Environmental drivers of occupancy dynamics.](../figs/pub_fig2_forest_3submodels.png)
 
 Land-use variables played a more prominent role in extinction, but in species-specific configurations. Urban encroachment (LC13) was the dominant extinction driver for *O. tarda* (beta = +2.80, P < 0.001). For *P. orientalis*, NDVI strongly increased extinction (beta = +2.05, P < 0.001; climate-adjacent) while cropland simultaneously reduced it (LC12, beta = −0.83, P = 0.02), indicating that agricultural mosaics buffer local extinction risk. For *T. tetrax*, cropland reduced extinction (LC12, beta = −0.57, P < 0.05), making it the only species for which a single management lever, maintaining agricultural land use through agri-environment schemes, can simultaneously increase colonisation and reduce extinction.
 
