@@ -7,13 +7,13 @@ Map.centerObject(coords, 11);
 
 // Define the time range for filtering the MODIS image collection (NDVI/EVI, Land Cover, and Temperature)
 var time_start_ndviEvi = '2017-05-01';
-var time_end_ndviEvi = '2022-08-31';
+var time_end_ndviEvi = '2023-08-31';
 
 var time_start_landCover = '2017-01-01';
-var time_end_landCover = '2022-12-31';
+var time_end_landCover = '2023-12-31';
 
 var time_start_temperature = '2017-05-01';
-var time_end_temperature = '2022-08-31';
+var time_end_temperature = '2023-08-31';
 
 // Import the MODIS NDVI and EVI image collection
 var ndviEviCollection = ee.ImageCollection("MODIS/061/MOD13A3").filterDate(time_start_ndviEvi, time_end_ndviEvi);
@@ -36,7 +36,7 @@ var landCoverSubset = landCoverCollection.select([
 var temperatureCollection = ee.ImageCollection("IDAHO_EPSCOR/TERRACLIMATE").filterDate(time_start_temperature, time_end_temperature);
 var temperatureSubset = temperatureCollection.select(['tmmn', 'tmmx', 'pr']);
 
-var years = [2017, 2018, 2019, 2020, 2021, 2022];
+var years = [2017, 2018, 2019, 2020, 2021, 2022, 2023];
 
 // Function to process each point and extract statistics for NDVI/EVI, Land Cover, and Temperature
 var processPoint = function(point) {
