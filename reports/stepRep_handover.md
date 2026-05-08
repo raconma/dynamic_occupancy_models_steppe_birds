@@ -1,220 +1,229 @@
-# stepRep — paquete de entrega para refitting de los modelos
+# stepRep — entrega para refitting de los modelos
 
-Documento de integración pensado para que el operador del modelo (Raúl) pueda
-añadir la covariable de representatividad esteparia al submodelo de detección
-sin necesidad de re-ejecutar `scripts/build_stepRep.R`.
+Documento de integración para que el operador del modelo (Raúl) pueda
+añadir la covariable de representatividad esteparia al submodelo de
+detección con la **mínima fricción posible** dentro de la pipeline ya
+existente (`scripts/1..4` + `R/model_configs.R`).
 
-## 1. Qué se entrega
+## TL;DR — los 3 pasos
 
-Cuatro tablas (una por especie), formato CSV o RDS, cada una en
-`data/derived/`:
+1. **Asegurarse de tener las tablas de la covariable.** Si no las tiene,
+   regenerar (~5 min) con `Rscript scripts/build_stepRep.R`. Si Guille
+   se las pasa por correo / Zenodo, copiarlas a
+   `data/derived/stepRep_cellyear_{otitar,ptealc,pteori,tettet}.csv`.
 
-```
-stepRep_cellyear_otitar.{csv,rds}    # Otis tarda
-stepRep_cellyear_ptealc.{csv,rds}    # Pterocles alchata   (piloto recomendado)
-stepRep_cellyear_pteori.{csv,rds}    # Pterocles orientalis
-stepRep_cellyear_tettet.{csv,rds}    # Tetrax tetrax
-```
+2. **Correr el script integrador (una vez):**
+   ```
+   Rscript scripts/3b_add_stepRep.R
+   ```
+   Este paso añade 28 columnas yearly-site-cov a cada
+   `data/processed_2023/{sp}/{sp}_occ_wide_dynamic.csv` (4 variantes ×
+   7 años: strict/broad × 500 m/1 km × 2017–2023). Es idempotente y
+   no destructivo: si los `stepRep_*_<year>` ya están, no hace nada;
+   y en cualquier caso siempre se puede regenerar el dynamic CSV
+   re-corriendo `scripts/3_prepare_dynamic_variables.R`.
 
-Estructura (9 columnas, ~42–46 k filas por especie):
+3. **Aplicar los 3 patches mínimos a `scripts/4_occupancy_models.R` y
+   `R/model_configs.R`** (detallados abajo) y re-ejecutar el step 4 como
+   siempre. Los patches añaden 4 líneas y modifican 1.
 
-| columna                | tipo  | rango   | descripción |
-|------------------------|-------|---------|-------------|
-| `cells`                | int   | —       | índice de celda en la malla WorldClim 5 km (mismo `cells` que ya usa la pipeline) |
-| `year`                 | int   | 2017–2023 | año |
-| `n_checklists`         | int   | ≥ 1     | nº de checklists eBird de la especie en esa celda-año |
-| `stepRep_strict_point` | num   | 0–1     | proporción de checklists cuyo píxel CAE en hábitat estricto (211/231/321/333) |
-| `stepRep_broad_point`  | num   | 0–1     | idem con máscara amplia (+ 242/243/244) |
-| `stepRep_strict_500m`  | num   | 0–1     | **principal** — proporción media de buffer 500 m en hábitat estricto |
-| `stepRep_strict_1km`   | num   | 0–1     | sensibilidad — buffer 1 km, máscara estricta |
-| `stepRep_broad_500m`   | num   | 0–1     | sensibilidad — buffer 500 m, máscara amplia |
-| `stepRep_broad_1km`    | num   | 0–1     | sensibilidad — buffer 1 km, máscara amplia |
+A partir de ahí, todo el pipeline downstream
+(`5_validation.R`, `15_parboot_publication.R`,
+`18_stPGOcc_production_run.R`, etc.) sigue funcionando sin cambios.
 
-Variable principal sugerida para el ajuste piloto: **`stepRep_strict_500m`**.
+## 1. Por qué este patrón
 
-Acompañar con: [reports/stepRep_diagnostics.md](stepRep_diagnostics.md)
-(documentación + figuras), por si Raúl necesita el contexto antes de tocar
-código.
+`scripts/4_occupancy_models.R` ya construye el `unmarkedMultFrame` a
+partir de `{sp}_occ_wide_dynamic.csv` extrayendo cada covariable yearly
+con `occ_wide_clean[, paste0("<varname>_", YEARS)]` (ver bloque líneas
+~215–225, donde se cargan `EVI`, `NDVI`, `pr`, `tmmn`, `tmmx` y los
+`Land_Cover_Type_1_Percent_Class_*`). `stepRep` encaja exactamente en
+ese mismo molde porque es también una **yearly site covariate**: un
+valor por (cell, año). La integración minimiza fricción porque:
 
-## 2. Quick start (R)
+- No cambia el sitio donde se cargan los datos (`occ_wide_dynamic.csv`).
+- No cambia el formato de las columnas (sigue siendo `<varname>_<year>`).
+- No cambia la estructura del `unmarkedMultFrame`.
+- No requiere tocar nada en steps 1–3 ni en R/.
+
+Verificado: la columna `cells` que usa la pipeline es el índice de la
+malla WorldClim 5 km, idéntica al `cells` que produce `build_stepRep.R`.
+Para *Pterocles alchata*, el solapamiento `pipeline ∩ stepRep` es
+**4 131 / 4 131 celdas** (100 %).
+
+Nota: tras unir, ~38 % de cell-years quedan inicialmente como NA porque
+ese cell tuvo visitas en algunos años pero no en otros. Se imputan
+primero por la media temporal del propio cell (siempre disponible, ya
+que cada site tiene ≥ 1 año con stepRep real); el fallback de mediana
+global queda en 0 NAs en los 4 species. Esto es suficiente para
+unmarked y preserva la variación temporal en los cells con datos en
+varios años (que es donde el modelo aprende el efecto).
+
+## 2. Patches a `scripts/4_occupancy_models.R`
+
+Tres adiciones, todas dentro del loop por especie. Las líneas de
+referencia son del fichero actual (commit `4ec50ca`).
+
+### Patch 1 — extraer la matriz (después de `tmmx`, ~línea 223)
+
+Buscar el final del bloque que extrae las yearly site covs:
 
 ```r
-library(here)
-library(data.table)
-
-sp <- "ptealc"  # piloto
-stepRep <- fread(here("data","derived",
-                      paste0("stepRep_cellyear_", sp, ".csv")))
-stepRep
-#       cells  year  n_checklists  stepRep_strict_point ...  stepRep_strict_500m ...
-# 1:    1234   2017             3                 0.000               0.045 ...
-# 2:    1234   2018             5                 0.200               0.183 ...
+  tmmx <- occ_wide_clean[, paste0("tmmx_", YEARS)]
 ```
 
-Clave de unión con la tabla de modelos: **`cells`** (indices WorldClim) +
-**`year`**.
-
-## 3. Integración en `colext` (unmarked)
-
-`stepRep_strict_500m` es una **yearly site covariate** (un valor por
-(celda, año)) y entra en el `pformula`. Encaja directamente en el mismo
-slot que tu pipeline ya usa para `Land_Cover_Type_1_Percent_Class_*`,
-`NDVI`, `pr`, `tmmn`, `tmmx` (cf. `scripts/4_occupancy_models.R:276–286`).
+Añadir inmediatamente debajo:
 
 ```r
-library(unmarked); library(data.table)
+  stepRep <- occ_wide_clean[, paste0("stepRep_strict_500m_", YEARS)]
+```
 
-YEARS <- 2017:2023
-sp    <- "ptealc"
+### Patch 2 — estandarizar (después de `tmmx <- scale(tmmx)`, ~línea 235)
 
-# (1) Cargar la covariable y poner en wide: filas = cells, cols = years
-stepRep_long <- fread(here("data","derived",
-                           paste0("stepRep_cellyear_", sp, ".csv")))
-stepRep_wide <- dcast(stepRep_long, cells ~ year,
-                      value.var = "stepRep_strict_500m")
+Buscar el final del bloque de estandarización:
 
-# (2) Alinear con el orden de filas del occ_wide_clean (sites del modelo)
-stepRep_wide <- stepRep_wide[match(occ_wide_clean$cells, cells)]
-stepRep_mat  <- as.matrix(stepRep_wide[, as.character(YEARS), with = FALSE])
+```r
+  tmmx <- scale(tmmx)
+```
 
-# (3) Tratar NAs: cell-years sin checklists pueden quedar NA porque no
-#     existen en stepRep_long. Decisión recomendada: imputar con la media
-#     temporal del propio cell (intuitivo y conserva los efectos fijos);
-#     si el cell no tiene NINGUNA observación en ningún año, asignar la
-#     mediana global. unmarked descarta filas con covariables NA en p,
-#     así que no imputar perderia esas visitas.
-row_means <- rowMeans(stepRep_mat, na.rm = TRUE)
-for (j in seq_len(ncol(stepRep_mat))) {
-  na_mask <- is.na(stepRep_mat[, j])
-  stepRep_mat[na_mask, j] <- row_means[na_mask]
-}
-stepRep_mat[is.na(stepRep_mat)] <- median(stepRep_long$stepRep_strict_500m,
-                                          na.rm = TRUE)
+Añadir inmediatamente debajo:
 
-# (4) Estandarizar (centrar y escalar). Guardar parametros para prediccion
-#     consistente, igual que se hace ya con NDVI/pr/tmmn/tmmx en el script 4.
-mu_step    <- mean(stepRep_mat)
-sigma_step <- sd(stepRep_mat)
-stepRep_mat_z <- (stepRep_mat - mu_step) / sigma_step
-colnames(stepRep_mat_z) <- as.character(YEARS)
+```r
+  stepRep <- scale(stepRep)
+```
 
-# (5) Anadir al unmarkedMultFrame existente:
-occ_umf <- unmarkedMultFrame(
-  y = y.cross,
-  siteCovs = data.frame(siteCovs),
-  yearlySiteCovs = list(
-    years  = years_df,
-    EVI    = EVI,
+### Patch 3 — capturar parámetros de escalado (~línea 240–253)
+
+Dentro del bloque que construye `train_dyn_scale` con la lista
+`.dyn_mats`, añadir `stepRep = stepRep` a la lista:
+
+```r
+  .dyn_mats <- list(
+    EVI = EVI, NDVI = NDVI, pr = pr, tmmn = tmmn, tmmx = tmmx,
     Land_Cover_Type_1_Percent_Class_0  = Land_Cover_Type_1_Percent_Class_0,
     # ... resto igual ...
-    NDVI = NDVI, pr = pr, tmmn = tmmn, tmmx = tmmx,
-    stepRep = stepRep_mat_z              # <-- nueva yearly site cov
-  ),
-  obsCovs = list(
-    duration = duration, effort = effort, observers = observers, time = time,
-    NDVI_obs = NDVI_obs, pr_obs = pr_obs,
-    topo_aspect_obs = topo_aspect_obs, topo_elev_obs = topo_elev_obs
-  ),
-  numPrimary = T_years
-)
-
-# (6) Anadir al pformula del modelo final. Para Pterocles alchata el
-#     formula actual en R/model_configs.R es:
-#       ~ effort + observers + time
-#     Pasaria a:
-#       ~ effort + observers + time + stepRep
-Mod.final <- colext(
-  psiformula     = cfg$psi_formula,
-  gammaformula   = cfg$gamma_formula,
-  epsilonformula = cfg$epsilon_formula,
-  pformula       = ~ effort + observers + time + stepRep,
-  data           = occ_umf
-)
-
-# (7) Guardar parametros de escalado igual que el resto de dynamic vars:
-train_dyn_scale[["stepRep"]]$center <- mu_step
-train_dyn_scale[["stepRep"]]$scale  <- sigma_step
-saveRDS(train_dyn_scale,
-        here("results", paste0(sp, "_train_dyn_scale.rds")))
+    Land_Cover_Type_1_Percent_Class_14 = Land_Cover_Type_1_Percent_Class_14,
+    stepRep = stepRep                       # <-- añadir
+  )
 ```
 
-## 4. Integración en `stPGOcc` (spOccupancy)
+Esto guarda center/scale por año en `{sp}_train_dyn_scale.rds`, igual
+que el resto. Necesario para que los scripts de atribución (8, 10) y
+de predicción puedan reescalar consistentemente.
 
-`stPGOcc` espera `det.covs` como lista; las covariables que varían por
-(celda, año) se pasan como matrices `n_sites x n_primary_years` —misma
-forma que `stepRep_mat_z` arriba. Anadir:
+### Patch 4 — añadir al `yearlySiteCovs` (~línea 276–287)
 
 ```r
-det.covs <- list(
-  effort    = effort_array,    # ya en uso
-  duration  = duration_array,
-  observers = observers_array,
-  time      = time_array,
-  stepRep   = stepRep_mat_z    # <-- aqui
-)
-
-fit <- stPGOcc(
-  occ.formula = ~ ...,
-  det.formula = ~ effort + duration + observers + time + stepRep,
-  data        = list(y = y_array, occ.covs = occ.covs, det.covs = det.covs,
-                     coords = coords, ...),
-  n.batch = ..., batch.length = ..., n.neighbors = 10,
-  ...
-)
+  occ_umf <- unmarkedMultFrame(
+    y = y.cross,
+    siteCovs = data.frame(siteCovs),
+    yearlySiteCovs = list(
+      years  = years_df,
+      EVI    = EVI,
+      Land_Cover_Type_1_Percent_Class_0  = Land_Cover_Type_1_Percent_Class_0,
+      # ... resto igual ...
+      NDVI = NDVI, pr = pr, tmmn = tmmn, tmmx = tmmx,
+      stepRep = stepRep                     # <-- añadir
+    ),
+    obsCovs = list( ... ),
+    numPrimary = T_years
+  )
 ```
 
-Equivalente a `colext`: una vez confirmado el efecto en `ptealc`, extender
-a las otras tres especies.
+## 3. Patch a `R/model_configs.R`
+
+Editar el `p_formula` de cada especie. Para el piloto en *Pterocles
+alchata* (línea 86 actual):
+
+```r
+      p_formula       = ~ effort + observers + time,
+```
+
+cambiar a:
+
+```r
+      p_formula       = ~ effort + observers + time + stepRep,
+```
+
+Replicar análogamente para las otras tres especies (líneas 27, 48, 67)
+una vez confirmado el efecto en ptealc.
+
+## 4. Cómo correr la sensibilidad
+
+`scripts/3b_add_stepRep.R` añade 4 variantes (28 columnas en total):
+strict 500 m, strict 1 km, broad 500 m, broad 1 km. Para reportar la
+sensibilidad sólo hay que cambiar la línea del Patch 1:
+
+```r
+  stepRep <- occ_wide_clean[, paste0("stepRep_strict_1km_",  YEARS)]   # buffer 1 km
+  stepRep <- occ_wide_clean[, paste0("stepRep_broad_500m_",  YEARS)]   # incluye dehesa
+  stepRep <- occ_wide_clean[, paste0("stepRep_broad_1km_",   YEARS)]   # ambas combinadas
+```
+
+y re-ejecutar el step 4 con cada variante. El resto de patches son
+idénticos. El nombre `stepRep` en la fórmula no cambia.
 
 ## 5. Lectura del coeficiente
 
-- **Direccion esperada**: positiva. Mayor stepRep en una celda-año implica
-  que mas checklists caen en hábitat compatible -> mayor p de detección.
-- **Magnitud orientativa**: el efecto sobre la probabilidad de detección
-  por checklist deberia ser sustancial (al menos 0.1 logit por SD de
-  stepRep) si la firma temporal observada en celdas focales es real.
-- **Test de robustez**: comparar gamma y epsilon con/sin stepRep:
-  - Si gamma baja y epsilon sube al anadir stepRep -> el sesgo
-    diagnosticado en `reports/stepRep_diagnostics.md` §5 estaba inflando
-    gamma y deflactando epsilon en los modelos previos. Ese es el
-    resultado esperable dada la tendencia ascendente de stepRep en
-    celdas focales 2017–2023.
-  - Si los puntos estimados de gamma/epsilon apenas se mueven, stepRep
-    no esta absorbiendo sesgo y la covariable puede dejarse fuera del
-    modelo final, pero sigue siendo defendible reportarla como auxiliar.
-- **Sensibilidades**: re-ajustar el modelo con `stepRep_strict_1km` y con
-  `stepRep_broad_500m` y reportar (Tabla suplementaria). La firma de
-  resultados debería mantener signo y orden de magnitud.
+- **Dirección esperada**: positiva. Mayor stepRep en una celda-año
+  significa que más checklists caen sobre hábitat compatible →
+  mayor *p* de detección por checklist.
+- **Magnitud orientativa**: para que el efecto sobre γ y ε sea visible,
+  el coeficiente sobre `stepRep` (logit) debería ser de al menos
+  ~0.1–0.3 por SD. Por debajo de eso la covariable está cerca de ser
+  irrelevante a este nivel de agregación.
+- **Test de robustez**: comparar γ y ε con/sin `stepRep`:
+  - Si γ baja y ε sube al añadir `stepRep` → la firma temporal
+    descrita en `stepRep_diagnostics.md` §5 estaba inflando γ y
+    deflactando ε. Es lo esperable dado que stepRep sube monotónicamente
+    en celdas focales 2017–2023.
+  - Si γ y ε apenas se mueven → `stepRep` no está absorbiendo sesgo
+    a este nivel de agregación. Reportarla como auxiliar igualmente.
 
 ## 6. Banderas rojas
 
-1. La tendencia temporal en celdas focales **sube** durante 2017–2023
-   (~0.10–0.14 sobre la escala 0–1, ver §5 del informe diagnóstico). Esto
-   es lo opuesto a la hipótesis inicial. La covariable sigue motivada,
-   pero la dirección esperada del coeficiente y el sentido del sesgo
-   detectado en gamma/epsilon va al revés de lo que pensábamos.
-2. La correlación de Spearman entre `log(n_checklists)` y stepRep por
-   celda-año es **prácticamente cero** (-0.005 a -0.05). Si tus modelos
-   ya controlan por effort, **eso no captura este sesgo**: el sesgo
-   opera vía estructura espacial intra-celda, no vía esfuerzo.
-3. La covariable no es independiente del esfuerzo en cell-years muy
-   pequeñas (n=1: stepRep_strict_500m solo puede tomar valores en
-   {0, focal_strict_500m(checklist único)}). Si n_checklists < 2 te
-   incomoda, podemos reportar dos versiones del modelo: con todas las
-   celda-año y con n_checklists ≥ 3.
-4. Imputar NAs por media-de-celda (pasos 3 del Quick start) afecta a
-   <5% de celda-años. Probar también con la imputación a 0 (ningún
-   checklist visitó hábitat estepario ese año) para ver sensibilidad.
+1. La tendencia temporal en celdas focales **sube** (≈ +0.10–0.14 sobre
+   la escala 0–1 a lo largo de 2017–2023, ver §5 del informe
+   diagnóstico). Esto va al revés de la hipótesis "newcomers diluyen el
+   muestreo". El sesgo es real y temporal, pero su signo es opuesto al
+   asumido inicialmente: los checklists tardíos en celdas focales son
+   **más informativos por visita** que los tempranos.
+2. La correlación de Spearman entre `log(n_checklists)` y `stepRep` por
+   celda-año es **prácticamente cero** (-0.005 a -0.05). Si los modelos
+   ya controlan por `effort`/`observers`/`duration`, eso **no** captura
+   el sesgo: el sesgo opera vía estructura espacial intra-celda, no vía
+   esfuerzo agregado.
+3. ~38 % de los cell-years en las tablas del modelo se imputan
+   (row-mean). Para los cells con datos en varios años la imputación
+   conserva la variación; para los cells con un sólo año observado
+   queda un valor constante a lo largo de los 7 años. Si Raúl quiere
+   ser conservador puede filtrar `n_checklists ≥ 3` por celda-año antes
+   de imputar (cambio menor en `scripts/3b_add_stepRep.R`); reportar
+   ambas versiones como sensibilidad.
 
-## 7. Reproducibilidad
+## 7. Diagnósticos previos al fit
 
-- Script generador: [scripts/build_stepRep.R](../scripts/build_stepRep.R).
-  Es idempotente (skip-if-exists). Tiempo end-to-end ~5–6 min en M2 con
-  CORINE recortada en disco.
-- Inputs requeridos para regenerar: CORINE 2018 v2020_20u1 (100 m, EPSG:3035),
-  los CSVs zero-fill de eBird por especie y la malla WorldClim. Documentado
-  al inicio del script.
-- Versionado: el commit
-  `4ec50ca Add steppe-representativeness covariate (CLC2018) for detection sub-model`
-  cierra el entregable. Los outputs binarios (rasters, RDS, CSVs derivadas)
-  están en `data/derived/` y no van al repositorio (se regeneran).
+`reports/stepRep_diagnostics.md` (mismo commit) contiene:
+
+- §1: provenencia y máscara CORINE.
+- §3: frecuencia de clases CLC bajo checklists (sesgo birder
+  cuantificado).
+- §5: tendencia temporal por celdas focales vs peninsulares (figura).
+- §6: mapa de stepRep medio por celda Iberia 5 km.
+- §7: correlación con esfuerzo (figura).
+- §10: borrador de Methods y Results en prosa narrativa, listo para
+  insertar en el manuscrito GCB con marcas `[REF NEEDED]`.
+
+## 8. Reproducibilidad
+
+```
+scripts/build_stepRep.R   # CORINE → focal rasters → cell-year table  (~5 min)
+scripts/3b_add_stepRep.R  # cell-year → wide model table              (~10 s)
+scripts/4_occupancy_models.R    # fit colext (con los patches arriba)
+scripts/18_stPGOcc_production_run.R   # fit stPGOcc (análogo, det.covs)
+```
+
+Commits que cierran el entregable:
+- `4ec50ca` — Add steppe-representativeness covariate (CLC2018) for detection sub-model
+- `0cf9f43` — Add stepRep handover doc with concrete colext / stPGOcc integration
+- (este) — Add 3b_add_stepRep.R integrator + minimal-friction recipe
