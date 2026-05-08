@@ -5,46 +5,55 @@ añadir la covariable de representatividad esteparia al submodelo de
 detección con la **mínima fricción posible** dentro de la pipeline ya
 existente (`scripts/1..4` + `R/model_configs.R`).
 
-## TL;DR — los 3 pasos
+## TL;DR — opción A: solo correr (recomendada)
 
-1. **Asegurarse de tener las tablas de la covariable.** Si no las tiene,
-   regenerar (~5 min) con `Rscript scripts/build_stepRep.R`. Si Guille
-   se las pasa por correo / Zenodo, copiarlas a
-   `data/derived/stepRep_cellyear_{otitar,ptealc,pteori,tettet}.csv`.
+```
+Rscript scripts/4_occupancy_models_v2.R
+```
 
-2. **Correr el script integrador (una vez):**
-   ```
-   Rscript scripts/3b_add_stepRep.R
-   ```
-   Este paso añade 28 columnas yearly-site-cov a cada
-   `data/processed_2023/{sp}/{sp}_occ_wide_dynamic.csv` (4 variantes ×
-   7 años: strict/broad × 500 m/1 km × 2017–2023). Es idempotente y
-   no destructivo: si los `stepRep_*_<year>` ya están, no hace nada;
-   y en cualquier caso siempre se puede regenerar el dynamic CSV
-   re-corriendo `scripts/3_prepare_dynamic_variables.R`.
+Eso ya hace todo:
 
-3. **Aplicar los 3 patches mínimos a `scripts/4_occupancy_models.R` y
-   `R/model_configs.R`** (detallados abajo) y re-ejecutar el step 4 como
-   siempre. Los patches añaden 4 líneas y modifican 1.
+1. Si `data/derived/stepRep_cellyear_*.csv` no existen, regenerarlas con
+   `Rscript scripts/build_stepRep.R` antes (~5 min).
+2. `4_occupancy_models_v2.R` detecta automáticamente si las columnas
+   `stepRep_*_<year>` no están en los CSVs `_occ_wide_dynamic.csv` y
+   en ese caso `source()` a `scripts/3b_add_stepRep.R`.
+3. Después fija `cfg$p_formula <- update(cfg$p_formula, ~ . + stepRep_obs)`
+   inline (no toca `R/model_configs.R`) y ajusta colext con `stepRep`
+   añadido al submodelo de detección.
+4. Todos los outputs llevan tag `_v2`
+   (`results/{sp}_v2_model_object.rds`, `figs/{sp}_v2_*.png`, etc.) para
+   no machacar los fits sin stepRep.
 
-A partir de ahí, todo el pipeline downstream
-(`5_validation.R`, `15_parboot_publication.R`,
-`18_stPGOcc_production_run.R`, etc.) sigue funcionando sin cambios.
+Si quieres cambiar de variante (`stepRep_strict_1km`, `stepRep_broad_500m`,
+`stepRep_broad_1km`), edita la constante `STEPREP_VARIANT` al principio
+del script y re-corre.
+
+## Opción B: aplicar los patches a mano sobre `scripts/4_occupancy_models.R`
+
+Si prefiere modificar el script v1 (porque ya lo tiene tuneado o
+quiere mantener una sola ruta de entrada), los patches mínimos están
+descritos abajo. La opción A es equivalente.
 
 ## 1. Por qué este patrón
 
 `scripts/4_occupancy_models.R` ya construye el `unmarkedMultFrame` a
-partir de `{sp}_occ_wide_dynamic.csv` extrayendo cada covariable yearly
-con `occ_wide_clean[, paste0("<varname>_", YEARS)]` (ver bloque líneas
-~215–225, donde se cargan `EVI`, `NDVI`, `pr`, `tmmn`, `tmmx` y los
-`Land_Cover_Type_1_Percent_Class_*`). `stepRep` encaja exactamente en
-ese mismo molde porque es también una **yearly site covariate**: un
-valor por (cell, año). La integración minimiza fricción porque:
+partir de `{sp}_occ_wide_dynamic.csv` extrayendo cada covariable
+dinámica con dos formas paralelas: una matriz `<var>` (n_sites × T_years)
+en `yearlySiteCovs` y una matriz expandida `<var>_obs` (n_sites × T·J_reps)
+en `obsCovs`. Ej.: `NDVI` en yearly + `NDVI_obs` en obs. `stepRep` encaja
+en ese mismo molde:
 
-- No cambia el sitio donde se cargan los datos (`occ_wide_dynamic.csv`).
-- No cambia el formato de las columnas (sigue siendo `<varname>_<year>`).
-- No cambia la estructura del `unmarkedMultFrame`.
-- No requiere tocar nada en steps 1–3 ni en R/.
+- `stepRep` (yearly) → captura per-year scaling para `train_dyn_scale`,
+  igual que NDVI/pr/tmmn/tmmx.
+- `stepRep_obs` (expandida) → entra en `pformula` como
+  `~ ... + stepRep_obs`, como `NDVI_obs`.
+
+La integración no toca ni el formato de los datos ni la estructura del
+`unmarkedMultFrame`. Y el helper de response curves del script
+(`plot_response_curves`) acepta cualquier covariable que esté en
+`obsCovs`, así que `stepRep_obs` aparece automáticamente en la figura
+de detección.
 
 Verificado: la columna `cells` que usa la pipeline es el índice de la
 malla WorldClim 5 km, idéntica al `cells` que produce `build_stepRep.R`.
@@ -55,47 +64,32 @@ Nota: tras unir, ~38 % de cell-years quedan inicialmente como NA porque
 ese cell tuvo visitas en algunos años pero no en otros. Se imputan
 primero por la media temporal del propio cell (siempre disponible, ya
 que cada site tiene ≥ 1 año con stepRep real); el fallback de mediana
-global queda en 0 NAs en los 4 species. Esto es suficiente para
+global queda en 0 NAs en las 4 especies. Esto es suficiente para
 unmarked y preserva la variación temporal en los cells con datos en
 varios años (que es donde el modelo aprende el efecto).
 
-## 2. Patches a `scripts/4_occupancy_models.R`
+## 2. Patches a `scripts/4_occupancy_models.R` (opción B)
 
-Tres adiciones, todas dentro del loop por especie. Las líneas de
-referencia son del fichero actual (commit `4ec50ca`).
+Cinco adiciones dentro del loop por especie. Líneas de referencia
+del fichero v1 (commit `4ec50ca`).
 
-### Patch 1 — extraer la matriz (después de `tmmx`, ~línea 223)
-
-Buscar el final del bloque que extrae las yearly site covs:
+### Patch 1 — extraer la matriz yearly (después de `tmmx`, ~línea 207)
 
 ```r
   tmmx <- occ_wide_clean[, paste0("tmmx_", YEARS)]
+  stepRep <- occ_wide_clean[, paste0("stepRep_strict_500m_", YEARS)]   # añadir
 ```
 
-Añadir inmediatamente debajo:
-
-```r
-  stepRep <- occ_wide_clean[, paste0("stepRep_strict_500m_", YEARS)]
-```
-
-### Patch 2 — estandarizar (después de `tmmx <- scale(tmmx)`, ~línea 235)
-
-Buscar el final del bloque de estandarización:
+### Patch 2 — estandarizar (después de `tmmx <- scale(tmmx)`, ~línea 227)
 
 ```r
   tmmx <- scale(tmmx)
+  stepRep <- scale(stepRep)                                            # añadir
 ```
 
-Añadir inmediatamente debajo:
+### Patch 3 — capturar el scaling per-year (~línea 234–243)
 
-```r
-  stepRep <- scale(stepRep)
-```
-
-### Patch 3 — capturar parámetros de escalado (~línea 240–253)
-
-Dentro del bloque que construye `train_dyn_scale` con la lista
-`.dyn_mats`, añadir `stepRep = stepRep` a la lista:
+Añadir `stepRep = stepRep` al final de la lista `.dyn_mats`:
 
 ```r
   .dyn_mats <- list(
@@ -103,37 +97,48 @@ Dentro del bloque que construye `train_dyn_scale` con la lista
     Land_Cover_Type_1_Percent_Class_0  = Land_Cover_Type_1_Percent_Class_0,
     # ... resto igual ...
     Land_Cover_Type_1_Percent_Class_14 = Land_Cover_Type_1_Percent_Class_14,
-    stepRep = stepRep                       # <-- añadir
+    stepRep = stepRep                                                  # añadir
   )
 ```
 
-Esto guarda center/scale por año en `{sp}_train_dyn_scale.rds`, igual
-que el resto. Necesario para que los scripts de atribución (8, 10) y
-de predicción puedan reescalar consistentemente.
+Esto guarda center/scale por año en `{sp}_train_dyn_scale.rds`,
+necesario para los scripts de atribución (8, 10) y predicción.
 
-### Patch 4 — añadir al `yearlySiteCovs` (~línea 276–287)
+### Patch 4 — expandir a observation-level (~línea 270, junto a `NDVI_obs`)
+
+```r
+  NDVI_obs        <- expand_matrix(NDVI, J_reps)
+  pr_obs          <- expand_matrix(pr, J_reps)
+  topo_aspect_obs <- expand_matrix(siteCovs[, "topo_aspect", drop = FALSE], J_reps * T_years)
+  topo_elev_obs   <- expand_matrix(siteCovs[, "topo_elev", drop = FALSE], J_reps * T_years)
+  stepRep_obs     <- expand_matrix(stepRep, J_reps)                    # añadir
+```
+
+### Patch 5 — añadir a `yearlySiteCovs` y `obsCovs` (~línea 276–294)
 
 ```r
   occ_umf <- unmarkedMultFrame(
     y = y.cross,
     siteCovs = data.frame(siteCovs),
     yearlySiteCovs = list(
-      years  = years_df,
-      EVI    = EVI,
-      Land_Cover_Type_1_Percent_Class_0  = Land_Cover_Type_1_Percent_Class_0,
-      # ... resto igual ...
+      years  = years_df, EVI = EVI, ...,
       NDVI = NDVI, pr = pr, tmmn = tmmn, tmmx = tmmx,
-      stepRep = stepRep                     # <-- añadir
+      stepRep = stepRep                                                # añadir
     ),
-    obsCovs = list( ... ),
+    obsCovs = list(
+      duration = duration, effort = effort, observers = observers, time = time,
+      NDVI_obs = NDVI_obs, pr_obs = pr_obs,
+      topo_aspect_obs = topo_aspect_obs, topo_elev_obs = topo_elev_obs,
+      stepRep_obs = stepRep_obs                                        # añadir
+    ),
     numPrimary = T_years
   )
 ```
 
 ## 3. Patch a `R/model_configs.R`
 
-Editar el `p_formula` de cada especie. Para el piloto en *Pterocles
-alchata* (línea 86 actual):
+Editar el `p_formula` de cada especie. Para *Pterocles alchata*
+(línea 86):
 
 ```r
       p_formula       = ~ effort + observers + time,
@@ -142,26 +147,35 @@ alchata* (línea 86 actual):
 cambiar a:
 
 ```r
-      p_formula       = ~ effort + observers + time + stepRep,
+      p_formula       = ~ effort + observers + time + stepRep_obs,
 ```
 
 Replicar análogamente para las otras tres especies (líneas 27, 48, 67)
-una vez confirmado el efecto en ptealc.
+cuando se quiera extender. La opción A (`4_occupancy_models_v2.R`)
+hace este paso inline con `update(cfg$p_formula, ~ . + stepRep_obs)`
+para que `R/model_configs.R` no se toque.
 
 ## 4. Cómo correr la sensibilidad
 
 `scripts/3b_add_stepRep.R` añade 4 variantes (28 columnas en total):
-strict 500 m, strict 1 km, broad 500 m, broad 1 km. Para reportar la
-sensibilidad sólo hay que cambiar la línea del Patch 1:
+strict 500 m, strict 1 km, broad 500 m, broad 1 km.
+
+**Opción A (v2 script):** editar la constante al principio del script
+y re-ejecutar:
 
 ```r
-  stepRep <- occ_wide_clean[, paste0("stepRep_strict_1km_",  YEARS)]   # buffer 1 km
-  stepRep <- occ_wide_clean[, paste0("stepRep_broad_500m_",  YEARS)]   # incluye dehesa
-  stepRep <- occ_wide_clean[, paste0("stepRep_broad_1km_",   YEARS)]   # ambas combinadas
+STEPREP_VARIANT <- "stepRep_strict_1km"   # o stepRep_broad_500m / _broad_1km
 ```
 
-y re-ejecutar el step 4 con cada variante. El resto de patches son
-idénticos. El nombre `stepRep` en la fórmula no cambia.
+**Opción B (patches manuales):** cambiar la línea del Patch 1 a la
+variante deseada:
+
+```r
+  stepRep <- occ_wide_clean[, paste0("stepRep_strict_1km_",  YEARS)]
+```
+
+y re-ejecutar el step 4 con cada variante. El nombre `stepRep` en
+la fórmula no cambia.
 
 ## 5. Lectura del coeficiente
 
@@ -216,14 +230,27 @@ idénticos. El nombre `stepRep` en la fórmula no cambia.
 
 ## 8. Reproducibilidad
 
+Pipeline completo (orden):
+
 ```
-scripts/build_stepRep.R   # CORINE → focal rasters → cell-year table  (~5 min)
-scripts/3b_add_stepRep.R  # cell-year → wide model table              (~10 s)
-scripts/4_occupancy_models.R    # fit colext (con los patches arriba)
-scripts/18_stPGOcc_production_run.R   # fit stPGOcc (análogo, det.covs)
+scripts/build_stepRep.R           # CORINE → focal rasters → cell-year table  (~5 min)
+scripts/4_occupancy_models_v2.R   # auto-llama a 3b si hace falta y ajusta colext + stepRep
+                                  # outputs en results/{sp}_v2_*.rds y figs/{sp}_v2_*.png
 ```
+
+Si quieres ver el join intermedio:
+```
+scripts/3b_add_stepRep.R          # cell-year → wide model table              (~10 s)
+```
+
+Para stPGOcc (`scripts/18_stPGOcc_production_run.R`), el patrón
+análogo es añadir `stepRep_obs` a `det.covs` y al `det.formula`. No
+hay v2 dedicado porque ese script es menos uniforme; los patches
+mínimos son los mismos cinco descritos arriba adaptados a
+`stPGOcc()`.
 
 Commits que cierran el entregable:
 - `4ec50ca` — Add steppe-representativeness covariate (CLC2018) for detection sub-model
 - `0cf9f43` — Add stepRep handover doc with concrete colext / stPGOcc integration
-- (este) — Add 3b_add_stepRep.R integrator + minimal-friction recipe
+- `a21c9ef` — Add 3b_add_stepRep.R integrator + minimal-friction recipe
+- (este) — Add 4_occupancy_models_v2.R drop-in script with stepRep wired
