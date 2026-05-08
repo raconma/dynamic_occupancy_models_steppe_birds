@@ -7,7 +7,7 @@
 # Inputs:  data/raw/ebd_ES_201612_202601_smp_relJan-2026/ebd_ES_201612_202601_smp_relJan-2026.txt
 #          data/raw/ebd_sampling_relJan-2026/ebd_sampling_relJan-2026.txt
 #
-# Outputs: data/processed/{species}/ebd_{species}_breeding_spain_zf.csv
+# Outputs: data/processed_2023/{species}/ebd_{species}_breeding_spain_zf.csv
 #
 # Note:    eBird data must be downloaded manually from https://ebird.org/data/download
 #          See data-raw/get_data.R for download instructions.
@@ -55,7 +55,7 @@ for (sp_name in names(species_list)) {
   message("Processing: ", sp_name, " (", sp_code, ")")
   
   # Create output directory
-  sp_dir <- here("data", "processed", sp_code)
+  sp_dir <- here("data", "processed_2023", sp_code)
   if (!dir.exists(sp_dir)) dir.create(sp_dir, recursive = TRUE)
   
   # Define breeding season dates per species
@@ -127,7 +127,7 @@ for (sp_name in names(species_list)) {
     )
   
   # Save output
-  out_path <- here("data", "processed", sp_code,
+  out_path <- here("data", "processed_2023", sp_code,
                    paste0("ebd_", sp_code, "_breeding_spain_zf.csv"))
   write.csv(ebird, out_path, na = "", row.names = FALSE)
   message("  Saved: ", out_path, " (", nrow(ebird), " rows)")
