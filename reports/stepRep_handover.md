@@ -243,14 +243,19 @@ Si quieres ver el join intermedio:
 scripts/3b_add_stepRep.R          # cell-year → wide model table              (~10 s)
 ```
 
-Para stPGOcc (`scripts/18_stPGOcc_production_run.R`), el patrón
-análogo es añadir `stepRep_obs` a `det.covs` y al `det.formula`. No
-hay v2 dedicado porque ese script es menos uniforme; los patches
-mínimos son los mismos cinco descritos arriba adaptados a
-`stPGOcc()`.
+Para stPGOcc el script v2 análogo:
+```
+scripts/18_stPGOcc_production_run_v2.R   # auto-3b + stepRep_obs en det.covs/det.formula
+```
+
+Outputs separados de v1: `results/results_spatial/results_production_v2/`
+y `figs/{sp}_spatial_diagnostics_production_v2.png`. Compara
+automáticamente con el fit v1 (`results_production/{sp}_stPGOcc.rds`)
+si existe y reporta el delta de WAIC.
 
 Commits que cierran el entregable:
 - `4ec50ca` — Add steppe-representativeness covariate (CLC2018) for detection sub-model
 - `0cf9f43` — Add stepRep handover doc with concrete colext / stPGOcc integration
 - `a21c9ef` — Add 3b_add_stepRep.R integrator + minimal-friction recipe
-- (este) — Add 4_occupancy_models_v2.R drop-in script with stepRep wired
+- `a2ff874` — Add 4_occupancy_models_v2.R drop-in script with stepRep wired
+- (este) — Add 18_stPGOcc_production_run_v2.R drop-in script with stepRep wired
