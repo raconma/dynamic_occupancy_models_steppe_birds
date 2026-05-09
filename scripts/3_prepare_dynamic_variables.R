@@ -30,14 +30,14 @@ species_codes <- c("otitar", "ptealc", "pteori", "tettet")
 
 for (sp in species_codes) {
   message("\n=== Processing dynamic variables: ", sp, " ===")
-
+  
   # Load wide-format static dataset
   occ_wide_clean <- read.csv(
     here("data", "processed_2023", sp, paste0(sp, "_occ_wide_static.csv"))
   )
   message("  Static dataset: ", nrow(occ_wide_clean), " rows, ",
           ncol(occ_wide_clean), " cols")
-
+  
   # Load GEE-exported dynamic variables
   dyn_path <- here("data", "gee_exports_2023", paste0(sp, "_dynamic_variables.csv"))
   if (!file.exists(dyn_path)) {
@@ -45,25 +45,27 @@ for (sp in species_codes) {
     next
   }
   dyn_var <- read.csv(dyn_path)
-
-  # Keep locality_id for merge, then remove GEE metadata columns
-  dyn_lid <- dyn_var[["locality_id"]]
+  
+  # Keep cells for merge, then remove GEE metadata columns
   dyn_var <- dyn_var[, !names(dyn_var) %in%
-                       c("system.index", "system:index", "cells",
+                       c("system.index", "system:index",
                          "latitude", "longitude", "locality_id", ".geo")]
   message("  Dynamic variables: ", ncol(dyn_var), " columns")
-
-  # Merge by locality_id (safer than cbind by row alignment)
-  dyn_var$locality_id <- dyn_lid
-  occ_wide_clean <- merge(occ_wide_clean, dyn_var, by = "locality_id", all.x = TRUE)
+  
+  # Verificar unicidad de 'cells' en ambos dataframes
+  stopifnot(!anyDuplicated(occ_wide_clean$cells))
+  stopifnot(!anyDuplicated(dyn_var$cells))
+  
+  # Merge by cells (safer than cbind by row alignment)
+  occ_wide_clean <- merge(occ_wide_clean, dyn_var, by = "cells", all.x = TRUE)
   message("  After merge: ", nrow(occ_wide_clean), " rows")
-
+  
   # Drop rows with missing NDVI in any year
   ndvi_cols <- paste0("NDVI_", 2017:2023)
   occ_wide_clean <- occ_wide_clean %>%
     drop_na(all_of(ndvi_cols))
   message("  After NDVI NA drop: ", nrow(occ_wide_clean), " rows")
-
+  
   # Save output
   out_path <- here("data", "processed_2023", sp, paste0(sp, "_occ_wide_dynamic.csv"))
   write.csv(occ_wide_clean, out_path, row.names = FALSE)
