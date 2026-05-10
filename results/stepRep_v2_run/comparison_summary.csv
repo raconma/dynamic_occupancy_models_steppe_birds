@@ -1,0 +1,5 @@
+species,species_n,AIC_v1,AIC_v2,delta_AIC,stepRep_beta,stepRep_SE,stepRep_z,gamma_mean_v1,gamma_mean_v2,delta_gamma_pct,epsilon_mean_v1,epsilon_mean_v2,delta_epsilon_pct
+otitar,Otis tarda,2267.9,2144.28,-123.63,0.89,0.089,10.02,0.00206,0.00515,149.7,0.26427,0.38613,46.1
+ptealc,Pterocles alchata,1981.71,1916.49,-65.21,0.628,0.078,8,0.00169,0.00189,11.6,0.48505,0.45449,-6.3
+pteori,Pterocles orientalis,2060.74,2014.63,-46.11,0.609,0.089,6.82,0.00231,0.00317,37.4,0.431,0.43153,0.1
+tettet,Tetrax tetrax,1780.09,1757.16,-22.94,0.804,0.13,6.16,0.00107,0.00111,3.5,0.15022,0.08294,-44.8

@@ -1,0 +1,39 @@
+Species: tettet   (v2: detection includes stepRep_obs)
+Date: 2026-05-10 21:46:46.290917 
+p_formula: ~effort + observers + time + stepRep_obs 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = cfg$gamma_formula, 
+    epsilonformula = cfg$epsilon_formula, pformula = cfg$p_formula, 
+    data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE     z  P(>|z|)
+(Intercept)   -5.277 0.603 -8.75 2.17e-18
+bio2           1.052 0.243  4.32 1.55e-05
+tree_cover    -2.918 0.574 -5.08 3.71e-07
+grass_cover    0.622 0.155  4.00 6.29e-05
+topo_elev     -0.255 0.167 -1.52 1.27e-01
+
+Colonization (logit-scale):
+                                   Estimate    SE     z  P(>|z|)
+(Intercept)                          -7.170 0.768 -9.34 9.43e-21
+Land_Cover_Type_1_Percent_Class_12    0.809 0.565  1.43 1.52e-01
+
+Extinction (logit-scale):
+                                   Estimate  SE   z P(>|z|)
+(Intercept)                           -5.35 NaN NaN     NaN
+Land_Cover_Type_1_Percent_Class_12    -4.64 NaN NaN     NaN
+
+Detection (logit-scale):
+            Estimate     SE      z  P(>|z|)
+(Intercept)  -2.1729 0.2612 -8.318 8.96e-17
+effort        0.3138 0.0701  4.476 7.59e-06
+observers     0.0483 0.0502  0.963 3.36e-01
+time         -0.2446 0.0703 -3.482 4.98e-04
+stepRep_obs   0.8037 0.1304  6.165 7.06e-10
+
+AIC: 1757.157 
+Number of sites: 3746
+

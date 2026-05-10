@@ -1,0 +1,46 @@
+Species: pteori   (v2: detection includes stepRep_obs)
+Date: 2026-05-10 21:43:16.542942 
+p_formula: ~time + duration + observers + pr_obs + topo_aspect_obs + stepRep_obs 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = cfg$gamma_formula, 
+    epsilonformula = cfg$epsilon_formula, pformula = cfg$p_formula, 
+    data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE     z  P(>|z|)
+(Intercept)   -5.251 0.616 -8.53 1.44e-17
+bio2           0.350 0.217  1.61 1.07e-01
+tree_cover    -3.790 0.641 -5.91 3.43e-09
+grass_cover    0.858 0.156  5.49 4.04e-08
+
+Colonization (logit-scale):
+                                  Estimate    SE     z P(>|z|)
+(Intercept)                        -13.631 4.498 -3.03 0.00244
+Land_Cover_Type_1_Percent_Class_7   -8.762 6.449 -1.36 0.17425
+NDVI                                -0.446 0.628 -0.71 0.47765
+tmmn                                -7.271 3.311 -2.20 0.02811
+tmmx                                 8.541 3.321  2.57 0.01011
+
+Extinction (logit-scale):
+                                   Estimate    SE      z  P(>|z|)
+(Intercept)                          -0.155 0.405 -0.382 0.702256
+Land_Cover_Type_1_Percent_Class_12   -0.795 0.287 -2.770 0.005608
+NDVI                                  2.543 0.763  3.334 0.000855
+pr                                    2.281 0.958  2.382 0.017223
+
+Detection (logit-scale):
+                Estimate     SE        z  P(>|z|)
+(Intercept)      -2.2753 0.2014 -11.2991 1.33e-29
+time             -0.2574 0.0709  -3.6307 2.83e-04
+duration          0.4734 0.0813   5.8214 5.84e-09
+observers         0.0023 0.0693   0.0331 9.74e-01
+pr_obs           -0.1842 0.1873  -0.9835 3.25e-01
+topo_aspect_obs  -0.1286 0.0891  -1.4428 1.49e-01
+stepRep_obs       0.6091 0.0893   6.8249 8.80e-12
+
+AIC: 2014.632 
+Number of sites: 4130
+ID of sites removed due to NA: 113
+
