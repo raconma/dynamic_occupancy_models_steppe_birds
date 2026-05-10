@@ -1,0 +1,48 @@
+Species: otitar   (v2: detection includes stepRep_obs)
+Date: 2026-05-10 21:36:25.746006 
+p_formula: ~effort + observers + NDVI_obs + pr_obs + topo_aspect_obs + stepRep_obs 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = cfg$gamma_formula, 
+    epsilonformula = cfg$epsilon_formula, pformula = cfg$p_formula, 
+    data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE      z  P(>|z|)
+(Intercept)  -6.6192 0.889 -7.443 9.84e-14
+bio1          1.1059 0.410  2.700 6.94e-03
+bio2          0.4771 0.295  1.618 1.06e-01
+tree_cover   -5.3286 0.903 -5.900 3.63e-09
+grass_cover   0.0765 0.172  0.444 6.57e-01
+topo_elev     1.3472 0.488  2.761 5.76e-03
+
+Colonization (logit-scale):
+            Estimate    SE     z  P(>|z|)
+(Intercept)    -9.56 1.799 -5.31 1.07e-07
+NDVI           -2.39 0.756 -3.17 1.54e-03
+pr             -1.66 1.065 -1.56 1.18e-01
+tmmn           -4.54 1.843 -2.47 1.37e-02
+tmmx            2.64 1.620  1.63 1.04e-01
+
+Extinction (logit-scale):
+                                   Estimate     SE      z P(>|z|)
+(Intercept)                          69.710 182.17  0.383 0.70198
+Land_Cover_Type_1_Percent_Class_6    -0.652   2.61 -0.249 0.80302
+Land_Cover_Type_1_Percent_Class_13  201.381 502.27  0.401 0.68846
+tmmx                                 -2.830   0.95 -2.981 0.00287
+
+Detection (logit-scale):
+                Estimate     SE      z  P(>|z|)
+(Intercept)       -2.629 0.1962 -13.40 6.26e-41
+effort             0.295 0.0595   4.96 7.04e-07
+observers          0.239 0.0536   4.47 7.93e-06
+NDVI_obs           0.380 0.1157   3.29 1.01e-03
+pr_obs            -0.452 0.1903  -2.37 1.76e-02
+topo_aspect_obs    0.102 0.0776   1.31 1.89e-01
+stepRep_obs        0.890 0.0888  10.02 1.19e-23
+
+AIC: 2144.276 
+Number of sites: 3745
+ID of sites removed due to NA: 95
+

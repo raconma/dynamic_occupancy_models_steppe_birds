@@ -49,3 +49,12 @@ data-raw/data.rar
 *_files/
 .Rcache/
 Rplots.pdf
+
+# === Exceptions: stepRep v1-vs-v2 comparison report assets ===
+!/results/stepRep_v2_run/comparison_summary.csv
+!/results/stepRep_v2_run/comparison_table.csv
+!/results/stepRep_v2_run/gamma_epsilon_comparison.csv
+!/results/stepRep_v2_run/*_v2_model_summary.txt
+!/results/stepRep_v2_run/*_v2_simulation_prevalence.csv
+!/results/stepRep_v2_run/figs/
+!/results/stepRep_v2_run/figs/*.png

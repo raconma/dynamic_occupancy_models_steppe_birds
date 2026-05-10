@@ -1,0 +1,45 @@
+Species: ptealc   (v2: detection includes stepRep_obs)
+Date: 2026-05-10 21:39:42.882762 
+p_formula: ~time + duration + effort + observers + NDVI_obs + pr_obs + stepRep_obs 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = cfg$gamma_formula, 
+    epsilonformula = cfg$epsilon_formula, pformula = cfg$p_formula, 
+    data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE     z  P(>|z|)
+(Intercept)   -6.006 0.694 -8.65 5.02e-18
+bio1          -0.443 0.195 -2.28 2.27e-02
+bio2           1.217 0.262  4.64 3.43e-06
+tree_cover    -4.155 0.701 -5.93 3.11e-09
+grass_cover    0.425 0.146  2.91 3.63e-03
+topo_aspect   -0.163 0.125 -1.31 1.91e-01
+
+Colonization (logit-scale):
+            Estimate    SE      z  P(>|z|)
+(Intercept)   -6.478 0.538 -12.05 2.05e-33
+pr            -0.711 0.494  -1.44 1.50e-01
+
+Extinction (logit-scale):
+            Estimate   SE      z P(>|z|)
+(Intercept)    -2.06  2.9 -0.712   0.477
+pr            -25.03 16.4 -1.522   0.128
+tmmx          -34.26 21.6 -1.587   0.112
+
+Detection (logit-scale):
+            Estimate     SE      z  P(>|z|)
+(Intercept)  -1.6849 0.2345 -7.184 6.77e-13
+time         -0.3703 0.0723 -5.123 3.01e-07
+duration      1.1091 0.1018 10.892 1.26e-27
+effort        0.2136 0.0773  2.765 5.70e-03
+observers     0.0822 0.0751  1.094 2.74e-01
+NDVI_obs     -0.2983 0.1286 -2.319 2.04e-02
+pr_obs       -0.1019 0.1909 -0.534 5.94e-01
+stepRep_obs   0.6280 0.0785  8.003 1.21e-15
+
+AIC: 1916.492 
+Number of sites: 4130
+ID of sites removed due to NA: 113
+
