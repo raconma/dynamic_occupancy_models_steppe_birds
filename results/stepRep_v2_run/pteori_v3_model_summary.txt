@@ -1,0 +1,62 @@
+Species: pteori   v3: gamma ~ 1, epsilon ~ 1, p with stepRep_obs
+Date: 2026-05-11 08:38:42.509127 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = g_form, epsilonformula = e_form, 
+    pformula = p_form, data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE      z  P(>|z|)
+(Intercept)   -5.499 0.464 -11.85 2.04e-32
+bio2           0.982 0.202   4.86 1.15e-06
+tree_cover    -3.581 0.472  -7.59 3.20e-14
+grass_cover    0.522 0.123   4.25 2.10e-05
+
+Colonization (logit-scale):
+ Estimate  SE   z P(>|z|)
+    -20.2 NaN NaN     NaN
+
+Extinction (logit-scale):
+ Estimate    SE     z  P(>|z|)
+    -2.79 0.424 -6.58 4.74e-11
+
+Detection (logit-scale):
+                Estimate     SE        z  P(>|z|)
+(Intercept)     -2.46131 0.2086 -11.8002 3.89e-32
+time            -0.25754 0.0696  -3.7027 2.13e-04
+duration         0.41710 0.0782   5.3372 9.44e-08
+observers       -0.00242 0.0681  -0.0356 9.72e-01
+pr_obs          -0.46089 0.1851  -2.4902 1.28e-02
+topo_aspect_obs -0.13071 0.0891  -1.4673 1.42e-01
+stepRep_obs      0.55224 0.0850   6.4933 8.40e-11
+
+AIC: 2075.621 
+Number of sites: 4130
+ID of sites removed due to NA: 113
+
+$psi
+              Estimate        SE          z      P(>|z|)
+(Intercept) -5.4992347 0.4638994 -11.854370 2.042536e-32
+bio2         0.9815029 0.2017835   4.864140 1.149558e-06
+tree_cover  -3.5807143 0.4717757  -7.589865 3.202386e-14
+grass_cover  0.5220892 0.1227216   4.254255 2.097462e-05
+
+$col
+             Estimate  SE   z P(>|z|)
+(Intercept) -20.17018 NaN NaN     NaN
+
+$ext
+             Estimate        SE         z      P(>|z|)
+(Intercept) -2.791588 0.4243322 -6.578779 4.743275e-11
+
+$det
+                    Estimate         SE            z      P(>|z|)
+(Intercept)     -2.461311319 0.20858166 -11.80022873 3.892520e-32
+time            -0.257539256 0.06955507  -3.70266695 2.133449e-04
+duration         0.417100030 0.07815023   5.33715700 9.441528e-08
+observers       -0.002422749 0.06814250  -0.03555416 9.716379e-01
+pr_obs          -0.460889402 0.18508243  -2.49018457 1.276768e-02
+topo_aspect_obs -0.130714034 0.08908325  -1.46732447 1.422878e-01
+stepRep_obs      0.552239833 0.08504783   6.49328534 8.398440e-11
+

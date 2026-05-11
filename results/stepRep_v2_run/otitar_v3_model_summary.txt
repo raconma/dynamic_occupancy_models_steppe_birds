@@ -1,0 +1,66 @@
+Species: otitar   v3: gamma ~ 1, epsilon ~ 1, p with stepRep_obs
+Date: 2026-05-11 08:38:41.906069 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = g_form, epsilonformula = e_form, 
+    pformula = p_form, data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE     z  P(>|z|)
+(Intercept)   -6.965 1.148 -6.07 1.32e-09
+bio1           0.796 0.407  1.96 5.06e-02
+bio2           1.219 0.317  3.85 1.18e-04
+tree_cover    -5.230 1.172 -4.46 8.11e-06
+grass_cover    0.257 0.179  1.43 1.52e-01
+topo_elev      0.802 0.470  1.71 8.78e-02
+
+Colonization (logit-scale):
+ Estimate    SE     z  P(>|z|)
+    -6.68 0.773 -8.63 5.89e-18
+
+Extinction (logit-scale):
+ Estimate    SE     z  P(>|z|)
+    -2.95 0.618 -4.77 1.82e-06
+
+Detection (logit-scale):
+                Estimate     SE      z  P(>|z|)
+(Intercept)       -2.786 0.2095 -13.30 2.27e-40
+effort             0.309 0.0599   5.16 2.51e-07
+observers          0.234 0.0524   4.47 7.79e-06
+NDVI_obs           0.336 0.1170   2.87 4.04e-03
+pr_obs            -0.454 0.1911  -2.38 1.75e-02
+topo_aspect_obs    0.124 0.0774   1.60 1.09e-01
+stepRep_obs        0.965 0.0972   9.92 3.39e-23
+
+AIC: 2199.555 
+Number of sites: 3745
+ID of sites removed due to NA: 95
+
+$psi
+              Estimate        SE         z      P(>|z|)
+(Intercept) -6.9646107 1.1482489 -6.065419 1.316100e-09
+bio1         0.7955612 0.4069139  1.955109 5.057016e-02
+bio2         1.2185614 0.3165506  3.849500 1.183594e-04
+tree_cover  -5.2296682 1.1720023 -4.462165 8.113555e-06
+grass_cover  0.2567316 0.1792160  1.432526 1.519935e-01
+topo_elev    0.8015697 0.4695113  1.707243 8.777697e-02
+
+$col
+            Estimate        SE        z      P(>|z|)
+(Intercept) -6.67737 0.7733245 -8.63463 5.891755e-18
+
+$ext
+             Estimate        SE         z      P(>|z|)
+(Intercept) -2.950807 0.6183214 -4.772286 1.821462e-06
+
+$det
+                  Estimate         SE          z      P(>|z|)
+(Intercept)     -2.7860421 0.20945327 -13.301497 2.268785e-40
+effort           0.3086771 0.05985911   5.156726 2.513045e-07
+observers        0.2340637 0.05235162   4.470992 7.785770e-06
+NDVI_obs         0.3364161 0.11702844   2.874653 4.044722e-03
+pr_obs          -0.4540558 0.19108673  -2.376177 1.749308e-02
+topo_aspect_obs  0.1238747 0.07735480   1.601383 1.092921e-01
+stepRep_obs      0.9647361 0.09724784   9.920386 3.394421e-23
+

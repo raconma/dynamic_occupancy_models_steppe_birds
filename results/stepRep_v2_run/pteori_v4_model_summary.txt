@@ -1,0 +1,64 @@
+Species: pteori   v4: gamma~1, eps with 1 cov, p+stepRep_obs
+Date: 2026-05-11 08:31:00.660565 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = g_form, epsilonformula = e_form, 
+    pformula = p_form, data = occ_umf)
+
+Initial (logit-scale):
+            Estimate     SE      z  P(>|z|)
+(Intercept)   -5.398 0.4219 -12.80 1.72e-37
+bio2           0.922 0.1878   4.91 9.14e-07
+tree_cover    -3.378 0.4581  -7.37 1.65e-13
+grass_cover    0.569 0.0663   8.58 9.62e-18
+
+Colonization (logit-scale):
+ Estimate  SE   z P(>|z|)
+    -24.6 NaN NaN     NaN
+
+Extinction (logit-scale):
+                                   Estimate  SE   z P(>|z|)
+(Intercept)                           -9.64 NaN NaN     NaN
+Land_Cover_Type_1_Percent_Class_12   -10.22 NaN NaN     NaN
+
+Detection (logit-scale):
+                Estimate     SE       z  P(>|z|)
+(Intercept)      -2.5385 0.1676 -15.146 8.06e-52
+time             -0.2518 0.0658  -3.828 1.29e-04
+duration          0.4040 0.0743   5.440 5.34e-08
+observers        -0.0150 0.0614  -0.244 8.07e-01
+pr_obs           -0.5245 0.1723  -3.044 2.34e-03
+topo_aspect_obs  -0.0751 0.0818  -0.918 3.59e-01
+stepRep_obs       0.5267 0.0768   6.859 6.95e-12
+
+AIC: 2082.591 
+Number of sites: 4130
+ID of sites removed due to NA: 113
+
+$psi
+              Estimate         SE          z      P(>|z|)
+(Intercept) -5.3982444 0.42186050 -12.796278 1.719987e-37
+bio2         0.9218512 0.18777452   4.909352 9.137791e-07
+tree_cover  -3.3781146 0.45806923  -7.374681 1.647386e-13
+grass_cover  0.5687393 0.06629885   8.578418 9.618650e-18
+
+$col
+             Estimate  SE   z P(>|z|)
+(Intercept) -24.59199 NaN NaN     NaN
+
+$ext
+                                    Estimate  SE   z P(>|z|)
+(Intercept)                         -9.64158 NaN NaN     NaN
+Land_Cover_Type_1_Percent_Class_12 -10.22447 NaN NaN     NaN
+
+$det
+                   Estimate         SE           z      P(>|z|)
+(Intercept)     -2.53846507 0.16760049 -15.1459286 8.060798e-52
+time            -0.25178610 0.06577447  -3.8280219 1.291773e-04
+duration         0.40399483 0.07426850   5.4396526 5.338456e-08
+observers       -0.01497548 0.06140224  -0.2438914 8.073149e-01
+pr_obs          -0.52451872 0.17232899  -3.0437057 2.336836e-03
+topo_aspect_obs -0.07507375 0.08177526  -0.9180497 3.585929e-01
+stepRep_obs      0.52674635 0.07680043   6.8586383 6.952003e-12
+
