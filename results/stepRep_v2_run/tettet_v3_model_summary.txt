@@ -1,0 +1,59 @@
+Species: tettet   v3: gamma ~ 1, epsilon ~ 1, p with stepRep_obs
+Date: 2026-05-11 08:38:42.7328 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = g_form, epsilonformula = e_form, 
+    pformula = p_form, data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE     z  P(>|z|)
+(Intercept)   -5.194 0.601 -8.65 5.22e-18
+bio2           1.140 0.251  4.54 5.73e-06
+tree_cover    -3.059 0.581 -5.26 1.42e-07
+grass_cover    0.487 0.151  3.22 1.30e-03
+topo_elev     -0.283 0.175 -1.62 1.05e-01
+
+Colonization (logit-scale):
+ Estimate    SE     z P(>|z|)
+    -6.98 0.779 -8.96 3.1e-19
+
+Extinction (logit-scale):
+ Estimate    SE    z  P(>|z|)
+    -2.42 0.411 -5.9 3.67e-09
+
+Detection (logit-scale):
+            Estimate     SE      z  P(>|z|)
+(Intercept)   -2.285 0.2710 -8.433 3.36e-17
+effort         0.273 0.0720  3.799 1.46e-04
+observers      0.049 0.0511  0.958 3.38e-01
+time          -0.222 0.0716 -3.102 1.92e-03
+stepRep_obs    0.917 0.1367  6.705 2.01e-11
+
+AIC: 1748.389 
+Number of sites: 3746
+
+$psi
+              Estimate        SE         z      P(>|z|)
+(Intercept) -5.1940908 0.6005803 -8.648454 5.220192e-18
+bio2         1.1403214 0.2513972  4.535934 5.734903e-06
+tree_cover  -3.0587406 0.5812130 -5.262684 1.419672e-07
+grass_cover  0.4868972 0.1513709  3.216584 1.297268e-03
+topo_elev   -0.2830510 0.1746294 -1.620867 1.050461e-01
+
+$col
+             Estimate        SE         z      P(>|z|)
+(Intercept) -6.982225 0.7788345 -8.964967 3.103745e-19
+
+$ext
+             Estimate       SE         z      P(>|z|)
+(Intercept) -2.424403 0.411034 -5.898303 3.672598e-09
+
+$det
+               Estimate         SE          z      P(>|z|)
+(Intercept) -2.28517919 0.27097126 -8.4332898 3.360810e-17
+effort       0.27332282 0.07195357  3.7985998 1.455159e-04
+observers    0.04896971 0.05111799  0.9579742 3.380758e-01
+time        -0.22204420 0.07157398 -3.1023036 1.920209e-03
+stepRep_obs  0.91657975 0.13669923  6.7050837 2.012909e-11
+

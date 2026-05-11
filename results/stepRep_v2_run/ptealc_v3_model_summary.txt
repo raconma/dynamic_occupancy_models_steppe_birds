@@ -1,0 +1,68 @@
+Species: ptealc   v3: gamma ~ 1, epsilon ~ 1, p with stepRep_obs
+Date: 2026-05-11 08:38:42.248921 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = g_form, epsilonformula = e_form, 
+    pformula = p_form, data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE      z  P(>|z|)
+(Intercept)   -6.111 0.466 -13.11 2.82e-39
+bio1           0.592 0.135   4.39 1.14e-05
+bio2           1.275 0.201   6.35 2.22e-10
+tree_cover    -3.263 0.474  -6.88 5.86e-12
+grass_cover    0.381 0.124   3.08 2.06e-03
+topo_aspect   -0.133 0.108  -1.24 2.15e-01
+
+Colonization (logit-scale):
+ Estimate  SE   z P(>|z|)
+    -20.7 NaN NaN     NaN
+
+Extinction (logit-scale):
+ Estimate    SE     z  P(>|z|)
+    -3.26 0.658 -4.95 7.32e-07
+
+Detection (logit-scale):
+            Estimate     SE       z  P(>|z|)
+(Intercept)  -1.7005 0.2286 -7.4392 1.01e-13
+time         -0.3950 0.0701 -5.6322 1.78e-08
+duration      0.9798 0.0929 10.5427 5.49e-26
+effort        0.1863 0.0754  2.4720 1.34e-02
+observers     0.1050 0.0773  1.3577 1.75e-01
+NDVI_obs     -0.3506 0.1245 -2.8168 4.85e-03
+pr_obs        0.0123 0.1865  0.0659 9.47e-01
+stepRep_obs   0.6455 0.0779  8.2889 1.14e-16
+
+AIC: 2030.446 
+Number of sites: 4130
+ID of sites removed due to NA: 113
+
+$psi
+              Estimate        SE          z      P(>|z|)
+(Intercept) -6.1111589 0.4660870 -13.111628 2.824685e-39
+bio1         0.5922268 0.1349356   4.388958 1.138950e-05
+bio2         1.2748000 0.2009049   6.345290 2.220071e-10
+tree_cover  -3.2632567 0.4740988  -6.883073 5.857491e-12
+grass_cover  0.3813078 0.1237449   3.081404 2.060272e-03
+topo_aspect -0.1333195 0.1076150  -1.238857 2.153986e-01
+
+$col
+             Estimate  SE   z P(>|z|)
+(Intercept) -20.69938 NaN NaN     NaN
+
+$ext
+            Estimate       SE         z      P(>|z|)
+(Intercept)  -3.2576 0.657753 -4.952618 7.322158e-07
+
+$det
+               Estimate         SE           z      P(>|z|)
+(Intercept) -1.70047548 0.22858322 -7.43919640 1.012996e-13
+time        -0.39503737 0.07013901 -5.63220659 1.779184e-08
+duration     0.97975125 0.09293210 10.54265678 5.492494e-26
+effort       0.18626991 0.07535238  2.47198431 1.343654e-02
+observers    0.10499507 0.07733123  1.35773174 1.745488e-01
+NDVI_obs    -0.35057633 0.12446092 -2.81675833 4.851101e-03
+pr_obs       0.01228771 0.18653549  0.06587334 9.474787e-01
+stepRep_obs  0.64545111 0.07786968  8.28886352 1.143356e-16
+

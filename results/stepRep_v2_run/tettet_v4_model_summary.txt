@@ -1,0 +1,61 @@
+Species: tettet   v4: gamma~1, eps with 1 cov, p+stepRep_obs
+Date: 2026-05-11 08:31:06.170349 
+
+
+Call:
+colext(psiformula = cfg$psi_formula, gammaformula = g_form, epsilonformula = e_form, 
+    pformula = p_form, data = occ_umf)
+
+Initial (logit-scale):
+            Estimate    SE     z  P(>|z|)
+(Intercept)   -5.060 0.599 -8.45 2.87e-17
+bio2           1.149 0.255  4.51 6.47e-06
+tree_cover    -2.923 0.580 -5.04 4.74e-07
+grass_cover    0.583 0.163  3.58 3.46e-04
+topo_elev     -0.276 0.177 -1.56 1.19e-01
+
+Colonization (logit-scale):
+ Estimate   SE  z  P(>|z|)
+    -6.84 0.76 -9 2.27e-19
+
+Extinction (logit-scale):
+                                   Estimate    SE     z  P(>|z|)
+(Intercept)                          -1.972 0.350 -5.64 1.74e-08
+Land_Cover_Type_1_Percent_Class_12   -0.572 0.311 -1.84 6.55e-02
+
+Detection (logit-scale):
+            Estimate     SE     z  P(>|z|)
+(Intercept)  -2.2094 0.2697 -8.19 2.57e-16
+effort        0.2729 0.0723  3.77 1.61e-04
+observers     0.0493 0.0513  0.96 3.37e-01
+time         -0.2201 0.0717 -3.07 2.13e-03
+stepRep_obs   0.8776 0.1360  6.45 1.09e-10
+
+AIC: 1746.663 
+Number of sites: 3746
+
+$psi
+              Estimate        SE         z      P(>|z|)
+(Intercept) -5.0598414 0.5986684 -8.451826 2.867824e-17
+bio2         1.1490485 0.2547632  4.510261 6.474778e-06
+tree_cover  -2.9229304 0.5803549 -5.036453 4.742363e-07
+grass_cover  0.5825164 0.1628109  3.577871 3.464048e-04
+topo_elev   -0.2758841 0.1768347 -1.560124 1.187305e-01
+
+$col
+             Estimate        SE       z      P(>|z|)
+(Intercept) -6.843869 0.7604805 -8.9994 2.269537e-19
+
+$ext
+                                     Estimate        SE         z      P(>|z|)
+(Intercept)                        -1.9724261 0.3499382 -5.636499 1.735423e-08
+Land_Cover_Type_1_Percent_Class_12 -0.5719768 0.3105533 -1.841799 6.550453e-02
+
+$det
+               Estimate         SE          z      P(>|z|)
+(Intercept) -2.20935001 0.26969209 -8.1921202 2.566642e-16
+effort       0.27289518 0.07230973  3.7739762 1.606661e-04
+observers    0.04925823 0.05128957  0.9603948 3.368566e-01
+time        -0.22010653 0.07167139 -3.0710515 2.133064e-03
+stepRep_obs  0.87755282 0.13598518  6.4532977 1.094421e-10
+

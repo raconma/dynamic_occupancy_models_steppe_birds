@@ -1,0 +1,5 @@
+species,intercept_logit,intercept_SE,baseline_eps,baseline_eps_lo,baseline_eps_hi,cov_in_eps
+otitar,52.283,203.931,1,0,1,ext(Land_Cover_Type_1_Percent_Class_13)
+ptealc,-3.258,0.658,0.0371,0.0105,0.1226,""
+pteori,-9.642,,1e-04,,,ext(Land_Cover_Type_1_Percent_Class_12)
+tettet,-1.972,0.35,0.1221,0.0655,0.2164,ext(Land_Cover_Type_1_Percent_Class_12)

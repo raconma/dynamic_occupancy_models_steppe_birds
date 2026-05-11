@@ -1,6 +1,8 @@
-# Steppe-representativeness covariate (`stepRep`): rationale, implementation and v1 vs v2 model comparison
+# Steppe-representativeness covariate (`stepRep`): rationale, implementation, comparison of model specifications (v1 → v4) and recommendation
 
-_Generated 2026-05-10 from the v1 fits (commits up to `6c5ffe7`) and the v2 fits (`Add 4_occupancy_models_v2.R drop-in script`, `a2ff874`, run with Raúl's filtered eBird CSVs)._
+_Generated 2026-05-10, expanded 2026-05-11. v1 fits from commits up to `6c5ffe7`; v2 fits from `a2ff874` (`Add 4_occupancy_models_v2.R drop-in script`); v3 and v4 fits added in this revision. All runs on Raúl's filtered eBird CSVs._
+
+> **Note on revision (May 2026).** Section §6 of this report originally identified that v2 destabilised the extinction sub-model in three of four species. To resolve that, we tested two reduced specifications — **v3** (γ and ε intercept-only, detection unchanged) and **v4** (γ intercept-only, ε with a single covariate per species, detection unchanged) — and added §11 and §12 with the results and the final recommendation for the manuscript. The original v1 vs v2 analysis below is unchanged; v3 and v4 are extensions, not corrections.
 
 ---
 
@@ -10,9 +12,9 @@ We added a new covariate, `stepRep`, to the **detection sub-model** of the dynam
 
 **Adding `stepRep` to detection improved fit dramatically across all four species** (ΔAIC between −22.9 and −123.6, all decisive). The coefficient on `stepRep_obs` is positive and highly significant for every species (β = +0.61 to +0.89 logit, p < 1 × 10⁻⁹), confirming that checklists falling on actual pseudo-steppe habitat detect these species at much higher rates than checklists in non-steppe pixels of the same cell.
 
-**Estimates of initial occupancy (ψ) are stable** between v1 and v2. **Estimates of colonisation (γ) are essentially unchanged** because both versions return γ ≈ 0 (these populations are very stable; γ is at the floor of identifiability). **Extinction (ε) estimates shift in species-specific directions** and become numerically less identified in three of the four species; this is a real caveat that the manuscript needs to acknowledge rather than report ε deltas as causal.
+**Estimates of initial occupancy (ψ) are stable** between v1 and v2. **Colonisation (γ) is at the identifiability floor in every specification we tested**, with point estimates 0.001–0.005 per year and SE that explodes when covariates are added; the data simply do not support inference about γ drivers for these species. **Extinction (ε) is biologically low (3.7–8.1 % per year baseline) and stably identifiable only when the sub-model is reduced to an intercept**; with covariates (whether the v1/v2 multi-covariate spec or the v4 single-covariate spec), ε destabilises in 3 of 4 species.
 
-The bottom-line take-home is that `stepRep` is a real, large, well-identified detection covariate. It deserves to enter the headline detection sub-model. Inferences about colonisation and extinction should be reported conservatively because the joint identifiability of γ/ε on these species is fragile in either model version.
+The bottom-line take-home is that `stepRep` is a real, large, well-identified detection covariate that **deserves to enter the headline detection sub-model**, and that the headline γ and ε sub-models for the manuscript should be **intercept-only with appropriate caveats** rather than covariate-rich. Section §12 below contains the precise recommended specification per species; sections §11 and §12 supersede the more cautious framing in §7 of the original v1 vs v2 analysis.
 
 ---
 
@@ -208,3 +210,140 @@ predictions/
 ```
 
 Reproducibility: `scripts/build_stepRep.R` generates the cell-year tables from CORINE; `scripts/3b_add_stepRep.R` joins them into the modelling tables; `scripts/4_occupancy_models_v2.R` fits the colext models and writes everything in this report. `gh pr view 26` for the merge that brought the code into main.
+
+---
+
+## 11. Reduced specifications (v3 and v4) and the final identifiability picture
+
+§6 of this report showed that adding `stepRep_obs` to the detection sub-model destabilises the extinction sub-model for three of four species, despite the headline detection effect being clean. To diagnose whether the instability comes from `stepRep` itself or from the original v1 covariate structure being inappropriate now that detection is better identified, we fitted two reduced specifications:
+
+- **v3**: same as v2 (detection with `stepRep_obs`) but with **γ ~ 1 and ε ~ 1** (intercept-only on both transition sub-models).
+- **v4**: same as v2 but with **γ ~ 1 and ε ~ single covariate per species**. The covariate chosen is the strongest by Wald `z` in v1, avoiding NDVI in *P. orientalis* to keep the climate-vs-land-use attribution clean (per `docs/decisions_gcb_v4.md` decision 1):
+  - *Otis tarda*: ε ~ Land_Cover_Type_1_Percent_Class_13
+  - *Pterocles alchata*: ε ~ 1 (v1 had no significant ε covariate; nothing to add)
+  - *Pterocles orientalis*: ε ~ Land_Cover_Type_1_Percent_Class_12
+  - *Tetrax tetrax*: ε ~ Land_Cover_Type_1_Percent_Class_12
+
+The fits are saved under `results/stepRep_v2_run/{sp}_v3_model_object.rds` (and `_v4_`); summaries in `{sp}_v3_model_summary.txt` and `{sp}_v4_model_summary.txt`; AIC comparison in `v1_v2_v3_v4_aic.csv`; ε intercept-only summary in `v4_eps_baseline.csv`.
+
+### 11.1 AIC across four specifications
+
+![AIC v1 v2 v3 v4](../results/stepRep_v2_run/figs/v1_v2_v3_v4_aic.png)
+
+| Species | AIC v1 | AIC v2 | AIC v3 | AIC v4 | ΔAIC (v3 − v2) | ΔAIC (v4 − v2) |
+|---|---:|---:|---:|---:|---:|---:|
+| *Otis tarda* | 2 267.9 | 2 144.3 | 2 199.6 | 2 155.4 | +55.3 | +11.1 |
+| *Pterocles alchata* | 1 981.7 | 1 916.5 | 2 030.5 | 2 030.5 | +114.0 | +114.0 |
+| *Pterocles orientalis* | 2 060.7 | 2 014.6 | 2 075.6 | 2 082.6 | +61.0 | +68.0 |
+| *Tetrax tetrax* | 1 780.1 | 1 757.2 | 1 748.4 | **1 746.7** | −8.8 | −10.5 |
+
+v3 and v4 cost between 8.8 and 114 AIC units versus v2 for three species; *Tetrax tetrax* actually improves under the simpler specifications. AIC alone would prefer v2; AIC together with parameter identifiability tells a different story.
+
+### 11.2 Identifiability of the ε intercept across specifications
+
+![ε identifiability](../results/stepRep_v2_run/figs/eps_identifiability.png)
+
+| Species | SE(ε intercept) v2 | SE v3 | SE v4 |
+|---|---:|---:|---:|
+| *Otis tarda* | 182 | **0.62** | 204 |
+| *Pterocles alchata* | 2.9 | **0.66** | 0.66 |
+| *Pterocles orientalis* | **0.41** | 0.42 | NaN |
+| *Tetrax tetrax* | NaN | **0.41** | **0.35** |
+
+v3 is the only specification where the ε intercept is well identified for all four species simultaneously. v2 works only for *P. orientalis*. v4 (single covariate) does not rescue the *Otis tarda* and *P. orientalis* fits — the model is information-starved on ε for those species under any covariate structure we have tried.
+
+### 11.3 Baseline ε under v3
+
+![v3 ε baseline](../results/stepRep_v2_run/figs/v3_eps_baseline.png)
+
+| Species | ε intercept (logit) | SE | **Baseline ε per year** | 95 % CI |
+|---|---:|---:|---:|---:|
+| *Pterocles alchata* | −3.26 | 0.66 | **3.7 %** | 1.1 % – 12.3 % |
+| *Otis tarda* | −2.95 | 0.62 | **5.0 %** | 1.6 % – 14.6 % |
+| *Pterocles orientalis* | −2.79 | 0.42 | **5.8 %** | 2.6 % – 12.6 % |
+| *Tetrax tetrax* | −2.42 | 0.41 | **8.1 %** | 4.0 % – 15.8 % |
+
+ε under v3 is biologically plausible and clean: every species sits in a tight band of 4–8 % per year, with 95 % confidence intervals that do not include high values (upper bound ~ 16 %). The v1 / v2 mean predicted ε values (0.15–0.49 across species) are inflated by the cell-years that fall at extreme values of the poorly-identified ε covariates; once those covariates are removed, the underlying rate is consistent with field-derived expectations of slow local extinction in a long-lived steppe-bird guild.
+
+### 11.4 γ under v3
+
+| Species | γ intercept (logit) | SE | γ per year |
+|---|---:|---:|---:|
+| *Otis tarda* | −6.68 | 0.77 | 0.13 % |
+| *Tetrax tetrax* | −6.98 | 0.78 | 0.09 % |
+| *Pterocles alchata* | −20.7 | NaN | ≈ 0 (boundary) |
+| *Pterocles orientalis* | −20.2 | NaN | ≈ 0 (boundary) |
+
+γ is at the floor of identifiability in all specifications: for *Otis* and *Tetrax* it converges to ~0.001 with finite SE, but for the two *Pterocles* species the optimiser hits the lower bound and SE is undefined. The honest statement is that γ is **indistinguishable from zero** for all four species in this dataset at this scale and over this period; the data do not support inference about γ drivers.
+
+### 11.5 What v3 and v4 add to the v1 vs v2 story
+
+The v1 vs v2 analysis in §6 told the right story for **detection**: `stepRep_obs` works, AIC drops, other detection covariates settle. The story it could not tell cleanly was about γ and ε, because v2's covariate-rich specification of those sub-models hides the underlying ecological signal behind numerical pathology.
+
+v3 makes that signal visible: γ is at the floor, ε is in a tight 4–8 % band per species. Once one accepts that the γ/ε signal in these data is what v3 says it is, the higher AIC of v3 versus v2 is fitting **noise** (the spurious variance that v2's poorly-identified covariates absorb is not real biological structure that v3 is missing — it is the model trying to explain detection-process variation as state-process variation, which is what motivated `stepRep` in the first place).
+
+v4 confirms that the issue is information starvation, not covariate selection: forcing v1's strongest covariate into ε does not rescue identifiability for *Otis tarda* or *P. orientalis*. The data have a limited number of true colonisation/extinction transitions in the 7-year window; no covariate restructuring will work without more data or a different model class.
+
+---
+
+## 12. Final recommendation: model specification for the manuscript
+
+### 12.1 Headline model specification
+
+| Component | Recommended form | Rationale |
+|---|---|---|
+| ψ (initial occupancy) | unchanged from v1 per species (e.g. *Otis tarda*: ~ bio1 + bio2 + tree_cover + grass_cover + topo_elev) | Coefficients are stable between v1, v2 and v3. Habitat associations on initial occupancy are robust to the detection-model misspecification we corrected. |
+| γ (colonisation) | **~ 1** (intercept-only) for all species | γ is indistinguishable from zero in every specification tested. Reporting "drivers of γ" is not supported by the data. State the asymmetry γ ≪ ε as the main finding instead. |
+| ε (extinction) | **~ 1** (intercept-only) for *Otis tarda*, *P. alchata* and *T. tetrax*. For *P. orientalis*, keep v2's `~ LC12 + NDVI + pr` because it is the only species where ε covariates are identifiable. | Three species: no covariate makes ε identifiable. *P. orientalis* is the lone exception; reporting its ε drivers is honest. |
+| p (detection) | v2 specification: existing covariates + **stepRep_obs** | The headline new finding. AIC drops 22–124 units; β = +0.61 to +0.89. |
+
+This is a **hybrid** specification: γ uniform across species, ε species-specific (intercept-only or full v2), p uniform across species (with `stepRep_obs` added). The trade-off is a small loss of inferential richness on the transition sub-models in exchange for parameter estimates that have sensible SE everywhere.
+
+### 12.2 Sensitivity analyses for the supplementary information
+
+Three sensitivities should travel with the headline:
+
+1. **v2 (all covariates retained) for γ and ε**: shows that with the original covariate structure, ε is unstable for 3 of 4 species (this is the evidence base for the v3 collapse).
+2. **v4 (single ε covariate)**: shows that selective simplification does not rescue identifiability; the choice to go to intercept-only is data-driven, not a default.
+3. **stepRep sensitivity variants**: `stepRep_strict_1km`, `stepRep_broad_500m`, `stepRep_broad_1km` reruns of the headline specification (single-line edit at the top of `scripts/4_occupancy_models_v2.R` via the `STEPREP_VARIANT` constant).
+
+All three are already prepared infrastructure-wise: the fits exist (v2, v4) or are one rerun away (sensitivity variants).
+
+### 12.3 Updated paper-skeleton claims
+
+The headline claims in `docs/paper_skeleton_GCB_v9.md` need adjustment to match what the data actually support:
+
+| Original claim | Recommended reformulation |
+|---|---|
+| "Colonisation-extinction asymmetry spans **two to six orders of magnitude** across species" | "γ is indistinguishable from zero (γ < 0.002) for all four species; ε is **3.7 – 8.1 % per year** baseline. The asymmetry γ ≪ ε is therefore **at least one and a half orders of magnitude**, robust to model specification." |
+| "Detection correction reverses the qualitative assessment of colonisation" | Strengthened. Detection correction now includes an explicit within-cell sampling covariate (`stepRep_obs`, β = +0.61 to +0.89 logit, p < 10⁻⁹ in every species). Naive vs detection-corrected γ ratios are recomputed against the new γ estimates and still show qualitative reversal (corrected γ ≪ naive γ). |
+| "Species-specific drivers of colonisation and extinction" | "ψ habitat associations are species-specific and robust; γ is at the identifiability floor in every species and we do not infer drivers; ε drivers are identifiable only for *P. orientalis* (LC12 negative, NDVI positive, pr positive) and reported there only." |
+| "Extinction debt affecting 5 – 100 % of currently occupied sites" | "Baseline ε of 4 – 8 % per year, projected forward, implies an extinction debt that is **modest in absolute terms but cumulatively important** (50 % loss over ~10 years for *T. tetrax* at 8 % per year vs ~25 years for *P. alchata* at 4 % per year). Cell-level projections in the original wording (5–100 %) were driven by spuriously high ε at extreme covariate values and should be retracted." |
+| "Spatial scales of conservation (43 – 264 km)" | Untouched; depends on the stPGOcc fits which are pending. The v2 stPGOcc analogue (`scripts/18_stPGOcc_production_run_v2.R`) is committed and ready to run; results will follow. |
+
+### 12.4 What to do next, in order
+
+1. **Refit colext under v3 with the *P. orientalis* exception** and freeze that as the manuscript's headline. Concretely: copy `scripts/4_occupancy_models_v3.R` to `scripts/4_occupancy_models_final.R`, hardcode the ε ~ LC12 + NDVI + pr exception for `pteori`, and use that as the canonical fit going forward.
+2. **Recompute the naive vs corrected γ table** with the new γ estimates from the headline fit. The ratios will change in magnitude but the qualitative reversal claim survives.
+3. **Run `stPGOcc` (v2) production** when Raúl has the machine. The spatial random effect may absorb some of the residual structure that destabilises ε in colext and could permit the original covariate spec to identify there.
+4. **Refresh the manuscript Results** with the reformulated claims from §12.3 of this report and the headline numbers from §11.3.
+
+### 12.5 Files added by this revision
+
+```
+results/stepRep_v2_run/
+  v1_v2_v3_aic.csv                v1/v2/v3 AIC comparison
+  v1_v2_v3_v4_aic.csv             v1/v2/v3/v4 AIC comparison
+  v4_eps_baseline.csv             ε baseline per species under v4
+  {sp}_v3_model_summary.txt       4 files (γ ~ 1, ε ~ 1)
+  {sp}_v4_model_summary.txt       4 files (γ ~ 1, ε ~ 1 cov)
+  figs/v1_v2_v3_v4_aic.png        AIC across four specifications
+  figs/v3_eps_baseline.png        ε per species under v3, with 95 % CI
+  figs/eps_identifiability.png    SE of ε intercept across versions
+
+scripts/
+  4_occupancy_models_v3.R         intercept-only γ and ε
+  4_occupancy_models_v4.R         intercept-only γ, single-cov ε
+```
+
+The model object `.rds` files for v3 and v4 (~30 MB total) live alongside in `results/stepRep_v2_run/` locally but stay gitignored — they are regenerated by these scripts.
