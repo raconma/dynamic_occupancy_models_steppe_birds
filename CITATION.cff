@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this code or the derived data, please cite the archived release."
+title: "Code and derived data for: Colonisation-extinction imbalance reveals a demographic trap in Iberian steppe birds"
+type: software
+authors:
+  - family-names: "Contreras-Martín"
+    given-names: "Raúl"
+    orcid: "https://orcid.org/0009-0008-8707-9562"
+    affiliation: "Universidad Complutense de Madrid; Museo Nacional de Ciencias Naturales (MNCN-CSIC)"
+  - family-names: "Martín"
+    given-names: "Carlos A."
+    orcid: "https://orcid.org/0000-0002-6865-9376"
+    affiliation: "Universidad Complutense de Madrid"
+  - family-names: "Fandos"
+    given-names: "Guillermo"
+    orcid: "https://orcid.org/0000-0003-1579-9444"
+    affiliation: "Universidad Complutense de Madrid"
+repository-code: "https://github.com/raconma/dynamic_occupancy_models_steppe_birds"
+license: MIT
+keywords:
+  - dynamic occupancy models
+  - colonisation-extinction dynamics
+  - steppe birds
+  - eBird
+  - imperfect detection
+  - extinction debt

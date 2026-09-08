@@ -1,0 +1,31 @@
+{
+  "title": "Code and derived data for: Colonisation-extinction imbalance reveals a demographic trap in Iberian steppe birds",
+  "description": "Analysis code (R) and derived detection-history matrices for dynamic occupancy models of four steppe bird species (Otis tarda, Tetrax tetrax, Pterocles alchata, Pterocles orientalis) in mainland Spain, 2017-2023, fitted to eBird data corrected for imperfect detection. Raw eBird records are not redistributed; they are available from eBird (https://ebird.org) under the eBird Basic Dataset terms of use.",
+  "creators": [
+    {
+      "name": "Contreras-Martín, Raúl",
+      "orcid": "0009-0008-8707-9562",
+      "affiliation": "Universidad Complutense de Madrid; Museo Nacional de Ciencias Naturales (MNCN-CSIC)"
+    },
+    {
+      "name": "Martín, Carlos A.",
+      "orcid": "0000-0002-6865-9376",
+      "affiliation": "Universidad Complutense de Madrid"
+    },
+    {
+      "name": "Fandos, Guillermo",
+      "orcid": "0000-0003-1579-9444",
+      "affiliation": "Universidad Complutense de Madrid"
+    }
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "keywords": [
+    "dynamic occupancy models",
+    "colonisation-extinction dynamics",
+    "steppe birds",
+    "eBird",
+    "imperfect detection",
+    "extinction debt"
+  ]
+}

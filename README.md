@@ -152,3 +152,20 @@ See [REPRODUCIBILITY.md](REPRODUCIBILITY.md) for:
 
 Code: MIT License
 Data: Subject to original data provider licenses (eBird, WorldClim, MODIS, MITECO).
+
+## Zenodo archive
+
+This branch (`zenodo-release`) is the curated snapshot archived at Zenodo to
+accompany the manuscript "Colonisation-extinction imbalance reveals a
+demographic trap in Iberian steppe birds". It contains the analysis code
+(`R/`, `scripts/`), model outputs (`results/`), the stepRep robustness
+documentation (`reports/`), the reproducibility environment (`renv.lock`) and
+the derived detection-history matrices used to fit the models
+(`data/processed_2023/<species>/<species>_occ_wide_dynamic.csv`, with the
+covariate scaling parameters in the accompanying `.rds` files).
+
+Raw eBird records are not redistributed here, in line with the eBird Basic
+Dataset terms of use. They can be requested from https://ebird.org and rebuilt
+into the derived matrices with `scripts/1_prepare_database_ebird.R` to
+`scripts/3_prepare_dynamic_variables.R`. See `REPRODUCIBILITY.md` for the full
+pipeline.
