@@ -49,6 +49,7 @@ library(here)
 library(unmarked)
 library(MASS)
 
+source(here("R", "colext_utils.R"))
 set.seed(42)
 
 species <- c("otitar", "ptealc", "pteori", "tettet")
@@ -59,27 +60,6 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 ###############################################################################
 # HELPERS
 ###############################################################################
-
-# Design matrix that keeps NA rows (model.matrix drops them by default)
-design <- function(formula, data) {
-  mf <- model.frame(formula, data, na.action = na.pass)
-  X <- model.matrix(formula, mf)
-  X_full <- matrix(NA_real_, nrow(data), ncol(X),
-                   dimnames = list(NULL, colnames(X)))
-  X_full[as.integer(rownames(X)), ] <- X
-  X_full
-}
-
-# Projected occupancy psi[i, t] from psi1 and transition matrices (M x T-1)
-project_occ <- function(psi1, gam, eps) {
-  n_t <- ncol(gam) + 1
-  psi <- matrix(NA_real_, length(psi1), n_t)
-  psi[, 1] <- psi1
-  for (t in 1:(n_t - 1)) {
-    psi[, t + 1] <- psi[, t] * (1 - eps[, t]) + (1 - psi[, t]) * gam[, t]
-  }
-  psi
-}
 
 # All summaries for one coefficient vector and one set of cells
 summarise_rates <- function(psi1, gam, eps, b_col0, b_ext0, cells) {
@@ -133,43 +113,17 @@ naive_rows <- list()
 for (sp in species) {
   message("\n=== ", sp, " ===")
   mod <- readRDS(here("results", paste0(sp, "_model_object.rds")))
-  umf <- mod@data
-  n_t <- umf@numPrimary
-
-  # Drop sites removed by unmarked during fitting (missing covariates)
-  keep <- setdiff(seq_len(numSites(umf)), mod@sitesRemoved)
-  M <- length(keep)
-  sc  <- siteCovs(umf)[keep, , drop = FALSE]
-  row_keep <- as.vector(t(outer((keep - 1) * n_t, 1:n_t, "+")))
-  ysc <- yearlySiteCovs(umf)[row_keep, , drop = FALSE]
-  ysc <- cbind(ysc, sc[rep(seq_len(M), each = n_t), , drop = FALSE])
-  rownames(ysc) <- NULL
-  rownames(sc)  <- NULL
-
-  fl <- mod@formlist
-  X_psi <- design(fl$psi, sc)
-  X_col <- design(fl$col, ysc)
-  X_ext <- design(fl$ext, ysc)
-
-  # Transitions t -> t+1 use yearly covariates of year t (years 1..T-1)
-  trans_rows <- which(rep(1:n_t, M) < n_t)
-  X_col <- X_col[trans_rows, , drop = FALSE]
-  X_ext <- X_ext[trans_rows, , drop = FALSE]
-
+  D <- colext_design(mod)
+  M <- D$M
+  n_t <- D$n_t
   cf <- coef(mod)
   V  <- vcov(mod)
-  i_psi <- grep("^psi\\(", names(cf))
-  i_col <- grep("^col\\(", names(cf))
-  i_ext <- grep("^ext\\(", names(cf))
-  stopifnot(length(i_psi) == ncol(X_psi), length(i_col) == ncol(X_col),
-            length(i_ext) == ncol(X_ext))
 
+  # Transitions t -> t+1 use yearly covariates of year t (years 1..T-1)
   rates_from <- function(b) {
-    list(
-      psi1 = as.vector(plogis(X_psi %*% b[i_psi])),
-      gam  = matrix(plogis(X_col %*% b[i_col]), M, n_t - 1, byrow = TRUE),
-      eps  = matrix(plogis(X_ext %*% b[i_ext]), M, n_t - 1, byrow = TRUE)
-    )
+    r <- colext_rates(b, D)
+    list(psi1 = r$psi1, gam = r$gam[, 1:(n_t - 1), drop = FALSE],
+         eps = r$eps[, 1:(n_t - 1), drop = FALSE])
   }
 
   r0 <- rates_from(cf)
@@ -185,8 +139,8 @@ for (sp in species) {
           signif(max(abs(proj_own - proj_unm), na.rm = TRUE), 3))
 
   # --- Naive states from detection histories --------------------------------
-  y <- getY(umf)[keep, , drop = FALSE]
-  J <- ncol(y) / n_t
+  y <- D$y
+  J <- D$J
   naive <- sapply(1:n_t, function(t) {
     yt <- y[, ((t - 1) * J + 1):(t * J), drop = FALSE]
     ifelse(rowSums(!is.na(yt)) > 0, as.integer(rowSums(yt, na.rm = TRUE) > 0),
