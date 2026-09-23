@@ -21,7 +21,7 @@
 # SPA effect: detected cells mostly inside SPAs (cover >= 0.5) are matched
 # with replacement to detected cells essentially outside (cover < 0.1) by
 # nearest Mahalanobis distance on strict steppe fraction and logit(psi1)
-# (sensitivity: + UTM coordinates). The contrast is the difference in
+# (sensitivity: + UTM coordinates; + checklists per surveyed year). The contrast is the difference in
 # extinction rate (SPA - matched controls). Uncertainty: 1,000 draws that
 # combine coefficient uncertainty (multivariate normal) with resampling of
 # treated cells (and their matched controls).
@@ -36,7 +36,9 @@
 #   results/core_spa/cell_habitat.csv
 #   results/core_spa/class_rates.csv
 #   results/core_spa/spa_matched.csv
-#   results/core_spa/spa_balance.csv
+#   results/core_spa/spa_balance.csv   (matching covariates and survey effort)
+#   results/core_spa/core_contrast.csv (marginal minus core extinction rate and
+#                                       ratio, with cell resampling per draw)
 #   results/core_spa/fig_class_rates.png
 ###############################################################################
 
@@ -131,6 +133,7 @@ match_nn <- function(Xt, Xc) {
 smd <- function(a, b) (mean(a) - mean(b)) / sqrt((var(a) + var(b)) / 2)
 
 rate_rows <- list(); match_rows <- list(); bal_rows <- list()
+contrast_store <- list()   # per-draw cell sums for the core-vs-marginal contrast
 
 for (sp in species) {
   message("\n=== ", sp, " ===")
@@ -170,20 +173,34 @@ for (sp in species) {
   classes$core_spa_in  <- classes$core_strict0.5 & h$spa_frac >= 0.5
   classes$core_spa_out <- classes$core_strict0.5 & h$spa_frac < 0.1
 
-  # Matching (fixed across draws)
+  # Survey effort per cell: checklists per surveyed year and number of
+  # anchored transitions in the recent period
+  effort <- cbind(visits_per_year = rowSums(!is.na(D$y)) / pmax(rowSums(surv), 1),
+                  anchored_transitions = rowSums(both[, recent, drop = FALSE]))
+
+  # Matching (fixed across draws). "effort" adds checklists per surveyed year,
+  # because SPA cells are surveyed less often and fewer visits give less
+  # evidence of absence
   tr <- which(classes$spa_in); ctl <- which(classes$spa_out)
+  lpsi <- qlogis(pmin(pmax(psi1, 1e-6), 1 - 1e-6))
   covs <- list(
-    base   = cbind(h$steppe_strict, qlogis(pmin(pmax(psi1, 1e-6), 1 - 1e-6))),
-    coords = cbind(h$steppe_strict, qlogis(pmin(pmax(psi1, 1e-6), 1 - 1e-6)),
-                   h$x / 1e5, h$y / 1e5))
+    base   = cbind(h$steppe_strict, lpsi),
+    coords = cbind(h$steppe_strict, lpsi, h$x / 1e5, h$y / 1e5),
+    effort = cbind(h$steppe_strict, lpsi, effort[, "visits_per_year"]))
+  cov_labels <- list(base = c("steppe_strict", "logit_psi1"),
+                     coords = c("steppe_strict", "logit_psi1", "x", "y"),
+                     effort = c("steppe_strict", "logit_psi1", "visits_per_year"))
   matches <- lapply(covs, function(X) ctl[match_nn(X[tr, , drop = FALSE],
                                                    X[ctl, , drop = FALSE])])
+  # Balance on the matching covariates and on survey effort
   for (nm in names(covs)) {
-    X <- covs[[nm]]
+    extra <- setdiff(colnames(effort), cov_labels[[nm]])
+    X <- cbind(covs[[nm]], effort[, extra, drop = FALSE])
+    labs <- c(cov_labels[[nm]], extra)
     for (j in seq_len(ncol(X))) {
       bal_rows[[paste(sp, nm, j)]] <- data.frame(
-        species = sp, spec = nm,
-        covariate = c("steppe_strict", "logit_psi1", "x", "y")[j],
+        species = sp, spec = nm, covariate = labs[j],
+        matched_on = j <= ncol(covs[[nm]]),
         smd_before = smd(X[tr, j], X[ctl, j]),
         smd_after = smd(X[tr, j], X[matches[[nm]], j]))
     }
@@ -197,6 +214,9 @@ for (sp in species) {
                   dimnames = list(NULL, names(classes), per, c("ext_rate", "net")))
   match_d <- array(NA_real_, c(N_DRAWS, length(covs), 2),
                    dimnames = list(NULL, names(covs), per))
+  det_idx <- which(det)
+  E_store <- O_store <- array(NA_real_, c(N_DRAWS, length(det_idx), 2),
+                              dimnames = list(NULL, NULL, per))
 
   for (k in seq_len(N_DRAWS)) {
     fb <- forward_backward(colext_rates(draws[k, ], D), D)
@@ -209,6 +229,7 @@ for (sp in species) {
                   C = rowSums((fb$col * both)[, recent])))
     for (p in per) {
       cs <- cell_sum[[p]]
+      E_store[k, , p] <- cs$E[det_idx]; O_store[k, , p] <- cs$O[det_idx]
       for (j in names(classes)) {
         w <- classes[[j]]
         rate_d[k, j, p, ] <- c(sum(cs$E[w]) / sum(cs$O[w]),
@@ -223,6 +244,14 @@ for (sp in species) {
       }
     }
   }
+
+  pairs <- c(setNames(paste0("strict", CORE_THRESHOLDS), paste0("strict", CORE_THRESHOLDS)),
+             broad0.5 = "broad0.5")
+  contrast_store[[sp]] <- list(
+    E = E_store, O = O_store, point_only = point_only,
+    groups = lapply(pairs, function(g) list(
+      core = classes[[paste0("core_", g)]][det_idx],
+      rest = classes[[paste0("rest_", g)]][det_idx])))
 
   for (j in names(classes)) for (p in per) {
     e <- rate_d[, j, p, "ext_rate"]; n <- rate_d[, j, p, "net"]
@@ -253,7 +282,38 @@ bal_df   <- do.call(rbind, bal_rows);   rownames(bal_df)   <- NULL
 write.csv(rate_df,  file.path(out_dir, "class_rates.csv"), row.names = FALSE)
 write.csv(match_df, file.path(out_dir, "spa_matched.csv"), row.names = FALSE)
 write.csv(bal_df,   file.path(out_dir, "spa_balance.csv"), row.names = FALSE)
+
+# Core vs marginal contrast with its own uncertainty: per coefficient draw,
+# resample cells with replacement within each habitat class. Run after all
+# species so that the random stream of the outputs above is unchanged.
+contrast_rows <- list()
+for (sp in names(contrast_store)) {
+  st <- contrast_store[[sp]]
+  for (g in names(st$groups)) for (p in dimnames(st$E)[[3]]) {
+    ci <- which(st$groups[[g]]$core); ri <- which(st$groups[[g]]$rest)
+    if (length(ci) < 2 || length(ri) < 2) next
+    d <- r <- numeric(N_DRAWS)
+    for (k in seq_len(N_DRAWS)) {
+      bc <- sample(ci, replace = TRUE); br <- sample(ri, replace = TRUE)
+      rc <- sum(st$E[k, bc, p]) / sum(st$O[k, bc, p])
+      rr <- sum(st$E[k, br, p]) / sum(st$O[k, br, p])
+      d[k] <- rr - rc; r[k] <- rr / rc
+    }
+    ok <- is.finite(d) & is.finite(r)
+    contrast_rows[[paste(sp, g, p)]] <- data.frame(
+      species = sp, variant = variant, point_only = st$point_only,
+      definition = g, period = p, n_core = length(ci), n_marginal = length(ri),
+      n_undefined = sum(!ok),
+      diff_med = median(d[ok]), diff_lo = q(d[ok], .025), diff_hi = q(d[ok], .975),
+      ratio_med = median(r[ok]), ratio_lo = q(r[ok], .025), ratio_hi = q(r[ok], .975),
+      p_marginal_higher = mean(d[ok] > 0))
+  }
+}
+contrast_df <- do.call(rbind, contrast_rows); rownames(contrast_df) <- NULL
+write.csv(contrast_df, file.path(out_dir, "core_contrast.csv"), row.names = FALSE)
+
 options(width = 220)
+print(contrast_df, digits = 3)
 print(rate_df, digits = 3)
 print(match_df, digits = 3)
 print(bal_df, digits = 2)
