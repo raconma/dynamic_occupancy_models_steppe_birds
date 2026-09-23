@@ -36,6 +36,7 @@ library(here)
 library(sf)
 library(ggplot2)
 
+source(here("R", "spatial_layers.R"))
 set.seed(42)  # no stochastic steps; kept for workflow consistency
 
 species <- c("otitar", "ptealc", "pteori", "tettet")
@@ -43,14 +44,11 @@ species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
                    pteori = "P. orientalis", tettet = "T. tetrax")
 atlas_col <- c(otitar = "OTITAR", ptealc = "PTEALC", pteori = "PTEORI",
                tettet = "TETTET")
-UTM30 <- 25830
 MIN_EFFORT <- c(3, 10)
 out_dir <- here("results", "atlas10")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-atlas2 <- st_transform(st_read(here("data-raw", "data", "validation",
-                                    "atlas_biodiversidad", "atlas_biodiversidad",
-                                    "aves_spain.shp"), quiet = TRUE), UTM30)
+atlas2 <- load_atlas2()
 atlas2$sq_id <- seq_len(nrow(atlas2))
 
 spain <- NULL

@@ -50,6 +50,7 @@ library(terra)
 library(ggplot2)
 
 source(here("R", "colext_utils.R"))
+source(here("R", "spatial_layers.R"))
 set.seed(42)
 
 species <- c("otitar", "ptealc", "pteori", "tettet")
@@ -58,7 +59,6 @@ species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
 atlas_col <- c(otitar = "OTITAR", ptealc = "PTEALC", pteori = "PTEORI",
                tettet = "TETTET")
 N_DRAWS <- 1000
-UTM30 <- 25830
 out_dir <- here("results", "net_change_maps")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
@@ -68,22 +68,8 @@ q <- function(x, p) as.numeric(quantile(x, p, na.rm = TRUE))
 # SHARED SPATIAL LAYERS
 ###############################################################################
 
-atlas2 <- st_read(here("data-raw", "data", "validation", "atlas_biodiversidad",
-                       "atlas_biodiversidad", "aves_spain.shp"), quiet = TRUE)
-atlas2 <- st_transform(atlas2, UTM30)
-
-spa <- st_read(here("data-raw", "data", "threats", "rn2000",
-                    "PS_NATURA2000_2023_PB.shp"), quiet = TRUE)
-spa <- spa[grepl("specialProtectionArea", spa$desig), ]
-# One SPA ("Estepas cerealistas de los rios Jarama y Henares", a key great
-# bustard site) holds a one-vertex hole that makes st_make_valid() fail.
-# Drop rings with < 4 vertices (degenerate by definition) before repairing.
-drop_degenerate_rings <- function(g) {
-  st_multipolygon(lapply(g, function(poly) Filter(function(r) nrow(r) >= 4, poly)))
-}
-st_geometry(spa) <- st_sfc(lapply(st_geometry(spa), drop_degenerate_rings),
-                           crs = st_crs(spa))
-spa <- st_union(st_make_valid(st_transform(spa, UTM30)))
+atlas2 <- load_atlas2()
+spa <- load_spa_union()
 spa_plot <- st_simplify(spa, dTolerance = 500)
 
 spain <- NULL
@@ -154,10 +140,7 @@ for (sp in species) {
   det <- rowSums(naive, na.rm = TRUE) > 0
 
   # --- Coefficient draws -----------------------------------------------------
-  V <- vcov(mod)
-  V_pd <- tryCatch({ chol(V); V },
-                   error = function(e) as.matrix(Matrix::nearPD(V)$mat))
-  draws <- MASS::mvrnorm(N_DRAWS, mu = cf, Sigma = V_pd)
+  draws <- draw_coefs(mod, N_DRAWS)
 
   ext_full <- col_full <- net_rec <- net_both <- risk <- z1_last <-
     matrix(NA_real_, D$M, N_DRAWS)

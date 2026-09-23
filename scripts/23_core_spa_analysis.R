@@ -28,7 +28,8 @@
 #
 # Inputs:
 #   results/{sp}_model_object.rds
-#   data/processed_2023/{sp}/{sp}_occ_wide_dynamic.csv
+#   data/processed_2023/{sp}/{sp}_occ_wide_dynamic.csv (stepRep variants:
+#   reports/script_4_v2_inputs/, see colext_input_path())
 #   CORINE 2018 100 m raster (see build_stepRep.R), SPAs (R/spatial_layers.R)
 #
 # Outputs (new):
@@ -69,10 +70,7 @@ q <- function(x, p) as.numeric(quantile(x, p, na.rm = TRUE))
 # 1. CELL HABITAT AND SPA COVER (cached)
 ###############################################################################
 
-occ_list <- lapply(species, function(sp) {
-  read.csv(here("data", "processed_2023", sp,
-                paste0(sp, "_occ_wide_dynamic.csv")))
-})
+occ_list <- lapply(species, function(sp) read.csv(colext_input_path(sp, variant)))
 names(occ_list) <- species
 all_cells <- sort(unique(unlist(lapply(occ_list, `[[`, "cells"))))
 

@@ -117,7 +117,6 @@ for (sp in species) {
   M <- D$M
   n_t <- D$n_t
   cf <- coef(mod)
-  V  <- vcov(mod)
 
   # Transitions t -> t+1 use yearly covariates of year t (years 1..T-1)
   rates_from <- function(b) {
@@ -172,9 +171,7 @@ for (sp in species) {
   )
 
   # --- Point estimates and coefficient draws --------------------------------
-  V_pd <- tryCatch({ chol(V); V },
-                   error = function(e) as.matrix(Matrix::nearPD(V)$mat))
-  draws <- MASS::mvrnorm(N_DRAWS, mu = cf, Sigma = V_pd)
+  draws <- draw_coefs(mod, N_DRAWS)
   r_draws <- lapply(seq_len(N_DRAWS), function(k) rates_from(draws[k, ]))
 
   for (set_name in names(cell_sets)) {

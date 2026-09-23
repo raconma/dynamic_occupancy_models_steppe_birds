@@ -23,14 +23,24 @@ colext_model_path <- function(sp, variant = "primary") {
   }
 }
 
+# Site-level input table (cell ids, detection histories) matching a model's
+# rows: the stepRep fits used the filtered inputs in reports/script_4_v2_inputs
+colext_input_path <- function(sp, variant = "primary") {
+  if (startsWith(variant, "steprep")) {
+    here::here("reports", "script_4_v2_inputs", paste0(sp, "_occ_wide_dynamic.csv"))
+  } else {
+    here::here("data", "processed_2023", sp, paste0(sp, "_occ_wide_dynamic.csv"))
+  }
+}
+
 # Multivariate-normal coefficient draws. When the Hessian gives non-finite
-# variances (parameters at the optimiser boundary) the point estimate is
-# repeated and attr(, "point_only") is TRUE, so callers can flag intervals
-# as unavailable rather than silently narrow.
+# or non-positive variances (parameters at the optimiser boundary) the point
+# estimate is repeated and attr(, "point_only") is TRUE, so callers can flag
+# intervals as unavailable rather than report an arbitrary spread.
 draw_coefs <- function(mod, n) {
   cf <- coef(mod)
   V <- suppressWarnings(vcov(mod))
-  if (!all(is.finite(V))) {
+  if (!all(is.finite(V)) || any(diag(V) <= 0)) {
     d <- matrix(cf, n, length(cf), byrow = TRUE, dimnames = list(NULL, names(cf)))
     attr(d, "point_only") <- TRUE
     return(d)
