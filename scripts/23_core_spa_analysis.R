@@ -35,7 +35,7 @@
 # Outputs (new):
 #   results/core_spa/cell_habitat.csv
 #   results/core_spa/class_rates.csv
-#   results/core_spa/spa_matched.csv
+#   results/core_spa/spa_matched.csv  (SPA minus matched difference and SPA / matched ratio)
 #   results/core_spa/spa_balance.csv   (matching covariates and survey effort)
 #   results/core_spa/core_contrast.csv (marginal minus core extinction rate and
 #                                       ratio, with cell resampling per draw)
@@ -216,6 +216,7 @@ for (sp in species) {
                   dimnames = list(NULL, names(classes), per, c("ext_rate", "net")))
   match_d <- array(NA_real_, c(N_DRAWS, length(covs), 2),
                    dimnames = list(NULL, names(covs), per))
+  match_r <- match_d   # SPA / matched-control ratio, same resamples as match_d
   det_idx <- which(det)
   E_store <- O_store <- array(NA_real_, c(N_DRAWS, length(det_idx), 2),
                               dimnames = list(NULL, NULL, per))
@@ -241,8 +242,9 @@ for (sp in species) {
       b <- sample(seq_along(tr), replace = TRUE)
       for (nm in names(covs)) {
         t_i <- tr[b]; c_i <- matches[[nm]][b]
-        match_d[k, nm, p] <- sum(cs$E[t_i]) / sum(cs$O[t_i]) -
-                             sum(cs$E[c_i]) / sum(cs$O[c_i])
+        r_t <- sum(cs$E[t_i]) / sum(cs$O[t_i]); r_c <- sum(cs$E[c_i]) / sum(cs$O[c_i])
+        match_d[k, nm, p] <- r_t - r_c
+        match_r[k, nm, p] <- r_t / r_c
       }
     }
   }
@@ -280,7 +282,11 @@ for (sp in species) {
       # give an undefined rate ratio (0/0) and are dropped
       n_undefined = sum(!is.finite(d)),
       diff_ext_rate_med = median(d[is.finite(d)]), diff_lo = q(d[is.finite(d)], .025),
-      diff_hi = q(d[is.finite(d)], .975), p_spa_higher = mean(d[is.finite(d)] > 0))
+      diff_hi = q(d[is.finite(d)], .975), p_spa_higher = mean(d[is.finite(d)] > 0),
+      n_ratio_undefined = sum(!is.finite(match_r[, nm, p])),
+      ratio_med = median(match_r[is.finite(match_r[, nm, p]), nm, p]),
+      ratio_lo = q(match_r[is.finite(match_r[, nm, p]), nm, p], .025),
+      ratio_hi = q(match_r[is.finite(match_r[, nm, p]), nm, p], .975))
   }
 }
 
@@ -344,12 +350,13 @@ for (sp in names(contrast_store)) {
       m <- ctl[match_nn(X[tr, , drop = FALSE], X[ctl, , drop = FALSE])]
       Xb <- X_all$effort   # balance always on habitat, psi1 and effort
       smd_after <- sapply(seq_len(ncol(Xb)), function(j) smd(Xb[tr, j], Xb[m, j]))
-      d <- numeric(N_DRAWS)
+      d <- r <- numeric(N_DRAWS)
       for (k in seq_len(N_DRAWS)) {
         b <- sample(seq_along(tr), replace = TRUE)
-        d[k] <- rate_of(k, tr[b]) - rate_of(k, m[b])
+        r_t <- rate_of(k, tr[b]); r_c <- rate_of(k, m[b])
+        d[k] <- r_t - r_c; r[k] <- r_t / r_c
       }
-      ok <- is.finite(d)
+      ok <- is.finite(d); okr <- is.finite(r)
       thr_rows[[paste(sp, dn, nm)]] <- data.frame(
         species = sp, variant = variant, point_only = st$point_only,
         definition = dn, spa_in_min = thr[1], spa_out_max = thr[2], spec = nm,
@@ -360,6 +367,8 @@ for (sp in names(contrast_store)) {
         rate_out_med = median(raw_out), rate_out_lo = q(raw_out, .025), rate_out_hi = q(raw_out, .975),
         n_undefined = sum(!ok), diff_med = median(d[ok]), diff_lo = q(d[ok], .025),
         diff_hi = q(d[ok], .975), p_spa_higher = mean(d[ok] > 0),
+        n_ratio_undefined = sum(!okr), ratio_med = median(r[okr]),
+        ratio_lo = q(r[okr], .025), ratio_hi = q(r[okr], .975),
         max_abs_smd_after = max(abs(smd_after)))
     }
   }

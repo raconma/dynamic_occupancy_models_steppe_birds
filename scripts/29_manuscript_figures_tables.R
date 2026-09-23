@@ -12,6 +12,8 @@
 #   fig3a_anchored_net_change.png  anchored net change at 10 x 10 km
 #   fig3b_atlas_status_eff10.png   II Atlas squares retained/uncertain/lost,
 #                              >= 10 surveyed cell-years
+#   fig3_contrasts.png         marginal/core extinction ratio and SPA vs matched
+#                              contrasts (main-text Fig. 3 of the submission)
 #   fig4a_habitat.png, fig4b_spa.png  core vs marginal habitat and SPA vs
 #                              matched cells under the three model specifications
 # Tables (results/manuscript_tables/), one CSV each:
@@ -27,6 +29,7 @@
 #   tableS_core_contrast.csv   marginal vs core extinction (difference and
 #                              ratio with cell resampling), all definitions
 #   tableS_spa_threshold.csv   SPA contrast under alternative SPA cover splits
+#   tableS_coefficients.csv    coefficients of all submodels, primary and stepRep fits
 #   tableS_spa_sites.csv       SPAs holding the recent net change
 #   tableS_atlas_effort.csv    II Atlas comparison by effort threshold
 ###############################################################################
@@ -146,14 +149,18 @@ map_theme <- list(coord_sf(crs = UTM30, xlim = c(-60000, 1130000), ylim = c(3980
                   theme(strip.text = element_text(face = "italic"), axis.text = element_blank(),
                         axis.ticks = element_blank(), panel.grid = element_blank(),
                         legend.position = "bottom"))
-lim3 <- max(abs(net_map$net_both))
+# P. alchata: net change depends on a non-identifiable extinction rate, so
+# its squares are outlined without a value
+net_map$net_both[net_map$species == species_names["ptealc"]] <- NA
+lim3 <- max(abs(net_map$net_both), na.rm = TRUE)
 p3a <- map_base(ggplot()) +
   geom_sf(data = range2, fill = "grey85", colour = NA) +
   geom_sf(data = net_map, aes(fill = net_both), colour = "grey40", linewidth = 0.1) +
   scale_fill_gradient2(low = "#A63446", mid = "white", high = "#2F6690", midpoint = 0,
-                       limits = c(-lim3, lim3),
+                       limits = c(-lim3, lim3), na.value = "white",
                        name = "Expected net change on anchored transitions, 2018-2023") +
-  labs(caption = "Grey: II Atlas range (1998-2002). Squares: 10 x 10 km with >= 1 eBird detection.") +
+  labs(caption = paste("Grey: II Atlas range (1998-2002). Squares: 10 x 10 km with >= 1 eBird detection.",
+                       "P. alchata: net change not identifiable (squares outlined only).")) +
   map_theme
 ggsave(file.path(fig_dir, "fig3a_anchored_net_change.png"), p3a, width = 8, height = 7.5, dpi = 300)
 
@@ -229,6 +236,37 @@ p4b <- ggplot(mt, aes(x = diff_ext_rate_med, y = variant, colour = matching)) +
        title = "(b) Special Protection Areas") +
   theme_bw(base_size = 9) +
   theme(strip.text.y = element_text(face = "italic"), legend.position = "bottom", legend.box = "vertical")
+# Marginal / core extinction ratio with cell resampling (core_contrast.csv),
+# the quantity reported in the text; class rates stay in fig4a (supplement)
+ctr <- do.call(rbind, lapply(names(variants), function(v) {
+  x <- read.csv(file.path(variant_dir("core_spa", v), "core_contrast.csv"))
+  x$variant <- v
+  x[x$period == "both" & x$species %in% keep_sp &
+      x$definition %in% c("strict0.5", "strict0.7"), ]
+}))
+ctr$threshold <- ifelse(ctr$definition == "strict0.5", ">= 50 % pseudo-steppe",
+                        ">= 70 % pseudo-steppe")
+ctr$species <- factor(species_names[ctr$species], levels = species_names[keep_sp])
+ctr$variant <- factor(variants[ctr$variant], levels = variants)
+RATIO_LIM <- c(0.05, 50)   # intervals beyond the limits are drawn to the edge
+p4r <- ggplot(ctr, aes(x = pmin(pmax(ratio_med, RATIO_LIM[1]), RATIO_LIM[2]), y = variant)) +
+  geom_vline(xintercept = 1, colour = "grey50", linetype = "dashed") +
+  geom_pointrange(aes(xmin = pmax(ratio_lo, RATIO_LIM[1]), xmax = pmin(ratio_hi, RATIO_LIM[2]),
+                      shape = ifelse(point_only, "Cell resampling only", "Full uncertainty")),
+                  size = 0.25) +
+  scale_x_log10(limits = RATIO_LIM, breaks = c(0.1, 0.3, 1, 3, 10, 30),
+                labels = c("0.1", "0.3", "1", "3", "10", "30")) +
+  scale_shape_manual(values = c("Full uncertainty" = 16, "Cell resampling only" = 1),
+                     name = NULL) +
+  facet_grid(species ~ threshold) +
+  labs(x = "Extinction ratio, marginal / core habitat (log scale)", y = NULL,
+       title = "(a) Core vs marginal habitat") +
+  theme_bw(base_size = 9) +
+  theme(strip.text.y = element_text(face = "italic"), legend.position = "bottom")
+fig3 <- cowplot::plot_grid(p4r, p4b + labs(title = "(b) Special Protection Areas") +
+                             guides(shape = "none"),
+                           ncol = 2, rel_widths = c(1.15, 1), align = "h", axis = "tb")
+ggsave(file.path(fig_dir, "fig3_contrasts.png"), fig3, width = 12, height = 6, dpi = 300)
 ggsave(file.path(fig_dir, "fig4a_habitat.png"), p4a, width = 7, height = 5.5, dpi = 300)
 ggsave(file.path(fig_dir, "fig4b_spa.png"), p4b, width = 6.5, height = 5.5, dpi = 300)
 
@@ -300,6 +338,20 @@ thr <- do.call(rbind, lapply(names(variants), function(v) {
 # run, so they are dropped to avoid two values for the same contrast
 thr <- thr[thr$definition != "in50_out10", ]
 write.csv(thr, file.path(tab_dir, "tableS_spa_threshold.csv"), row.names = FALSE)
+
+# Coefficients of all submodels of the primary and steppe-representativeness
+# fits (logit scale). SEs from
+# the Hessian; NaN where the estimate sits at a boundary
+coefs <- do.call(rbind, lapply(c("primary", "steprep_v3"), function(v) do.call(rbind, lapply(species, function(sp) {
+  m <- readRDS(if (v == "primary") res(paste0(sp, "_model_object.rds")) else
+                 res("robustness", paste0(sp, "_", v, "_model_object.rds")))
+  cf <- coef(m)
+  se <- suppressWarnings(sqrt(diag(vcov(m))))
+  data.frame(variant = v, species = sp, submodel = sub("\\(.*", "", names(cf)),
+             term = sub("^[a-z]+\\((.*)\\)$", "\\1", names(cf)),
+             estimate = unname(cf), se = unname(se))
+}))))
+write.csv(coefs, file.path(tab_dir, "tableS_coefficients.csv"), row.names = FALSE)
 file.copy(res("core_spa", "spa_losses_by_site.csv"),
           file.path(tab_dir, "tableS_spa_sites.csv"), overwrite = TRUE)
 file.copy(res("atlas10", "status_vs_atlas2.csv"),
