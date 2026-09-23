@@ -26,6 +26,7 @@
 #                              specifications and model specifications
 #   tableS_core_contrast.csv   marginal vs core extinction (difference and
 #                              ratio with cell resampling), all definitions
+#   tableS_spa_threshold.csv   SPA contrast under alternative SPA cover splits
 #   tableS_spa_sites.csv       SPAs holding the recent net change
 #   tableS_atlas_effort.csv    II Atlas comparison by effort threshold
 ###############################################################################
@@ -291,6 +292,10 @@ for (tb in c("spa_matched", "core_contrast")) {
   write.csv(x[x$period == "both", ], file.path(tab_dir, paste0("tableS_", tb, ".csv")),
             row.names = FALSE)
 }
+thr <- do.call(rbind, lapply(names(variants), function(v) {
+  read.csv(file.path(variant_dir("core_spa", v), "spa_threshold.csv"))
+}))
+write.csv(thr, file.path(tab_dir, "tableS_spa_threshold.csv"), row.names = FALSE)
 file.copy(res("core_spa", "spa_losses_by_site.csv"),
           file.path(tab_dir, "tableS_spa_sites.csv"), overwrite = TRUE)
 file.copy(res("atlas10", "status_vs_atlas2.csv"),
