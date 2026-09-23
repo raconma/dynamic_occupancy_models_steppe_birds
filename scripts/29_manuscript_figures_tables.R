@@ -164,7 +164,9 @@ p3a <- map_base(ggplot()) +
   map_theme
 ggsave(file.path(fig_dir, "fig3a_anchored_net_change.png"), p3a, width = 8, height = 7.5, dpi = 300)
 
-st10 <- do.call(rbind, lapply(species, function(sp) {
+# P. alchata is not classified: its 2023 occupancy depends on a
+# non-identifiable extinction rate
+st10 <- do.call(rbind, lapply(setdiff(species, "ptealc"), function(sp) {
   q <- read.csv(res("atlas10", paste0(sp, "_squares.csv")))
   q <- q[q$atlas2 & q$status_eff10 != "insufficient effort", c("sq_id", "status_eff10")]
   q$species <- sp
@@ -174,13 +176,13 @@ st_map <- merge(atlas2[, "sq"], st10, by.x = "sq", by.y = "sq_id")
 st_map$species <- factor(species_names[st_map$species], levels = species_names)
 st_map$status <- factor(st_map$status_eff10, levels = c("retained", "uncertain", "lost"))
 p3b <- map_base(ggplot()) +
-  geom_sf(data = range2, fill = "grey90", colour = NA) +
+  geom_sf(data = range2[range2$species != species_names["ptealc"], ], fill = "grey90", colour = NA) +
   geom_sf(data = st_map, aes(fill = status), colour = "grey30", linewidth = 0.1) +
   scale_fill_manual(values = c(retained = "#3D6B45", uncertain = "#E3B448", lost = "#A63446"),
                     name = "Status in 2023 of II Atlas squares (>= 10 surveyed cell-years)") +
   labs(caption = "Grey: II Atlas range (1998-2002).") +
   map_theme
-ggsave(file.path(fig_dir, "fig3b_atlas_status_eff10.png"), p3b, width = 8, height = 7.5, dpi = 300)
+ggsave(file.path(fig_dir, "fig3b_atlas_status_eff10.png"), p3b, width = 8, height = 3.6, dpi = 300)
 
 ###############################################################################
 # FIGURE 4: extinction contrasts across specifications

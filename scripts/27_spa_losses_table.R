@@ -2,7 +2,9 @@
 # 27_spa_losses_table.R
 #
 # Which Special Protection Areas hold the recent losses? For each species and
-# SPA: cells with >= 1 eBird detection whose centroid lies in the SPA, their
+# SPA: SPA cells as defined in script 23 (cells with >= 1 eBird detection and
+# >= 50 % of their area inside SPAs), each assigned to the SPA covering the
+# largest part of the cell, with their
 # posterior net change 2018-2023 on data-anchored transitions (net_both,
 # script 21), all recent transitions (net_recent), observed (naive)
 # extinctions and colonisations, and mean CORINE pseudo-steppe cover
@@ -30,10 +32,15 @@ rows <- list()
 for (sp in species) {
   cells <- read.csv(here("results", "net_change_maps", paste0(sp, "_cells.csv")))
   cells <- cells[cells$ever_detected, ]
-  pts <- st_as_sf(cells, coords = c("x", "y"), crs = UTM30)
-  hit <- st_intersects(pts, spa)
-  cells$spa_id <- vapply(hit, function(i) if (length(i)) spa$localId[i[1]] else NA_character_, "")
   cells$steppe_strict <- hab$steppe_strict[match(cells$cells, hab$cells)]
+  cells$spa_frac <- hab$spa_frac[match(cells$cells, hab$cells)]
+  cells <- cells[cells$spa_frac >= 0.5, ]   # same SPA cells as class_rates.csv
+  polys <- wc_cell_polygons(cells$cells)
+  ov <- suppressWarnings(st_intersection(polys, spa[, "localId"]))
+  ov$area <- as.numeric(st_area(ov))
+  ov <- ov[order(ov$cells, -ov$area), ]
+  best <- ov[!duplicated(ov$cells), ]
+  cells$spa_id <- best$localId[match(cells$cells, best$cells)]
   in_spa <- cells[!is.na(cells$spa_id), ]
   if (!nrow(in_spa)) next
   agg <- do.call(rbind, lapply(split(in_spa, in_spa$spa_id), function(d) {
