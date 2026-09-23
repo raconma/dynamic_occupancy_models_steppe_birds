@@ -295,6 +295,10 @@ for (tb in c("spa_matched", "core_contrast")) {
 thr <- do.call(rbind, lapply(names(variants), function(v) {
   read.csv(file.path(variant_dir("core_spa", v), "spa_threshold.csv"))
 }))
+# The main split (in50_out10) is reported in tableS_spa_matched.csv from the
+# same draws as Table 2; its rows here come from an independent resampling
+# run, so they are dropped to avoid two values for the same contrast
+thr <- thr[thr$definition != "in50_out10", ]
 write.csv(thr, file.path(tab_dir, "tableS_spa_threshold.csv"), row.names = FALSE)
 file.copy(res("core_spa", "spa_losses_by_site.csv"),
           file.path(tab_dir, "tableS_spa_sites.csv"), overwrite = TRUE)
