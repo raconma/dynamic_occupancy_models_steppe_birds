@@ -39,6 +39,8 @@
 #   results/core_spa/spa_balance.csv   (matching covariates and survey effort)
 #   results/core_spa/core_contrast.csv (marginal minus core extinction rate and
 #                                       ratio, with cell resampling per draw)
+#   results/core_spa/spa_threshold.csv (SPA contrast under alternative SPA
+#                                       cover thresholds, anchored transitions)
 #   results/core_spa/fig_class_rates.png
 ###############################################################################
 
@@ -247,8 +249,14 @@ for (sp in species) {
 
   pairs <- c(setNames(paste0("strict", CORE_THRESHOLDS), paste0("strict", CORE_THRESHOLDS)),
              broad0.5 = "broad0.5")
+  # Observed (naive) extinctions on recent anchored transitions, per cell
+  obs_ext <- rowSums(naive[, recent] == 1 & naive[, recent + 1] == 0 &
+                       both[, recent], na.rm = TRUE)
   contrast_store[[sp]] <- list(
     E = E_store, O = O_store, point_only = point_only,
+    cell = data.frame(spa_frac = h$spa_frac, steppe_strict = h$steppe_strict,
+                      lpsi = lpsi, visits_per_year = effort[, "visits_per_year"],
+                      obs_ext = obs_ext)[det_idx, ],
     groups = lapply(pairs, function(g) list(
       core = classes[[paste0("core_", g)]][det_idx],
       rest = classes[[paste0("rest_", g)]][det_idx])))
@@ -312,8 +320,56 @@ for (sp in names(contrast_store)) {
 contrast_df <- do.call(rbind, contrast_rows); rownames(contrast_df) <- NULL
 write.csv(contrast_df, file.path(out_dir, "core_contrast.csv"), row.names = FALSE)
 
+# Sensitivity of the SPA contrast to the SPA cover thresholds (anchored
+# transitions, 2018-2023). The main analysis compares cells >= 50 % inside
+# SPAs with cells < 10 % inside and leaves out intermediate cover; here the
+# treated/control split is varied. Matching and resampling as above. Run
+# after the other outputs so that their random stream is unchanged.
+SPA_DEFS <- list(in50_out10 = c(0.5, 0.1), in50_out50 = c(0.5, 0.5),
+                 in30_out30 = c(0.3, 0.3), in10_out10 = c(0.1, 0.1))
+thr_rows <- list()
+for (sp in names(contrast_store)) {
+  st <- contrast_store[[sp]]; cl <- st$cell
+  E <- st$E[, , "both"]; O <- st$O[, , "both"]
+  rate_of <- function(k, i) sum(E[k, i]) / sum(O[k, i])
+  for (dn in names(SPA_DEFS)) {
+    thr <- SPA_DEFS[[dn]]
+    tr <- which(cl$spa_frac >= thr[1]); ctl <- which(cl$spa_frac < thr[2])
+    X_all <- list(base = cbind(cl$steppe_strict, cl$lpsi),
+                  effort = cbind(cl$steppe_strict, cl$lpsi, cl$visits_per_year))
+    raw_in <- sapply(seq_len(N_DRAWS), rate_of, i = tr)
+    raw_out <- sapply(seq_len(N_DRAWS), rate_of, i = ctl)
+    for (nm in names(X_all)) {
+      X <- X_all[[nm]]
+      m <- ctl[match_nn(X[tr, , drop = FALSE], X[ctl, , drop = FALSE])]
+      Xb <- X_all$effort   # balance always on habitat, psi1 and effort
+      smd_after <- sapply(seq_len(ncol(Xb)), function(j) smd(Xb[tr, j], Xb[m, j]))
+      d <- numeric(N_DRAWS)
+      for (k in seq_len(N_DRAWS)) {
+        b <- sample(seq_along(tr), replace = TRUE)
+        d[k] <- rate_of(k, tr[b]) - rate_of(k, m[b])
+      }
+      ok <- is.finite(d)
+      thr_rows[[paste(sp, dn, nm)]] <- data.frame(
+        species = sp, variant = variant, point_only = st$point_only,
+        definition = dn, spa_in_min = thr[1], spa_out_max = thr[2], spec = nm,
+        n_treated = length(tr), n_control_pool = length(ctl),
+        n_unique_controls = length(unique(m)), n_excluded = nrow(cl) - length(tr) - length(ctl),
+        obs_ext_treated = sum(cl$obs_ext[tr]), obs_ext_control = sum(cl$obs_ext[ctl]),
+        rate_in_med = median(raw_in), rate_in_lo = q(raw_in, .025), rate_in_hi = q(raw_in, .975),
+        rate_out_med = median(raw_out), rate_out_lo = q(raw_out, .025), rate_out_hi = q(raw_out, .975),
+        n_undefined = sum(!ok), diff_med = median(d[ok]), diff_lo = q(d[ok], .025),
+        diff_hi = q(d[ok], .975), p_spa_higher = mean(d[ok] > 0),
+        max_abs_smd_after = max(abs(smd_after)))
+    }
+  }
+}
+thr_df <- do.call(rbind, thr_rows); rownames(thr_df) <- NULL
+write.csv(thr_df, file.path(out_dir, "spa_threshold.csv"), row.names = FALSE)
+
 options(width = 220)
 print(contrast_df, digits = 3)
+print(thr_df, digits = 3)
 print(rate_df, digits = 3)
 print(match_df, digits = 3)
 print(bal_df, digits = 2)
