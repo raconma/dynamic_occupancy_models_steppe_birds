@@ -483,23 +483,19 @@ for (sp in species_codes) {
 
   set.seed(123)  # reproducible simulations
 
-  predict_data <- occ_wide_clean %>%
-    drop_na(paste0("NDVI_", YEARS))
+  sim_rows <- complete.cases(occ_wide_clean[, paste0("NDVI_", YEARS)])
+  predict_data <- occ_wide_clean[sim_rows, ]
 
   S <- nrow(predict_data)
   T_sim <- occ_umf@numPrimary
 
   # --- Initial occupancy (ψ₁) ---
-  # FIX Bug 1: scale psi covariates using TRAINING params (from step 2).
-  # Previously passed raw values to predict() → logit saturation → ψ₁ ≈ 1.
-  psi_data <- predict_data[, cfg$psi_vars, drop = FALSE]
-  for (v in cfg$psi_vars) {
-    if (v %in% names(scaling_params)) {
-      psi_data[[v]] <- scale_with_params(
-        psi_data[[v]], scaling_params[[v]]$center, scaling_params[[v]]$scale
-      )
-    }
-  }
+  # FIX Bug 4 (CRITICAL): the psi covariates in occ_wide_dynamic.csv are
+  # already standardised in step 2, so applying scaling_params again
+  # double-scaled them (mean ψ₁ ~1e-5 instead of ~0.06 for otitar). The
+  # model was trained on scale(siteCovs), so reuse exactly those values.
+  # The raster prediction surface above holds raw values and is unaffected.
+  psi_data <- as.data.frame(siteCovs)[sim_rows, cfg$psi_vars, drop = FALSE]
   psi1 <- predict(Mod.final, type = "psi",
                    newdata = as.data.frame(psi_data))$Predicted
 
