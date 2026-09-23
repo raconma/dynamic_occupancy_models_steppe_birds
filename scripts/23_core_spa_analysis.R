@@ -50,12 +50,18 @@ source(here("R", "colext_utils.R"))
 source(here("R", "spatial_layers.R"))
 set.seed(42)
 
+# Model variant: "primary" (default) or a robustness refit from script 28,
+# e.g. Rscript scripts/23_core_spa_analysis.R eps_null
+variant <- commandArgs(trailingOnly = TRUE)[1]
+if (is.na(variant)) variant <- "primary"
+
 species <- c("otitar", "ptealc", "pteori", "tettet")
 species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
                    pteori = "P. orientalis", tettet = "T. tetrax")
 N_DRAWS <- 1000
 CORE_THRESHOLDS <- c(0.3, 0.5, 0.7)
-out_dir <- here("results", "core_spa")
+hab_dir <- here("results", "core_spa")
+out_dir <- if (variant == "primary") hab_dir else file.path(hab_dir, variant)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 q <- function(x, p) as.numeric(quantile(x, p, na.rm = TRUE))
 
@@ -70,7 +76,7 @@ occ_list <- lapply(species, function(sp) {
 names(occ_list) <- species
 all_cells <- sort(unique(unlist(lapply(occ_list, `[[`, "cells"))))
 
-hab_path <- file.path(out_dir, "cell_habitat.csv")
+hab_path <- file.path(hab_dir, "cell_habitat.csv")
 if (!file.exists(hab_path)) {
   message("Computing CORINE pseudo-steppe and SPA cover for ",
           length(all_cells), " cells ...")
@@ -130,7 +136,7 @@ rate_rows <- list(); match_rows <- list(); bal_rows <- list()
 
 for (sp in species) {
   message("\n=== ", sp, " ===")
-  mod <- readRDS(here("results", paste0(sp, "_model_object.rds")))
+  mod <- readRDS(colext_model_path(sp, variant))
   D <- colext_design(mod)
   n_t <- D$n_t
   occ <- occ_list[[sp]][D$keep, ]
@@ -186,10 +192,8 @@ for (sp in species) {
   }
 
   # Draws
-  V <- vcov(mod)
-  V_pd <- tryCatch({ chol(V); V },
-                   error = function(e) as.matrix(Matrix::nearPD(V)$mat))
-  draws <- MASS::mvrnorm(N_DRAWS, mu = cf, Sigma = V_pd)
+  draws <- draw_coefs(mod, N_DRAWS)
+  point_only <- attr(draws, "point_only")
   per <- c("rec", "both")
   rate_d <- array(NA_real_, c(N_DRAWS, length(classes), 2, 2),
                   dimnames = list(NULL, names(classes), per, c("ext_rate", "net")))
@@ -225,7 +229,8 @@ for (sp in species) {
   for (j in names(classes)) for (p in per) {
     e <- rate_d[, j, p, "ext_rate"]; n <- rate_d[, j, p, "net"]
     rate_rows[[paste(sp, j, p)]] <- data.frame(
-      species = sp, class = j, period = p, n_cells = sum(classes[[j]]),
+      species = sp, variant = variant, point_only = point_only,
+      class = j, period = p, n_cells = sum(classes[[j]]),
       ext_rate_med = median(e), ext_rate_lo = q(e, .025), ext_rate_hi = q(e, .975),
       net_med = median(n), net_lo = q(n, .025), net_hi = q(n, .975),
       p_net_loss = mean(n < 0))
@@ -233,7 +238,8 @@ for (sp in species) {
   for (nm in names(covs)) for (p in per) {
     d <- match_d[, nm, p]
     match_rows[[paste(sp, nm, p)]] <- data.frame(
-      species = sp, spec = nm, period = p, n_treated = length(tr),
+      species = sp, variant = variant, point_only = point_only,
+      spec = nm, period = p, n_treated = length(tr),
       n_control_pool = length(ctl), n_unique_controls = length(unique(matches[[nm]])),
       # Resamples whose treated or control cells carry no expected occupancy
       # give an undefined rate ratio (0/0) and are dropped

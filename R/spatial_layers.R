@@ -1,8 +1,10 @@
 ###############################################################################
 # spatial_layers.R
 #
-# Shared spatial layers for scripts 21-23 (all returned in ETRS89 / UTM 30N):
-#   load_spa_union()   Natura 2000 Special Protection Areas (MITECO 2023)
+# Shared spatial layers for scripts 21-27 (all returned in ETRS89 / UTM 30N):
+#   load_spa_sites()   Natura 2000 Special Protection Areas (MITECO 2023), one
+#                      feature per SPA with code and name
+#   load_spa_union()   the same SPAs dissolved into one geometry
 #   load_atlas2()      II Breeding Bird Atlas 10x10 km grid (aves_spain.shp;
 #                      matches MITECO INB 2007 in GBIF, fieldwork 1998-2002)
 #   wc_cell_polygons() polygons of the WorldClim 2.5 arc-min cells that define
@@ -12,6 +14,11 @@
 UTM30 <- 25830
 
 load_spa_union <- function() {
+  sf::st_union(load_spa_sites())
+}
+
+# Individual SPAs (code and name), geometry repaired
+load_spa_sites <- function() {
   spa <- sf::st_read(here::here("data-raw", "data", "threats", "rn2000",
                                 "PS_NATURA2000_2023_PB.shp"), quiet = TRUE)
   spa <- spa[grepl("specialProtectionArea", spa$desig), ]
@@ -25,7 +32,8 @@ load_spa_union <- function() {
   sf::st_geometry(spa) <- sf::st_sfc(lapply(sf::st_geometry(spa),
                                             drop_degenerate_rings),
                                      crs = sf::st_crs(spa))
-  sf::st_union(sf::st_make_valid(sf::st_transform(spa, UTM30)))
+  spa <- sf::st_make_valid(sf::st_transform(spa, UTM30))
+  spa[, c("localId", "SOName")]
 }
 
 load_atlas2 <- function() {

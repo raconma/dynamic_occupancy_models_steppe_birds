@@ -13,6 +13,35 @@
 #                     detection histories (two-state hidden Markov model)
 ###############################################################################
 
+# Path to a fitted model: "primary" = results/{sp}_model_object.rds; any
+# other variant = results/robustness/{sp}_{variant}_model_object.rds (28)
+colext_model_path <- function(sp, variant = "primary") {
+  if (identical(variant, "primary")) {
+    here::here("results", paste0(sp, "_model_object.rds"))
+  } else {
+    here::here("results", "robustness", paste0(sp, "_", variant, "_model_object.rds"))
+  }
+}
+
+# Multivariate-normal coefficient draws. When the Hessian gives non-finite
+# variances (parameters at the optimiser boundary) the point estimate is
+# repeated and attr(, "point_only") is TRUE, so callers can flag intervals
+# as unavailable rather than silently narrow.
+draw_coefs <- function(mod, n) {
+  cf <- coef(mod)
+  V <- suppressWarnings(vcov(mod))
+  if (!all(is.finite(V))) {
+    d <- matrix(cf, n, length(cf), byrow = TRUE, dimnames = list(NULL, names(cf)))
+    attr(d, "point_only") <- TRUE
+    return(d)
+  }
+  V_pd <- tryCatch({ chol(V); V },
+                   error = function(e) as.matrix(Matrix::nearPD(V)$mat))
+  d <- MASS::mvrnorm(n, mu = cf, Sigma = V_pd)
+  attr(d, "point_only") <- FALSE
+  d
+}
+
 # Design matrix that keeps NA rows (model.matrix drops them by default)
 design <- function(formula, data) {
   mf <- model.frame(formula, data, na.action = na.pass)
