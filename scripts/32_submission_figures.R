@@ -7,7 +7,8 @@
 # open axes, bold panel letters). No new analyses. Script 29 keeps the
 # working figures; this script only changes presentation.
 #
-#   Fig. 1  naive vs detection-corrected dynamics on anchored transitions
+#   Fig. 1  naive vs detection-corrected dynamics on anchored transitions,
+#           four species (P. alchata extinction marked as not identifiable)
 #           (extinction rate, colonisation rate, extinctions per colonisation,
 #           expected net change)
 #   Fig. 2  maps of expected net change in recorded cells for the three
@@ -19,8 +20,8 @@
 #   Fig. S2 II Atlas squares classified in 2023
 #   Graphical abstract
 #
-# P. alchata is omitted wherever the plotted quantity depends on its
-# non-identifiable extinction rate.
+# P. alchata is omitted from Figs. 2, 3 and S2, whose quantities depend on
+# its non-identifiable extinction rate; Fig. 1 shows it with that flagged.
 #
 # Outputs: results/manuscript_figures/submission/*.pdf, *.tif (600 dpi),
 #          *.png (300 dpi, for embedding in the manuscript file)
@@ -102,44 +103,68 @@ cr$sp <- factor(sp_short[cr$species], levels = sp_short[sp_est])
 # FIG. 1: naive vs detection-corrected
 ###############################################################################
 
+# All four species. P. alchata extinction is not identifiable (posterior
+# spanning several orders of magnitude, median at the boundary), so its
+# corrected extinction and ratio are drawn as a grey interval without a
+# median, and its net change is marked "n.i."
 nv <- read.csv(res("naive_vs_corrected_anchored", "summary.csv"))
-nv <- nv[nv$period == "recent" & nv$species %in% sp_est, ]
-nv$sp <- factor(sp_short[nv$species], levels = rev(sp_short[sp_est]))
+nv <- nv[nv$period == "recent" & nv$species %in% sp_all, ]
+nv$sp <- factor(sp_short[nv$species], levels = rev(sp_short[sp_all]))
 nv <- transform(nv, med = corrected_med, lo = corrected_lo, hi = corrected_hi)
+nv$ni <- nv$species == "ptealc" & nv$metric %in% c("eps", "ratio")
 net <- cr[cr$class == "det_all", ]
-net$sp <- factor(as.character(net$sp), levels = rev(sp_short[sp_est]))
-net <- transform(net, med = net_med, lo = net_lo, hi = net_hi)
+net$sp <- factor(as.character(net$sp), levels = rev(sp_short[sp_all]))
+net <- transform(net, med = net_med, lo = net_lo, hi = net_hi, ni = FALSE)
+RL1 <- c(0.3, 6)                                   # x limits of the ratio panel
 
-rate_panel <- function(d, letter, text, xlab, log = FALSE, ref = NULL, naive = TRUE, show_y = FALSE) {
-  p <- ggplot(d, aes(y = sp, colour = sp))
+rate_panel <- function(d, letter, text, xlab, log = FALSE, ref = NULL, naive = TRUE, show_y = FALSE,
+                       ni_label = NULL, sp_levels = sp_all) {
+  if (log) d <- transform(d, lo_cut = lo < RL1[1], lo = pmax(lo, RL1[1]), hi = pmin(hi, RL1[2]))
+  est <- d[!d$ni, ]; nid <- d[d$ni, ]
+  p <- ggplot(est, aes(y = sp, colour = sp))
   if (!is.null(ref)) p <- p + geom_vline(xintercept = ref, colour = "grey50", linetype = "dashed",
                                          linewidth = 0.3)
   if (naive) p <- p + geom_segment(aes(x = naive, xend = med, yend = sp), colour = "grey65",
                                    linetype = "dotted", linewidth = 0.35)
   p <- p + errbar(aes(xmin = lo, xmax = hi)) +
     geom_point(aes(x = med, shape = "Detection-corrected"), size = 2.4)
-  if (naive) p <- p + geom_point(aes(x = naive, shape = "Naive"), size = 2.4, stroke = 0.9)
+  if (nrow(nid) > 0) {
+    p <- p + errbar(data = nid, aes(xmin = lo, xmax = hi), colour = "grey75") +
+      geom_label(data = nid, aes(x = sqrt_or_mid(lo, hi, log), label = "not identifiable"),
+                 colour = "grey40", fill = "white", size = 2.2, vjust = -0.5, linewidth = 0,
+                 label.padding = unit(0.3, "mm"))
+    if (log) p <- p + geom_point(data = nid[nid$lo_cut, ], aes(x = RL1[1]), shape = "<", size = 2.2,
+                                 colour = "grey60")
+  }
+  if (naive) p <- p + geom_point(data = d, aes(x = naive, shape = "Naive"), size = 2.4, stroke = 0.9)
+  if (!is.null(ni_label)) p <- p + geom_label(data = ni_label, aes(x = x, y = sp, label = "n.i."),
+                                              colour = "grey40", fill = "white", size = 2.4,
+                                              linewidth = 0, inherit.aes = FALSE)
   p <- p + scale_colour_manual(values = sp_col_lab, guide = "none") +
     scale_shape_manual(values = c("Naive" = 4, "Detection-corrected" = 16), name = NULL) +
+    scale_y_discrete(limits = rev(unname(sp_short[sp_levels]))) +
     labs(x = xlab, y = NULL, title = ptitle(letter, text)) + theme_gcb + italic_y +
     theme(legend.position = "none")
-  if (log) p <- p + scale_x_log10(breaks = c(0.5, 1, 2, 4))
+  if (log) p <- p + scale_x_log10(limits = RL1, breaks = c(0.5, 1, 2, 4))
   if (!show_y) p <- p + theme(axis.text.y = element_blank())
   p
 }
+# label position: middle of the interval (geometric middle on a log axis)
+sqrt_or_mid <- function(lo, hi, log) if (log) sqrt(lo * hi) else (lo + hi) / 2
 p1a <- rate_panel(nv[nv$metric == "eps", ], "A", "Extinction", "Per occupied cell-year", show_y = TRUE)
 p1b <- rate_panel(nv[nv$metric == "gamma", ], "B", "Colonisation", "Per unoccupied cell-year")
 p1c <- rate_panel(nv[nv$metric == "ratio", ], "C", "Extinctions per colonisation", "Ratio (log scale)",
                   log = TRUE, ref = 1)
-p1d <- rate_panel(net, "D", "Net change", "Expected change (cells)", ref = 0, naive = FALSE)
+p1d <- rate_panel(net, "D", "Net change", "Expected change (cells)", ref = 0, naive = FALSE,
+                  ni_label = data.frame(x = 0, sp = sp_short[["ptealc"]]))
 leg1 <- cowplot::get_plot_component(
-  rate_panel(nv[nv$metric == "eps", ], "A", "", "") +
+  rate_panel(nv[nv$metric == "gamma", ], "A", "", "") +
     guides(shape = guide_legend(override.aes = list(colour = "grey30"))) +
     theme(legend.position = "bottom"), "guide-box-bottom")
 row1 <- cowplot::plot_grid(p1a, p1b, p1c, p1d, nrow = 1, align = "h", axis = "tb",
                            rel_widths = c(1.3, 1, 1, 1))
 fig1 <- cowplot::plot_grid(row1, leg1, ncol = 1, rel_heights = c(1, 0.1))
-save_fig(fig1, "Fig1_naive_vs_corrected", 190, 64)
+save_fig(fig1, "Fig1_naive_vs_corrected", 190, 72)
 
 ###############################################################################
 # FIG. 2: where occupied cells are lost, three species, and partition of the
@@ -320,8 +345,9 @@ save_fig(pS2, "FigS2_atlas_status", 190, 80)
 # GCB conceptual figure were added by hand and are not drawn here.
 ###############################################################################
 
-ga1 <- rate_panel(nv[nv$metric == "ratio", ], "", "", "Extinctions per colonisation (log)",
-                  log = TRUE, ref = 1, show_y = TRUE) +
+ga1 <- rate_panel(nv[nv$metric == "ratio" & nv$species %in% sp_est, ], "", "",
+                  "Extinctions per colonisation (log)", log = TRUE, ref = 1, show_y = TRUE,
+                  sp_levels = sp_est) +
   labs(title = "Correcting for detection\nchanges the trajectories")
 ga2 <- ga_map + labs(title = "Great bustard losses: about\nhalf of them inside SPAs")
 eff <- mt[mt$variant == "primary" & mt$spec == "effort", ]
