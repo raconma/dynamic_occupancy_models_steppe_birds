@@ -5,6 +5,8 @@
 #   load_spa_sites()   Natura 2000 Special Protection Areas (MITECO 2023), one
 #                      feature per SPA with code and name
 #   load_spa_union()   the same SPAs dissolved into one geometry
+#   load_n2k_sites()   all Natura 2000 sites (SPAs, SCIs, SACs), optionally
+#                      filtered by designation
 #   load_atlas2()      II Breeding Bird Atlas 10x10 km grid (aves_spain.shp;
 #                      matches MITECO INB 2007 in GBIF, fieldwork 1998-2002)
 #   wc_cell_polygons() polygons of the WorldClim 2.5 arc-min cells that define
@@ -17,11 +19,14 @@ load_spa_union <- function() {
   sf::st_union(load_spa_sites())
 }
 
-# Individual SPAs (code and name), geometry repaired
-load_spa_sites <- function() {
-  spa <- sf::st_read(here::here("data-raw", "data", "threats", "rn2000",
+# Natura 2000 sites (MITECO 2023), one feature per site with code, name and
+# designation, geometry repaired. `desig` is a pattern on the INSPIRE
+# designation (specialProtectionArea, siteOfCommunityImportance,
+# specialAreaOfConservation); NULL keeps all sites.
+load_n2k_sites <- function(desig = NULL) {
+  n2k <- sf::st_read(here::here("data-raw", "data", "threats", "rn2000",
                                 "PS_NATURA2000_2023_PB.shp"), quiet = TRUE)
-  spa <- spa[grepl("specialProtectionArea", spa$desig), ]
+  if (!is.null(desig)) n2k <- n2k[grepl(desig, n2k$desig), ]
   # One SPA ("Estepas cerealistas de los rios Jarama y Henares", a key great
   # bustard site) holds a one-vertex hole that makes st_make_valid() fail.
   # Drop rings with < 4 vertices (degenerate by definition) before repairing.
@@ -29,11 +34,16 @@ load_spa_sites <- function() {
     sf::st_multipolygon(lapply(g, function(poly)
       Filter(function(r) nrow(r) >= 4, poly)))
   }
-  sf::st_geometry(spa) <- sf::st_sfc(lapply(sf::st_geometry(spa),
+  sf::st_geometry(n2k) <- sf::st_sfc(lapply(sf::st_geometry(n2k),
                                             drop_degenerate_rings),
-                                     crs = sf::st_crs(spa))
-  spa <- sf::st_make_valid(sf::st_transform(spa, UTM30))
-  spa[, c("localId", "SOName")]
+                                     crs = sf::st_crs(n2k))
+  n2k <- sf::st_make_valid(sf::st_transform(n2k, UTM30))
+  n2k[, c("localId", "SOName", "desig")]
+}
+
+# Individual SPAs (code and name)
+load_spa_sites <- function() {
+  load_n2k_sites("specialProtectionArea")[, c("localId", "SOName")]
 }
 
 load_atlas2 <- function() {
