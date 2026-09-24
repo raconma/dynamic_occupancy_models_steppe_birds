@@ -2,22 +2,21 @@
 # 32_submission_figures.R
 #
 # Final figures for the Biological Conservation submission, drawn at print
-# size (190 mm, double column) from the outputs of scripts 21, 23, 26 and 29.
-# No new analyses. Script 29 keeps the working figures; this script only
-# changes presentation.
+# size (190 mm, double column) from the outputs of scripts 21, 23, 26 and 29,
+# in the style of the earlier GCB figures (one Okabe-Ito colour per species,
+# open axes, bold panel letters). No new analyses. Script 29 keeps the
+# working figures; this script only changes presentation.
 #
 #   Fig. 1  naive vs detection-corrected dynamics on anchored transitions
 #           (extinction rate, colonisation rate, extinctions per colonisation,
 #           expected net change)
-#   Fig. 2  great bustard: (a) map of expected net change in recorded cells
-#           with Special Protection Areas, (b) partition of the net change
-#           by protection and habitat class
+#   Fig. 2  maps of expected net change in recorded cells for the three
+#           species with identifiable extinction, with Special Protection
+#           Areas, and partition of the net change by protection and habitat
 #   Fig. 3  (a) marginal/core extinction ratio, (b) SPA minus matched
 #           extinction, three model specifications
 #   Fig. S1 surveyed cells and cells with detections
 #   Fig. S2 II Atlas squares classified in 2023
-#   Fig. S3 expected net change maps, little bustard and black-bellied
-#           sandgrouse
 #   Graphical abstract
 #
 # P. alchata is omitted wherever the plotted quantity depends on its
@@ -39,23 +38,33 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 res <- function(...) here("results", ...)
 variant_dir <- function(base, v) if (v == "primary") res(base) else res(base, v)
 
-# Species order follows the text; labels are plotmath strings
+# Species order follows the text. One colour per species throughout, as in
+# the GCB figures (Okabe-Ito)
 sp_all <- c("otitar", "tettet", "pteori", "ptealc")
 sp_est <- c("otitar", "tettet", "pteori")          # extinction identifiable
-sp_common <- c(otitar = "Great bustard", tettet = "Little bustard",
-               pteori = "Black-bellied sandgrouse", ptealc = "Pin-tailed sandgrouse")
-sp_latin <- c(otitar = "Otis tarda", tettet = "Tetrax tetrax",
-              pteori = "Pterocles orientalis", ptealc = "Pterocles alchata")
-# Common names are quoted so that plotmath keeps hyphens ("Black-bellied")
-sp_expr <- setNames(sprintf('"%s"~(italic("%s"))', sp_common, sp_latin), names(sp_common))
-sp_expr2 <- setNames(sprintf('atop("%s", italic("%s"))', sp_common, sp_latin), names(sp_common))
+sp_short <- c(otitar = "O. tarda", tettet = "T. tetrax", pteori = "P. orientalis",
+              ptealc = "P. alchata")
+sp_col <- c(otitar = "#D55E00", tettet = "#CC79A7", pteori = "#009E73", ptealc = "#0072B2")
+sp_col_lab <- setNames(sp_col, sp_short[names(sp_col)])
 variants <- c(primary = "Primary model", eps_null = "Constant extinction",
               steprep_v3 = "Steppe-rep. detection")
+vlev <- c("steprep_v3", "eps_null", "primary")     # bottom to top
 
-col_loss <- "#B2182B"; col_gain <- "#2166AC"; col_effort <- "#2C6E91"
-theme_sub <- theme_bw(base_size = 8) +
-  theme(panel.grid.minor = element_blank(), strip.background = element_rect(fill = "grey95"),
-        legend.key.size = unit(3, "mm"), plot.title = element_text(size = 8, face = "bold"))
+theme_gcb <- theme_minimal(base_size = 8) +
+  theme(panel.grid.major.x = element_blank(), panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_line(colour = "grey92", linewidth = 0.3),
+        axis.line = element_line(colour = "grey35", linewidth = 0.3),
+        axis.ticks = element_line(colour = "grey35", linewidth = 0.3),
+        axis.text = element_text(colour = "grey20"),
+        plot.title = element_text(size = 8.5, margin = margin(b = 3)),
+        legend.position = "bottom", legend.key.size = unit(3, "mm"),
+        legend.text = element_text(margin = margin(r = 8)),
+        strip.text = element_text(face = "italic", size = 8),
+        panel.spacing.x = unit(4, "mm"),
+        plot.background = element_rect(fill = "white", colour = NA))
+italic_y <- theme(axis.text.y = element_text(face = "italic", colour = "grey20"))
+ptitle <- function(letter, text) bquote(bold(.(letter)) ~~ .(text))
+errbar <- function(...) geom_errorbar(..., orientation = "y", width = 0.25, linewidth = 0.45)
 
 save_fig <- function(p, name, w, h) {
   ggsave(file.path(out_dir, paste0(name, ".pdf")), p, width = w, height = h, units = "mm",
@@ -72,19 +81,22 @@ spain <- st_transform(rnaturalearth::ne_countries(scale = 50, country = "Spain",
 spain_parts <- st_cast(st_geometry(spain), "POLYGON")
 spain_main <- st_sf(geometry = spain_parts[which.max(st_area(spain_parts))])
 spa_sites <- load_spa_sites()
-spa_land <- suppressWarnings(st_intersection(st_simplify(spa_sites, dTolerance = 300), spain_main))
 spa_union <- suppressWarnings(st_intersection(st_simplify(load_spa_union(), dTolerance = 300), spain_main))
 bb <- st_bbox(spain_main)
 map_coord <- coord_sf(crs = UTM30, xlim = c(bb["xmin"], bb["xmax"]), ylim = c(bb["ymin"], bb["ymax"]),
                       expand = TRUE)
 map_theme <- theme_void(base_size = 8) +
-  theme(legend.position = "bottom", strip.text = element_text(size = 8, margin = margin(2, 0, 2, 0)),
+  theme(legend.position = "bottom", plot.title = element_text(size = 8.5, margin = margin(b = 2)),
+        strip.text = element_text(face = "italic", size = 8.5, margin = margin(2, 0, 2, 0)),
         plot.background = element_rect(fill = "white", colour = NA))
+col_spa_fill <- "#DDEBDD"; col_spa_line <- "#7FA67F"
 
-hab <- read.csv(res("core_spa", "cell_habitat.csv"))
 atlas2 <- load_atlas2()
 atlas_col <- c(otitar = "OTITAR", ptealc = "PTEALC", pteori = "PTEORI", tettet = "TETTET")
 atlas_range <- function(sp) atlas2[as.numeric(st_drop_geometry(atlas2)[[atlas_col[sp]]]) > 0, ]
+cr <- read.csv(res("core_spa", "class_rates.csv"))
+cr <- cr[cr$variant == "primary" & !cr$point_only & cr$period == "both" & cr$species %in% sp_est, ]
+cr$sp <- factor(sp_short[cr$species], levels = sp_short[sp_est])
 
 ###############################################################################
 # FIG. 1: naive vs detection-corrected
@@ -92,100 +104,118 @@ atlas_range <- function(sp) atlas2[as.numeric(st_drop_geometry(atlas2)[[atlas_co
 
 nv <- read.csv(res("naive_vs_corrected_anchored", "summary.csv"))
 nv <- nv[nv$period == "recent" & nv$species %in% sp_est, ]
-nv$sp <- factor(nv$species, levels = rev(sp_est))
-cr <- read.csv(res("core_spa", "class_rates.csv"))
-net <- cr[cr$variant == "primary" & cr$class == "det_all" & cr$period == "both" &
-            cr$species %in% sp_est, ]
-net$sp <- factor(net$species, levels = rev(sp_est))
-ylab_sp <- scale_y_discrete(labels = function(x) parse(text = sp_expr2[x]))
+nv$sp <- factor(sp_short[nv$species], levels = rev(sp_short[sp_est]))
+nv <- transform(nv, med = corrected_med, lo = corrected_lo, hi = corrected_hi)
+net <- cr[cr$class == "det_all", ]
+net$sp <- factor(as.character(net$sp), levels = rev(sp_short[sp_est]))
+net <- transform(net, med = net_med, lo = net_lo, hi = net_hi)
 
-rate_panel <- function(metric, title, log = FALSE, ref = NULL, show_y = FALSE) {
-  d <- nv[nv$metric == metric, ]
-  p <- ggplot(d, aes(y = sp)) +
-    { if (!is.null(ref)) geom_vline(xintercept = ref, colour = "grey50", linetype = "dashed", linewidth = 0.3) } +
-    geom_segment(aes(x = naive, xend = corrected_med, yend = sp), colour = "grey70", linewidth = 0.3) +
-    geom_linerange(aes(xmin = corrected_lo, xmax = corrected_hi), linewidth = 0.5) +
-    geom_point(aes(x = corrected_med, shape = "Detection-corrected"), size = 1.8) +
-    geom_point(aes(x = naive, shape = "Naive"), size = 1.8) +
-    scale_shape_manual(values = c("Detection-corrected" = 16, "Naive" = 4), name = NULL) +
-    ylab_sp + labs(x = NULL, y = NULL, title = title) + theme_sub +
+rate_panel <- function(d, letter, text, xlab, log = FALSE, ref = NULL, naive = TRUE, show_y = FALSE) {
+  p <- ggplot(d, aes(y = sp, colour = sp))
+  if (!is.null(ref)) p <- p + geom_vline(xintercept = ref, colour = "grey50", linetype = "dashed",
+                                         linewidth = 0.3)
+  if (naive) p <- p + geom_segment(aes(x = naive, xend = med, yend = sp), colour = "grey65",
+                                   linetype = "dotted", linewidth = 0.35)
+  p <- p + errbar(aes(xmin = lo, xmax = hi)) +
+    geom_point(aes(x = med, shape = "Detection-corrected"), size = 2.4)
+  if (naive) p <- p + geom_point(aes(x = naive, shape = "Naive"), size = 2.4, stroke = 0.9)
+  p <- p + scale_colour_manual(values = sp_col_lab, guide = "none") +
+    scale_shape_manual(values = c("Naive" = 4, "Detection-corrected" = 16), name = NULL) +
+    labs(x = xlab, y = NULL, title = ptitle(letter, text)) + theme_gcb + italic_y +
     theme(legend.position = "none")
   if (log) p <- p + scale_x_log10(breaks = c(0.5, 1, 2, 4))
-  if (!show_y) p <- p + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  if (!show_y) p <- p + theme(axis.text.y = element_blank())
   p
 }
-p1a <- rate_panel("eps", "a  Extinction rate\n", show_y = TRUE)
-p1b <- rate_panel("gamma", "b  Colonisation rate\n")
-p1c <- rate_panel("ratio", "c  Extinctions per\n    colonisation (log)", log = TRUE, ref = 1)
-p1d <- ggplot(net, aes(y = sp)) +
-  geom_vline(xintercept = 0, colour = "grey50", linetype = "dashed", linewidth = 0.3) +
-  geom_linerange(aes(xmin = net_lo, xmax = net_hi), linewidth = 0.5) +
-  geom_point(aes(x = net_med), size = 1.8, shape = 16) +
-  ylab_sp + labs(x = NULL, y = NULL, title = "d  Expected net\n    change (cells)") + theme_sub +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-leg1 <- cowplot::get_legend(rate_panel("eps", "")+ theme(legend.position = "bottom"))
+p1a <- rate_panel(nv[nv$metric == "eps", ], "A", "Extinction", "Per occupied cell-year", show_y = TRUE)
+p1b <- rate_panel(nv[nv$metric == "gamma", ], "B", "Colonisation", "Per unoccupied cell-year")
+p1c <- rate_panel(nv[nv$metric == "ratio", ], "C", "Extinctions per colonisation", "Ratio (log scale)",
+                  log = TRUE, ref = 1)
+p1d <- rate_panel(net, "D", "Net change", "Expected change (cells)", ref = 0, naive = FALSE)
+leg1 <- cowplot::get_plot_component(
+  rate_panel(nv[nv$metric == "eps", ], "A", "", "") +
+    guides(shape = guide_legend(override.aes = list(colour = "grey30"))) +
+    theme(legend.position = "bottom"), "guide-box-bottom")
 row1 <- cowplot::plot_grid(p1a, p1b, p1c, p1d, nrow = 1, align = "h", axis = "tb",
-                           rel_widths = c(1.55, 1, 1, 1))
-fig1 <- cowplot::plot_grid(row1, leg1, ncol = 1, rel_heights = c(1, 0.12))
-save_fig(fig1, "Fig1_naive_vs_corrected", 190, 62)
+                           rel_widths = c(1.3, 1, 1, 1))
+fig1 <- cowplot::plot_grid(row1, leg1, ncol = 1, rel_heights = c(1, 0.1))
+save_fig(fig1, "Fig1_naive_vs_corrected", 190, 64)
 
 ###############################################################################
-# FIG. 2: great bustard map and partition of the net change
+# FIG. 2: where occupied cells are lost, three species, and partition of the
+# net change by protection and habitat
 ###############################################################################
 
-ot <- read.csv(res("net_change_maps", "otitar_cells.csv"))
-ot <- ot[ot$ever_detected, ]
-ot$spa_frac <- hab$spa_frac[match(ot$cells, hab$cells)]
-ot$abs_net <- abs(ot$net_both)
-ot$dir <- ifelse(ot$net_both < 0, "Loss", "Gain")
-small <- ot[ot$abs_net < 0.05, ]; big <- ot[ot$abs_net >= 0.05, ]
+# The two SPAs with the largest great bustard losses, labelled on panel A
 sites <- read.csv(res("core_spa", "spa_losses_by_site.csv"))
-top2 <- head(sites[sites$species == "otitar", ][order(sites$net_both[sites$species == "otitar"]), ], 2)
+ot_sites <- sites[sites$species == "otitar", ]
+top2 <- head(ot_sites[order(ot_sites$net_both), ], 2)
 lab_pts <- st_point_on_surface(spa_sites[match(top2$spa_code, spa_sites$localId), ])
 lab_xy <- data.frame(st_coordinates(lab_pts), lab = c("1", "2"))
-p2a <- ggplot() +
-  geom_sf(data = spain_main, fill = "white", colour = "grey55", linewidth = 0.2) +
-  geom_sf(data = atlas_range("otitar"), fill = "grey88", colour = NA) +
-  geom_sf(data = spa_union, fill = "#CFE3D1", colour = "#5E8C66", linewidth = 0.1, alpha = 0.8) +
-  geom_point(data = small, aes(x, y), shape = 21, size = 0.7, fill = "white", colour = "grey40",
-             stroke = 0.25) +
-  geom_point(data = big[order(-big$abs_net), ], aes(x, y, size = abs_net, fill = dir), shape = 21,
-             colour = "grey20", stroke = 0.25) +
-  geom_text(data = lab_xy, aes(X, Y, label = lab), size = 2.6, fontface = "bold",
-            nudge_x = 22000, nudge_y = 18000) +
-  scale_size_area(max_size = 4.5, breaks = c(0.25, 0.5, 1), name = "Expected net change\n(cells, absolute)") +
-  scale_fill_manual(values = c(Loss = col_loss, Gain = col_gain), name = NULL) +
-  map_coord + map_theme +
-  guides(fill = guide_legend(override.aes = list(size = 2.5), order = 1),
-         size = guide_legend(order = 2)) +
-  labs(title = "a") + theme(plot.title = element_text(face = "bold", size = 9))
+
+map_sp <- function(sp, letter) {
+  d <- read.csv(res("net_change_maps", paste0(sp, "_cells.csv")))
+  d <- d[d$ever_detected, ]
+  d$abs_net <- abs(d$net_both)
+  d$dir <- factor(ifelse(d$net_both < 0, "Loss", "Gain"), levels = c("Loss", "Gain"))
+  small <- d[d$abs_net < 0.05, ]
+  big <- d[d$abs_net >= 0.05, ]
+  big <- big[order(-big$abs_net), ]
+  ggplot() +
+    geom_sf(data = spain_main, fill = "white", colour = "grey45", linewidth = 0.2) +
+    geom_sf(data = atlas_range(sp), fill = "grey90", colour = NA) +
+    geom_sf(data = spa_union, fill = col_spa_fill, colour = col_spa_line, linewidth = 0.08) +
+    geom_point(data = small, aes(x, y), shape = 21, size = 0.6, fill = "white", colour = "grey45",
+               stroke = 0.2) +
+    geom_point(data = big, aes(x, y, size = abs_net, shape = dir), colour = sp_col[sp],
+               stroke = 0.7) +
+    scale_shape_manual(values = c(Loss = 16, Gain = 1), drop = FALSE, name = NULL) +
+    scale_size_area(max_size = 4, limits = c(0, 1.1), breaks = c(0.25, 0.5, 1),
+                    name = "Absolute net change (cells)") +
+    labs(title = bquote(bold(.(letter)) ~~ italic(.(unname(sp_short[sp]))))) +
+    map_coord + map_theme
+}
+m2 <- lapply(seq_along(sp_est), function(i) map_sp(sp_est[i], LETTERS[i]))
+ga_map <- m2[[1]] + theme(legend.position = "none")   # unlabelled copy for the graphical abstract
+m2[[1]] <- m2[[1]] + geom_text(data = lab_xy, aes(X, Y, label = lab), size = 2.6, fontface = "bold",
+                               nudge_x = 24000, nudge_y = 20000)
+leg_map <- cowplot::get_plot_component(
+  m2[[1]] + guides(shape = guide_legend(override.aes = list(size = 2.5, colour = "grey30"), order = 1),
+                   size = guide_legend(override.aes = list(colour = "grey30"), order = 2)),
+  "guide-box-bottom")
+m2 <- lapply(m2, function(p) p + theme(legend.position = "none"))
+
 cls <- c(det_all = "All recorded cells", spa_in = "SPA cells", spa_out = "Unprotected cells",
          core_strict0.5 = "Core (≥ 50 %)", rest_strict0.5 = "Marginal (< 50 %)",
          core_strict0.7 = "Core (≥ 70 %)", rest_strict0.7 = "Marginal (< 70 %)")
 grp <- c(det_all = "All", spa_in = "Protection", spa_out = "Protection",
-         core_strict0.5 = "Habitat, 50 %", rest_strict0.5 = "Habitat, 50 %",
-         core_strict0.7 = "Habitat, 70 %", rest_strict0.7 = "Habitat, 70 %")
-part <- cr[cr$species == "otitar" & cr$variant == "primary" & cr$period == "both" &
-             cr$class %in% names(cls), ]
-part$lab <- factor(sprintf("%s (%d)", cls[part$class], part$n_cells),
-                   levels = rev(sprintf("%s (%d)", cls[names(cls)],
-                                        part$n_cells[match(names(cls), part$class)])))
+         core_strict0.5 = "Habitat", rest_strict0.5 = "Habitat",
+         core_strict0.7 = "Habitat", rest_strict0.7 = "Habitat")
+part <- cr[cr$class %in% names(cls), ]
+part$lab <- factor(cls[part$class], levels = rev(cls))
 part$grp <- factor(grp[part$class], levels = unique(grp))
-p2b <- ggplot(part, aes(y = lab)) +
+part$sp <- factor(as.character(part$sp), levels = rev(sp_short[sp_est]))   # O. tarda on top
+pd2 <- position_dodge(width = 0.7)
+p2d <- ggplot(part, aes(y = lab, colour = sp, group = sp)) +
   geom_vline(xintercept = 0, colour = "grey50", linetype = "dashed", linewidth = 0.3) +
-  geom_linerange(aes(xmin = net_lo, xmax = net_hi), linewidth = 0.5) +
-  geom_point(aes(x = net_med), size = 1.8, colour = col_loss) +
+  geom_errorbar(aes(xmin = net_lo, xmax = net_hi), orientation = "y", width = 0.35, linewidth = 0.4,
+                position = pd2) +
+  geom_point(aes(x = net_med), size = 1.8, position = pd2) +
+  scale_colour_manual(values = sp_col_lab, breaks = unname(sp_short[sp_est]), name = NULL) +
   facet_grid(grp ~ ., scales = "free_y", space = "free_y") +
-  labs(x = "Expected net change (cells)", y = NULL, title = "b") + theme_sub +
-  theme(strip.text.y = element_text(angle = 0, hjust = 0), plot.title = element_text(face = "bold", size = 9))
-fig2 <- cowplot::plot_grid(p2a, p2b, nrow = 1, rel_widths = c(1.75, 1))
-save_fig(fig2, "Fig2_great_bustard", 190, 105)
+  labs(x = "Expected net change (cells)", y = NULL, title = ptitle("D", "Net change by class of cell")) +
+  theme_gcb +
+  theme(strip.text.y = element_blank(), legend.text = element_text(face = "italic", margin = margin(r = 8)),
+        panel.spacing.y = unit(2, "mm"), legend.margin = margin(0, 0, 0, 0))
+fig2 <- cowplot::plot_grid(
+  cowplot::plot_grid(m2[[1]], m2[[2]], m2[[3]], p2d, nrow = 2),
+  leg_map, ncol = 1, rel_heights = c(1, 0.06))
+save_fig(fig2, "Fig2_net_change_maps", 190, 180)
 
 ###############################################################################
 # FIG. 3: habitat and SPA contrasts
 ###############################################################################
 
-vlev <- rev(names(variants))
 ctr <- do.call(rbind, lapply(names(variants), function(v) {
   x <- read.csv(file.path(variant_dir("core_spa", v), "core_contrast.csv")); x$variant <- v
   x[x$period == "both" & x$species %in% sp_est & x$definition %in% c("strict0.5", "strict0.7"), ]
@@ -195,56 +225,49 @@ mt <- do.call(rbind, lapply(names(variants), function(v) {
   x[x$period == "both" & x$species %in% sp_est & x$spec %in% c("base", "effort"), ]
 }))
 prep <- function(d) {
-  d$sp <- factor(d$species, levels = sp_est, labels = sp_expr[sp_est])
-  d$var <- factor(d$variant, levels = vlev, labels = variants[vlev])   # primary drawn on top
-  d$primary <- d$variant == "primary"
-  d$fix <- ifelse(d$point_only, "Coefficients fixed at point estimates", "Full uncertainty")
+  d$sp <- factor(sp_short[d$species], levels = sp_short[sp_est])
+  d$var <- factor(variants[d$variant], levels = unname(variants[vlev]))
+  # open symbols: coefficients fixed at their point estimates
+  d$pt_fill <- ifelse(d$point_only, "white", sp_col[d$species])
   d
 }
 ctr <- prep(ctr); mt <- prep(mt)
 RL <- c(0.03, 200)
-ctr$thr <- factor(ifelse(ctr$definition == "strict0.5", "≥ 50 % pseudo-steppe", "≥ 70 % pseudo-steppe"))
+ctr$grp <- factor(ifelse(ctr$definition == "strict0.5", "Core ≥ 50 % pseudo-steppe",
+                         "Core ≥ 70 % pseudo-steppe"))
 ctr$lo_p <- pmax(ctr$ratio_lo, RL[1]); ctr$hi_p <- pmin(ctr$ratio_hi, RL[2])
-ctr$lo_cut <- ctr$ratio_lo < RL[1]; ctr$hi_cut <- ctr$ratio_hi > RL[2]
-pd <- position_dodge(width = 0.6)
-band <- data.frame(var = factor(variants["primary"], levels = variants[vlev]))
-p3a <- ggplot(ctr, aes(y = var, colour = thr, group = thr)) +
-  geom_tile(data = band, aes(y = var, x = 1), width = Inf, height = 1, fill = "grey93",
-            colour = NA, inherit.aes = FALSE) +
-  geom_vline(xintercept = 1, colour = "grey50", linetype = "dashed", linewidth = 0.3) +
-  geom_linerange(aes(xmin = lo_p, xmax = hi_p), position = pd, linewidth = 0.5) +
-  geom_point(aes(x = ratio_med, shape = fix), position = pd, size = 1.7, fill = "white") +
-  geom_point(data = ctr[ctr$lo_cut, ], aes(x = RL[1]), shape = "<", size = 2.2, position = pd,
-             show.legend = FALSE) +
-  geom_point(data = ctr[ctr$hi_cut, ], aes(x = RL[2]), shape = ">", size = 2.2, position = pd,
-             show.legend = FALSE) +
-  scale_x_log10(limits = RL, breaks = c(0.1, 1, 10, 100), labels = c("0.1", "1", "10", "100")) +
-  scale_colour_manual(values = c("grey55", "black"), name = NULL) +
-  scale_shape_manual(values = c("Full uncertainty" = 16, "Coefficients fixed at point estimates" = 21),
-                     name = NULL) +
-  scale_y_discrete(limits = unname(variants[c("steprep_v3", "eps_null", "primary")])) +
-  facet_grid(. ~ sp, labeller = label_parsed) +
-  labs(x = "Extinction ratio, marginal / core habitat (log scale)\n← lower in marginal      higher in marginal →",
-       y = NULL, title = "a") + theme_sub +
-  theme(legend.position = "bottom", plot.title = element_text(face = "bold", size = 9)) +
-  guides(shape = "none")
-mt$match <- factor(ifelse(mt$spec == "base", "Matched on habitat", "Matched on habitat and survey effort"))
-p3b <- ggplot(mt, aes(y = var, colour = match, group = match)) +
-  geom_tile(data = band, aes(y = var, x = 0), width = Inf, height = 1, fill = "grey93",
-            colour = NA, inherit.aes = FALSE) +
-  geom_vline(xintercept = 0, colour = "grey50", linetype = "dashed", linewidth = 0.3) +
-  geom_linerange(aes(xmin = diff_lo, xmax = diff_hi), position = pd, linewidth = 0.5) +
-  geom_point(aes(x = diff_ext_rate_med, shape = fix), position = pd, size = 1.7, fill = "white") +
-  scale_colour_manual(values = c("black", col_effort), name = NULL) +
-  scale_shape_manual(values = c("Full uncertainty" = 16, "Coefficients fixed at point estimates" = 21),
-                     name = NULL) +
-  scale_y_discrete(limits = unname(variants[c("steprep_v3", "eps_null", "primary")])) +
-  facet_grid(. ~ sp, labeller = label_parsed) +
-  labs(x = "Extinction rate, SPA cells minus matched unprotected cells\n← lower in SPAs      higher in SPAs →",
-       y = NULL, title = "b") + theme_sub +
-  theme(legend.position = "bottom", legend.box = "vertical", legend.spacing.x = unit(2, "mm"),
-        legend.text = element_text(margin = margin(r = 6)), plot.title = element_text(face = "bold", size = 9))
-fig3 <- cowplot::plot_grid(p3a, p3b, ncol = 1, align = "v", axis = "lr", rel_heights = c(1, 1.12))
+mt$grp <- factor(ifelse(mt$spec == "base", "Matched on habitat and initial occupancy",
+                        "Also matched on survey effort"),
+                 levels = c("Matched on habitat and initial occupancy", "Also matched on survey effort"))
+band <- data.frame(var = factor(variants["primary"], levels = unname(variants[vlev])))
+pd <- position_dodge(width = 0.55)
+contrast_panel <- function(d, x, lo, hi, ref, letter, text, xlab, shapes) {
+  ggplot(d, aes(y = var, colour = sp, group = grp)) +
+    geom_tile(data = band, aes(y = var, x = ref), width = Inf, height = 1, fill = "grey95",
+              colour = NA, inherit.aes = FALSE) +
+    geom_vline(xintercept = ref, colour = "grey50", linetype = "dashed", linewidth = 0.3) +
+    geom_errorbar(aes(xmin = .data[[lo]], xmax = .data[[hi]]), orientation = "y", width = 0.3,
+                  linewidth = 0.45, position = pd) +
+    geom_point(aes(x = .data[[x]], shape = grp, fill = pt_fill), size = 2, stroke = 0.6, position = pd) +
+    scale_colour_manual(values = sp_col_lab, guide = "none") +
+    scale_fill_identity() +
+    scale_shape_manual(values = shapes, name = NULL) +
+    guides(shape = guide_legend(override.aes = list(colour = "grey30", fill = "grey30"))) +
+    scale_y_discrete(limits = unname(variants[vlev])) +
+    facet_grid(. ~ sp) +
+    labs(x = xlab, y = NULL, title = ptitle(letter, text)) + theme_gcb
+}
+p3a <- contrast_panel(ctr, "ratio_med", "lo_p", "hi_p", 1, "A", "Marginal vs core habitat",
+                      "Extinction ratio, marginal / core (log scale)", c(21, 24)) +
+  geom_point(data = ctr[ctr$ratio_lo < RL[1], ], aes(x = RL[1]), shape = "<", size = 2.2,
+             position = pd, show.legend = FALSE) +
+  geom_point(data = ctr[ctr$ratio_hi > RL[2], ], aes(x = RL[2]), shape = ">", size = 2.2,
+             position = pd, show.legend = FALSE) +
+  scale_x_log10(limits = RL, breaks = c(0.1, 1, 10, 100), labels = c("0.1", "1", "10", "100"))
+p3b <- contrast_panel(mt, "diff_ext_rate_med", "diff_lo", "diff_hi", 0, "B",
+                      "SPA cells vs matched unprotected cells",
+                      "Extinction rate, SPA minus matched unprotected cells", c(21, 22))
+fig3 <- cowplot::plot_grid(p3a, p3b, ncol = 1, align = "v", axis = "lr")
 save_fig(fig3, "Fig3_contrasts", 190, 130)
 
 ###############################################################################
@@ -253,17 +276,16 @@ save_fig(fig3, "Fig3_contrasts", 190, 130)
 
 cov <- do.call(rbind, lapply(sp_all, function(sp) {
   d <- read.csv(res("net_change_maps", paste0(sp, "_cells.csv")))
-  data.frame(sp = sp, x = d$x, y = d$y,
-             status = ifelse(d$ever_detected, "Cell with ≥ 1 detection", "Surveyed cell"))
+  data.frame(species = sp, x = d$x, y = d$y, detected = d$ever_detected)
 }))
-cov$sp <- factor(cov$sp, levels = sp_all, labels = sp_expr[sp_all])
+cov$sp <- factor(sp_short[cov$species], levels = sp_short[sp_all])
 pS1 <- ggplot() +
-  geom_sf(data = spain_main, fill = "white", colour = "grey55", linewidth = 0.2) +
-  geom_tile(data = cov[cov$status == "Surveyed cell", ], aes(x, y, fill = status), width = 4500, height = 4500) +
-  geom_sf(data = spa_union, fill = NA, colour = "#5E8C66", linewidth = 0.12) +
-  geom_tile(data = cov[cov$status != "Surveyed cell", ], aes(x, y, fill = status), width = 9000, height = 9000) +
-  scale_fill_manual(values = c("Surveyed cell" = "grey80", "Cell with ≥ 1 detection" = col_loss), name = NULL) +
-  facet_wrap(~ sp, labeller = label_parsed) + map_coord + map_theme
+  geom_sf(data = spain_main, fill = "white", colour = "grey45", linewidth = 0.2) +
+  geom_tile(data = cov[!cov$detected, ], aes(x, y), fill = "grey82", width = 4500, height = 4500) +
+  geom_sf(data = spa_union, fill = NA, colour = col_spa_line, linewidth = 0.12) +
+  geom_tile(data = cov[cov$detected, ], aes(x, y, fill = sp), width = 9000, height = 9000) +
+  scale_fill_manual(values = sp_col_lab, guide = "none") +
+  facet_wrap(~ sp) + map_coord + map_theme
 save_fig(pS1, "FigS1_coverage", 190, 150)
 
 ###############################################################################
@@ -274,81 +296,45 @@ atlas2$sq <- seq_len(nrow(atlas2))
 st10 <- do.call(rbind, lapply(sp_est, function(sp) {
   q <- read.csv(res("atlas10", paste0(sp, "_squares.csv")))
   q <- q[q$atlas2 & q$status_eff10 != "insufficient effort", c("sq_id", "status_eff10")]
-  q$sp <- sp; q
+  q$species <- sp; q
 }))
 st_map <- merge(atlas2[, "sq"], st10, by.x = "sq", by.y = "sq_id")
-st_map$sp <- factor(st_map$sp, levels = sp_est, labels = sp_expr[sp_est])
+st_map$sp <- factor(sp_short[st_map$species], levels = sp_short[sp_est])
 st_map$status <- factor(st_map$status_eff10, levels = c("retained", "uncertain", "lost"),
                         labels = c("Retained", "Uncertain", "Lost"))
 rng <- do.call(rbind, lapply(sp_est, function(sp) {
-  r <- atlas_range(sp)[, "geometry"]; r$sp <- factor(sp, levels = sp_est, labels = sp_expr[sp_est]); r
+  r <- atlas_range(sp)[, "geometry"]; r$sp <- factor(sp_short[sp], levels = sp_short[sp_est]); r
 }))
 pS2 <- ggplot() +
-  geom_sf(data = spain_main, fill = "white", colour = "grey55", linewidth = 0.2) +
-  geom_sf(data = rng, fill = "grey88", colour = NA) +
+  geom_sf(data = spain_main, fill = "white", colour = "grey45", linewidth = 0.2) +
+  geom_sf(data = rng, fill = "grey90", colour = NA) +
   geom_sf(data = st_centroid(st_map), aes(fill = status), shape = 22, size = 1.6, colour = "grey20",
           stroke = 0.2) +
-  scale_fill_manual(values = c(Retained = col_gain, Uncertain = "#F2C14E", Lost = col_loss),
+  scale_fill_manual(values = c(Retained = "#56B4E9", Uncertain = "#F0E442", Lost = "#D55E00"),
                     name = "Status in 2023 (II Atlas squares, ≥ 10 surveyed cell-years)") +
-  facet_wrap(~ sp, nrow = 1, labeller = label_parsed) + map_coord + map_theme
+  facet_wrap(~ sp, nrow = 1) + map_coord + map_theme
 save_fig(pS2, "FigS2_atlas_status", 190, 80)
 
 ###############################################################################
-# FIG. S3: net change maps, little bustard and black-bellied sandgrouse
+# GRAPHICAL ABSTRACT (numbers as in the abstract). The bird silhouettes of the
+# GCB conceptual figure were added by hand and are not drawn here.
 ###############################################################################
 
-oth <- do.call(rbind, lapply(c("tettet", "pteori"), function(sp) {
-  d <- read.csv(res("net_change_maps", paste0(sp, "_cells.csv")))
-  d <- d[d$ever_detected, ]
-  data.frame(sp = sp, x = d$x, y = d$y, net = d$net_both)
-}))
-oth$sp <- factor(oth$sp, levels = c("tettet", "pteori"), labels = sp_expr[c("tettet", "pteori")])
-oth$abs_net <- abs(oth$net); oth$dir <- ifelse(oth$net < 0, "Loss", "Gain")
-rng2 <- do.call(rbind, lapply(c("tettet", "pteori"), function(sp) {
-  r <- atlas_range(sp)[, "geometry"]
-  r$sp <- factor(sp, levels = c("tettet", "pteori"), labels = sp_expr[c("tettet", "pteori")]); r
-}))
-pS3 <- ggplot() +
-  geom_sf(data = spain_main, fill = "white", colour = "grey55", linewidth = 0.2) +
-  geom_sf(data = rng2, fill = "grey88", colour = NA) +
-  geom_sf(data = spa_union, fill = "#CFE3D1", colour = "#5E8C66", linewidth = 0.1, alpha = 0.8) +
-  geom_point(data = oth[oth$abs_net < 0.05, ], aes(x, y), shape = 21, size = 0.7, fill = "white",
-             colour = "grey40", stroke = 0.25) +
-  geom_point(data = oth[oth$abs_net >= 0.05, ], aes(x, y, size = abs_net, fill = dir), shape = 21,
-             colour = "grey20", stroke = 0.25) +
-  scale_size_area(max_size = 4.5, breaks = c(0.25, 0.5, 1), name = "Expected net change\n(cells, absolute)") +
-  scale_fill_manual(values = c(Loss = col_loss, Gain = col_gain), name = NULL) +
-  facet_wrap(~ sp, nrow = 1, labeller = label_parsed) + map_coord + map_theme
-save_fig(pS3, "FigS3_net_change_other_species", 190, 90)
-
-###############################################################################
-# GRAPHICAL ABSTRACT (numbers as in the abstract)
-###############################################################################
-
-ga1 <- ggplot(data.frame(k = factor(c("Raw records", "Detection-corrected"),
-                                    levels = c("Raw records", "Detection-corrected")),
-                         m = c(nv$naive[nv$species == "otitar" & nv$metric == "ratio"],
-                               nv$corrected_med[nv$species == "otitar" & nv$metric == "ratio"]),
-                         lo = c(NA, nv$corrected_lo[nv$species == "otitar" & nv$metric == "ratio"]),
-                         hi = c(NA, nv$corrected_hi[nv$species == "otitar" & nv$metric == "ratio"])),
-              aes(x = k, y = m)) +
-  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey50") +
-  geom_linerange(aes(ymin = lo, ymax = hi), na.rm = TRUE, linewidth = 0.6) +
-  geom_point(size = 2.5, colour = col_loss) +
-  labs(x = NULL, y = "Extinctions per colonisation", title = "Great bustard: about three losses\nper colonisation") +
-  theme_sub
-eff <- mt[mt$species == "otitar" & mt$variant == "primary" & mt$spec == "effort", ]
-ga3 <- ggplot(eff, aes(y = 1, x = ratio_med)) +
-  geom_vline(xintercept = 1, linetype = "dashed", colour = "grey50") +
-  geom_linerange(aes(xmin = ratio_lo, xmax = ratio_hi), linewidth = 0.6) +
-  geom_point(size = 2.5, colour = col_loss) +
-  scale_x_log10(breaks = c(0.25, 0.5, 1, 2, 4)) +
-  labs(x = "Extinction ratio, SPA / matched cells", y = NULL,
-       title = "No detectable reduction\ninside SPAs") +
-  theme_sub + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-ga2 <- p2a + labs(title = "About half of the losses\ninside SPAs") + guides(size = "none", fill = "none") +
-  theme(plot.title = element_text(size = 8, face = "bold"))
-ga <- cowplot::plot_grid(ga1, ga2, ga3, nrow = 1, rel_widths = c(1, 1.3, 1))
+ga1 <- rate_panel(nv[nv$metric == "ratio", ], "", "", "Extinctions per colonisation (log)",
+                  log = TRUE, ref = 1, show_y = TRUE) +
+  labs(title = "Correcting for detection\nchanges the trajectories")
+ga2 <- ga_map + labs(title = "Great bustard losses: about\nhalf of them inside SPAs")
+eff <- mt[mt$variant == "primary" & mt$spec == "effort", ]
+eff$sp <- factor(as.character(eff$sp), levels = rev(sp_short[sp_est]))
+ga3 <- ggplot(eff, aes(y = sp, colour = sp)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50", linewidth = 0.3) +
+  errbar(aes(xmin = diff_lo, xmax = diff_hi)) +
+  geom_point(aes(x = diff_ext_rate_med), size = 2.4) +
+  scale_colour_manual(values = sp_col_lab, guide = "none") +
+  labs(x = "Extinction, SPA minus matched cells", y = NULL,
+       title = "SPAs: no lower extinction for bustards;\nsandgrouse reduction not robust") +
+  theme_gcb + italic_y
+ga <- cowplot::plot_grid(ga1, ga2, ga3, nrow = 1, rel_widths = c(1, 1.05, 1))
 save_fig(ga, "Graphical_abstract", 200, 80)
 
 print(list.files(out_dir))
