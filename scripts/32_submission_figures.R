@@ -290,7 +290,7 @@ p3a <- contrast_panel(ctr, "ratio_med", "lo_p", "hi_p", 1, "A", "Marginal vs cor
              position = pd, show.legend = FALSE) +
   scale_x_log10(limits = RL, breaks = c(0.1, 1, 10, 100), labels = c("0.1", "1", "10", "100"))
 p3b <- contrast_panel(mt, "diff_ext_rate_med", "diff_lo", "diff_hi", 0, "B",
-                      "SPA cells vs matched unprotected cells",
+                      "Estimated SPA\u2013control difference in local extinction",
                       "Extinction rate, SPA minus matched unprotected cells", c(21, 22))
 fig3 <- cowplot::plot_grid(p3a, p3b, ncol = 1, align = "v", axis = "lr")
 save_fig(fig3, "Fig3_contrasts", 190, 130)

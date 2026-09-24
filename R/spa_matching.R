@@ -47,11 +47,14 @@ spa_setup <- function(sp, variant, hab) {
        ctl = which(det & h$spa_frac < 0.1))
 }
 
-# Matched control for each SPA cell; specifications as in script 23
+# Matched control for each SPA cell; base, coords and effort as in script 23
 spa_matches <- function(s, specs = c("base", "effort"), ctl = s$ctl) {
   covs <- list(base = cbind(s$h$steppe_strict, s$lpsi),
                coords = cbind(s$h$steppe_strict, s$lpsi, s$h$x / 1e5, s$h$y / 1e5),
-               effort = cbind(s$h$steppe_strict, s$lpsi, s$visits))
+               effort = cbind(s$h$steppe_strict, s$lpsi, s$visits),
+               # without initial occupancy (sensitivity to matching on psi1)
+               steppe = cbind(s$h$steppe_strict),
+               steppe_effort = cbind(s$h$steppe_strict, s$visits))
   lapply(setNames(specs, specs), function(nm) {
     X <- covs[[nm]]
     ctl[match_nn(X[s$tr, , drop = FALSE], X[ctl, , drop = FALSE])]
