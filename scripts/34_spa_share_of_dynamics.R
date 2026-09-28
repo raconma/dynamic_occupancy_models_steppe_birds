@@ -12,8 +12,8 @@
 # SPA share of colonisations should be lower than the SPA share of occupancy.
 #
 # Uncertainty: 1,000 coefficient draws combined with resampling of recorded
-# cells. P. alchata is included for occupancy and colonisation only (its
-# extinction is not identifiable).
+# cells. All four species are identifiable with the pooled histories
+# (script 39).
 #
 # Inputs:  results/{sp}_model_object.rds, colext inputs (colext_input_path()),
 #          results/core_spa/cell_habitat.csv (script 23)

@@ -3,7 +3,7 @@
 #
 # Goodness of fit of the primary colext models used in the Biological
 # Conservation draft. Parametric bootstrap of the sum of squared errors
-# (unmarked::parboot, default statistic SSE, 500 simulations), as in
+# (unmarked::parboot, default statistic SSE, 200 simulations), as in
 # script 15.
 #
 # Script 15 stored bootstraps in results/{sp}_gof_parboot.rds, but two
@@ -20,7 +20,7 @@ library(unmarked)
 set.seed(42)
 
 species <- c("otitar", "ptealc", "pteori", "tettet")
-N_SIM <- 500
+N_SIM <- 200   # 500 in the earlier fits; 200 is ample for a P value and keeps refits with up to 30 visits per cell-year tractable
 N_CORES <- max(1, min(4, parallel::detectCores() - 2))
 tab_dir <- here("results", "manuscript_tables")
 dir.create(tab_dir, showWarnings = FALSE, recursive = TRUE)
