@@ -48,9 +48,9 @@ sp_short <- c(otitar = "O. tarda", tettet = "T. tetrax", pteori = "P. orientalis
               ptealc = "P. alchata")
 sp_col <- c(otitar = "#D55E00", tettet = "#CC79A7", pteori = "#009E73", ptealc = "#0072B2")
 sp_col_lab <- setNames(sp_col, sp_short[names(sp_col)])
-variants <- c(primary = "Primary model", eps_null = "Constant extinction",
+variants <- c(primary = "Primary model", trend = "Linear trend",
               steprep_v3 = "Steppe-rep. detection")
-vlev <- c("steprep_v3", "eps_null", "primary")     # bottom to top
+vlev <- c("steprep_v3", "trend", "primary")     # bottom to top
 
 theme_gcb <- theme_minimal(base_size = 8) +
   theme(panel.grid.major.x = element_blank(), panel.grid.minor = element_blank(),
@@ -361,7 +361,7 @@ ga3 <- ggplot(eff, aes(y = sp, colour = sp)) +
   geom_point(aes(x = diff_ext_rate_med), size = 2.4) +
   scale_colour_manual(values = sp_col_lab, guide = "none") +
   labs(x = "Extinction, SPA minus matched cells", y = NULL,
-       title = "SPAs: no robust reduction\nin extinction") +
+       title = "SPAs: no lower extinction\nin any species") +
   theme_gcb + italic_y
 ga <- cowplot::plot_grid(ga1, ga2, ga3, nrow = 1, rel_widths = c(1, 1.05, 1))
 save_fig(ga, "Graphical_abstract", 200, 80)

@@ -14,7 +14,7 @@
 ###############################################################################
 
 # Path to a fitted model: "primary" = results/{sp}_model_object.rds; any
-# other variant = results/robustness/{sp}_{variant}_model_object.rds (28)
+# other variant = results/robustness/{sp}_{variant}_model_object.rds (28, 41)
 colext_model_path <- function(sp, variant = "primary") {
   if (identical(variant, "primary")) {
     here::here("results", paste0(sp, "_model_object.rds"))

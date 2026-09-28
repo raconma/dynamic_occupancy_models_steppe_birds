@@ -16,12 +16,10 @@
 # (and colonisation possibly lower) than in matched cells; if SPAs acted as
 # sources, colonisation of vacant SPA cells would be higher.
 #
-# Model variants: primary, eps_null, steprep_v3 (script 28). In both
-# sandgrouse the alternative variants place colonisation at its boundary, so
-# their colonisation contrasts are not informative (flagged by point_only).
-# P. alchata is kept for colonisation only (extinction not identifiable).
+# Model variants: primary, trend (script 28), steprep_v3 (script 41).
+# Variants whose Hessian gives non-finite SEs are flagged by point_only.
 #
-# Inputs:  results/{sp}_model_object.rds and results/robustness/ (script 28),
+# Inputs:  results/{sp}_model_object.rds and results/robustness/ (scripts 28 and 41),
 #          colext inputs, results/core_spa/cell_habitat.csv (script 23)
 # Output:  results/core_spa/spa_turnover_contrast.csv
 ###############################################################################
@@ -35,7 +33,7 @@ source(here("R", "spa_matching.R"))
 set.seed(42)
 
 species <- c("otitar", "tettet", "pteori", "ptealc")
-variants <- c("primary", "eps_null", "steprep_v3")
+variants <- c("primary", "trend", "steprep_v3")
 N_DRAWS <- 1000
 hab <- read.csv(here("results", "core_spa", "cell_habitat.csv"))
 q <- function(x, p) as.numeric(quantile(x, p, na.rm = TRUE))

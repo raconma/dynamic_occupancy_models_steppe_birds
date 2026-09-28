@@ -45,7 +45,7 @@ set.seed(42)  # no stochastic steps
 species <- c("otitar", "ptealc", "pteori", "tettet")
 species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
                    pteori = "P. orientalis", tettet = "T. tetrax")
-variants <- c(primary = "Primary model", eps_null = "Constant extinction",
+variants <- c(primary = "Primary model", trend = "Linear trend in dynamics",
               steprep_v3 = "Steppe-representativeness detection")
 fig_dir <- here("results", "manuscript_figures")
 tab_dir <- here("results", "manuscript_tables")

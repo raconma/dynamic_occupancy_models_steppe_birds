@@ -22,13 +22,15 @@
 #        data/processed_2023/{sp}/{sp}_occ_wide_dynamic.csv
 #        reports/script_4_v2_inputs/{sp}_occ_wide_dynamic.csv (stepRep inputs)
 #      The single-site originals are kept as *_singlesite.csv.
+#      The tables also carry the day of year of each visit (day_of_year).
 #   2. the primary model and the stepRep v2 model are refitted on the pooled
-#      histories with the same formulas, site and yearly covariates, and
+#      histories with the original formulas, site and yearly covariates, and
 #      environmental observation covariates (constant within a year, expanded
-#      to J visits); checklist covariates are scaled column-wise as in the
-#      original fits. Originals are kept in
+#      to J visits); checklist covariates are scaled over all visits. These
+#      refits are kept in results/_pooled_original_formulas/ for comparison;
+#      the models used downstream come from the covariate selection on the
+#      pooled histories (script 41). Single-site originals are kept in
 #      results/_single_site_histories/.
-# The robustness variants are then refitted from these models by script 28.
 #
 # Outputs: the files above; results/pooled_refit_summary.csv
 ###############################################################################
@@ -46,6 +48,10 @@ grid <- rast(here("data-raw", "data", "environmental_data", "environmental_data_
                   "variables_spain.grd"), lyrs = 1)
 bk_dir <- here("results", "_single_site_histories")
 dir.create(bk_dir, showWarnings = FALSE)
+# refits with the original formulas (superseded by the covariate selection
+# of script 41, which writes the primary and stepRep models)
+orig_dir <- here("results", "_pooled_original_formulas")
+dir.create(orig_dir, showWarnings = FALSE)
 
 # Keep the single-site original once; later runs read from the backup
 backup_once <- function(path, bk) {
@@ -53,7 +59,8 @@ backup_once <- function(path, bk) {
   bk
 }
 ck <- c(y = "y", duration = "duration_minutes", effort = "effort_distance_km",
-        observers = "number_observers", time = "time_observations_started")
+        observers = "number_observers", time = "time_observations_started",
+        doy = "day_of_year")
 col_of <- function(var, j, yr) paste0(var, ".", j, ".", yr)
 
 rows <- list()
@@ -102,6 +109,7 @@ for (sp in species) {
       mats$effort[i, cols] <- ifelse(is.na(x$effort_distance_km), 0, x$effort_distance_km)
       mats$observers[i, cols] <- x$number_observers
       mats$time[i, cols] <- x$time_observations_started
+      mats$doy[i, cols] <- x$day_of_year
     }
     # as in the original tables: no detection record without effort data
     mats$y[is.na(mats$time) | is.na(mats$duration) | is.na(mats$observers)] <- NA
@@ -142,11 +150,11 @@ for (sp in species) {
             lapply(oc0[keep_oc], expand_J))
     # visits with a missing detection covariate carry no detection record
     # (unmarked would drop them when fitting; the event code must agree)
+    # The table keeps the effort-based mask only; script 41 masks the
+    # visits with missing values of its own detection covariates
+    write.csv(d, csvs[k], row.names = FALSE)
     dv <- intersect(all.vars(src_mod@formlist$det), names(oc))
     y[Reduce(`|`, lapply(oc[dv], is.na))] <- NA
-    ycols <- unlist(lapply(YEARS, function(yr) col_of("y", seq_len(J), yr)))
-    d[ycols] <- as.data.frame(matrix(as.logical(y), nrow(y)))
-    write.csv(d, csvs[k], row.names = FALSE)
     new_umf <- unmarkedMultFrame(y = y, siteCovs = siteCovs(umf),
                                  yearlySiteCovs = yearlySiteCovs(umf), obsCovs = oc,
                                  numPrimary = T_years)
@@ -155,7 +163,7 @@ for (sp in species) {
     fit <- colext(psiformula = fl$psi, gammaformula = fl$col, epsilonformula = fl$ext,
                   pformula = fl$det, data = new_umf, starts = coef(src_mod),
                   control = list(maxit = 2000))
-    saveRDS(fit, models[k])
+    saveRDS(fit, file.path(orig_dir, basename(models[k])))
     se <- suppressWarnings(sqrt(diag(vcov(fit))))
     rows[[paste(sp, k)]] <- data.frame(
       species = sp, model = k, n_sites = M, visits_per_year_max = J,

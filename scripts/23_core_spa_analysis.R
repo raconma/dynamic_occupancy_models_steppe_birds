@@ -66,8 +66,8 @@ source(here("R", "colext_utils.R"))
 source(here("R", "spatial_layers.R"))
 set.seed(42)
 
-# Model variant: "primary" (default) or a robustness refit from script 28,
-# e.g. Rscript scripts/23_core_spa_analysis.R eps_null
+# Model variant: "primary" (default) or a robustness refit (scripts 28 and 41),
+# e.g. Rscript scripts/23_core_spa_analysis.R trend
 variant <- commandArgs(trailingOnly = TRUE)[1]
 if (is.na(variant)) variant <- "primary"
 

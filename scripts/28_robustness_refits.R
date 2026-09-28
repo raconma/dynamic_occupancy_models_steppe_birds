@@ -1,22 +1,22 @@
 ###############################################################################
 # 28_robustness_refits.R
 #
-# Refits two robustness variants of the colext models so that the spatial
-# contrasts of scripts 23 and 26 can be repeated with extinction constant
-# across cells (any core / SPA difference must then come from the data, not
-# from the extinction covariates):
+# Refits the robustness variant of the colext models in which colonisation
+# and extinction change linearly over the study period:
 #
-#   eps_null    primary model (results/{sp}_model_object.rds) with epsilon ~ 1
-#   steprep_v3  stepRep detection model (results/stepRep_v2_run/
-#               {sp}_v2_model_object.rds, detection + stepRep_obs) with
-#               gamma ~ 1 and epsilon ~ 1 (the reduced specification of
-#               Appendix S19; here epsilon ~ 1 also for P. orientalis)
+#   trend       primary model (results/{sp}_model_object.rds, script 41) with
+#               gamma ~ t and epsilon ~ t, t = year - 2020 (no habitat
+#               covariates, so spatial contrasts still come from the
+#               detection histories)
 #
-# Starting values come from the source fit for the shared parameters.
-# Fits whose Hessian gives non-finite standard errors are flagged: they
-# cannot be propagated with multivariate-normal draws.
+# The stepRep variant (steprep_v3) is fitted by script 41. A variant with a
+# separate gamma and epsilon for each year was not identifiable (years with
+# almost no events sent their effects to the boundary; singular Hessian).
+# Starting values: psi and p from the primary fit, the primary intercepts
+# for gamma and epsilon and zero slopes. Fits whose Hessian gives non-finite standard errors are flagged:
+# they cannot be propagated with multivariate-normal draws.
 #
-# Outputs: results/robustness/{sp}_{variant}_model_object.rds
+# Outputs: results/robustness/{sp}_trend_model_object.rds
 #          results/robustness/refit_summary.csv
 ###############################################################################
 
@@ -26,61 +26,46 @@ library(unmarked)
 set.seed(42)
 
 species <- c("otitar", "ptealc", "pteori", "tettet")
+YEARS <- 2017:2023
 out_dir <- here("results", "robustness")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-# Starting values: source estimates for the submodels that are kept; for
-# submodels reduced to an intercept, fixed plausible values (the source
-# intercepts can be degenerate, e.g. ext(Int) = 52 in the otitar v2 fit)
-START_COL <- qlogis(0.002)
-START_EXT <- qlogis(0.08)
-starts_for <- function(src, keep_col) {
-  cf <- coef(src)
-  pick <- function(pat) cf[grep(pat, names(cf))]
-  col0 <- if (keep_col) pick("^col\\(") else START_COL
-  unname(c(pick("^psi\\("), col0, START_EXT, pick("^p\\(")))
-}
-
-refit <- function(src, col_form, ext_form, starts) {
-  fl <- src@formlist
-  t0 <- Sys.time()
-  fit <- colext(psiformula = fl$psi, gammaformula = col_form,
-                epsilonformula = ext_form, pformula = fl$det,
-                data = src@data, starts = starts)
-  attr(fit, "fit_seconds") <- as.numeric(Sys.time() - t0, units = "secs")
-  fit
+with_trend <- function(umf) {
+  M <- numSites(umf); n_t <- umf@numPrimary
+  ysc <- yearlySiteCovs(umf)
+  ysc$t <- rep(YEARS, M) - 2020
+  unmarkedMultFrame(y = getY(umf), siteCovs = siteCovs(umf), yearlySiteCovs = ysc,
+                    obsCovs = obsCovs(umf), numPrimary = n_t)
 }
 
 rows <- list()
 for (sp in species) {
   primary <- readRDS(here("results", paste0(sp, "_model_object.rds")))
-  steprep <- readRDS(here("results", "stepRep_v2_run", paste0(sp, "_v2_model_object.rds")))
-
-  variants <- list(
-    eps_null = list(src = primary, col = primary@formlist$col, ext = ~ 1,
-                    keep_col = TRUE),
-    steprep_v3 = list(src = steprep, col = ~ 1, ext = ~ 1, keep_col = FALSE))
-
-  for (v in names(variants)) {
-    s <- variants[[v]]
-    message(sp, " / ", v, " ...")
-    fit <- tryCatch(refit(s$src, s$col, s$ext, starts_for(s$src, s$keep_col)),
-                    error = function(e) { message("  failed: ", conditionMessage(e)); NULL })
-    if (is.null(fit)) {
-      rows[[paste(sp, v)]] <- data.frame(species = sp, variant = v, converged = FALSE,
-                                         finite_se = NA, aic = NA, aic_source = s$src@AIC,
-                                         gamma_int = NA, eps_int = NA, fit_seconds = NA)
-      next
-    }
-    saveRDS(fit, file.path(out_dir, paste0(sp, "_", v, "_model_object.rds")))
-    se <- suppressWarnings(sqrt(diag(vcov(fit))))
-    cf <- coef(fit)
-    rows[[paste(sp, v)]] <- data.frame(
-      species = sp, variant = v, converged = fit@opt$convergence == 0,
-      finite_se = all(is.finite(se)), aic = fit@AIC, aic_source = s$src@AIC,
-      gamma_int = plogis(cf["col(Int)"]), eps_int = plogis(cf["ext(Int)"]),
-      fit_seconds = attr(fit, "fit_seconds"))
+  fl <- primary@formlist
+  cf <- coef(primary)
+  starts <- unname(c(cf[grep("^psi\\(", names(cf))], cf["col(Int)"], 0,
+                     cf["ext(Int)"], 0, cf[grep("^p\\(", names(cf))]))
+  message(sp, " / trend ...")
+  t0 <- Sys.time()
+  fit <- tryCatch(colext(psiformula = fl$psi, gammaformula = ~ t, epsilonformula = ~ t,
+                         pformula = fl$det, data = with_trend(primary@data), starts = starts,
+                         control = list(maxit = 2000)),
+                  error = function(e) { message("  failed: ", conditionMessage(e)); NULL })
+  if (is.null(fit)) {
+    rows[[sp]] <- data.frame(species = sp, variant = "trend", converged = FALSE,
+                             finite_se = NA, max_se = NA, aic = NA, aic_primary = primary@AIC,
+                             fit_seconds = NA)
+    next
   }
+  saveRDS(fit, file.path(out_dir, paste0(sp, "_trend_model_object.rds")))
+  se <- tryCatch(suppressWarnings(sqrt(diag(vcov(fit)))),
+                 error = function(e) rep(NA_real_, length(coef(fit))))   # singular Hessian
+  rows[[sp]] <- data.frame(
+    species = sp, variant = "trend", converged = fit@opt$convergence == 0,
+    finite_se = all(is.finite(se)), max_se = max(se, na.rm = TRUE), aic = fit@AIC, aic_primary = primary@AIC,
+    fit_seconds = as.numeric(Sys.time() - t0, units = "secs"))
+  print(rows[[sp]])
+  print(round(cbind(est = coef(fit), se = se)[grep("^(col|ext)", names(coef(fit))), ], 2))
 }
 
 res <- do.call(rbind, rows); rownames(res) <- NULL
