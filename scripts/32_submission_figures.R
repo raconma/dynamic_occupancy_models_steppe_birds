@@ -351,8 +351,8 @@ save_fig(pS2, "FigS2_atlas_status", 190, 150)
 ga1 <- rate_panel(nv[nv$metric == "ratio" & nv$species %in% sp_est, ], "", "",
                   "Extinctions per colonisation (log)", log = TRUE, ref = 1, show_y = TRUE,
                   sp_levels = sp_est) +
-  labs(title = "Correcting for detection\nchanges the trajectories")
-ga2 <- ga_map + labs(title = "Great bustard losses: about\nhalf of them inside SPAs")
+  labs(title = "Four steppe birds,\ndifferent trajectories")
+ga2 <- ga_map + labs(title = "Over half of the great bustard\nnet loss is inside SPAs")
 eff <- mt[mt$variant == "primary" & mt$spec == "base", ]
 eff$sp <- factor(as.character(eff$sp), levels = rev(sp_short[sp_est]))
 ga3 <- ggplot(eff, aes(y = sp, colour = sp)) +
