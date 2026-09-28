@@ -3,11 +3,12 @@
 #
 # Single model with all the controls of scripts 44 and 45 together, the
 # primary estimate of the SPA effects on colonisation (recruitment) and
-# extinction (retention): primary covariates + pseudo-steppe, survey effort in
-# years t and t + 1, cell coordinates and both neighbourhood covariates in
-# colonisation and extinction (neighbourhood in colonisation only), and SPA
-# cover in detection. Fitted with and without SPA cover in colonisation and
-# extinction.
+# extinction (retention). Colonisation: primary covariates + pseudo-steppe,
+# survey effort in years t and t + 1, cell coordinates and both
+# neighbourhood covariates; extinction: primary covariates + pseudo-steppe
+# (with the controls also in extinction the T. tetrax model was not
+# identifiable); SPA cover in detection. Fitted with and without SPA cover in
+# colonisation and extinction.
 #
 # Inputs:  results/{sp}_model_object.rds, data/processed_2023/{sp}/
 #          occ_{sp}_prediction.csv (script 40), cell_habitat.csv (script 23)
