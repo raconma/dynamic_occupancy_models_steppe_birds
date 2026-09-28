@@ -87,9 +87,13 @@ colext_design <- function(mod) {
   cf <- coef(mod)
   idx <- list(psi = grep("^psi\\(", names(cf)), col = grep("^col\\(", names(cf)),
               ext = grep("^ext\\(", names(cf)), det = grep("^p\\(", names(cf)))
+  X_det <- design(fl$det, oc)
+  # unmarked drops visits whose detection covariates are missing when fitting;
+  # drop them here too so that emissions are never evaluated with p = NA
+  y[matrix(rowSums(is.na(X_det)) > 0, M, J * n_t, byrow = TRUE)] <- NA
   D <- list(M = M, n_t = n_t, J = J, keep = keep, y = y, idx = idx,
             X_psi = design(fl$psi, sc), X_col = design(fl$col, ysc),
-            X_ext = design(fl$ext, ysc), X_det = design(fl$det, oc))
+            X_ext = design(fl$ext, ysc), X_det = X_det)
   stopifnot(length(idx$psi) == ncol(D$X_psi), length(idx$col) == ncol(D$X_col),
             length(idx$ext) == ncol(D$X_ext), length(idx$det) == ncol(D$X_det))
   D

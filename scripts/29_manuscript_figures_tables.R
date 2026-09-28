@@ -315,9 +315,11 @@ write.csv(nv, file.path(tab_dir, "tableS_first_transition.csv"), row.names = FAL
 
 cls <- read.csv(res("net_change_maps", "summary_by_class.csv"))
 cls <- cls[cls$class %in% c("all", "det", "never_det"), ]
-share <- read.csv(res("net_change_maps", "validation.csv"))[, c("species", "share_ext_never_detected")]
-write.csv(merge(cls, share, by = "species"), file.path(tab_dir, "tableS_unanchored.csv"),
-          row.names = FALSE)
+# Share of whole-grid extinctions in never-recorded cells, per period
+# (per-draw median and interval; script 21)
+share <- read.csv(res("net_change_maps", "share_ext_never_detected.csv"))
+write.csv(merge(cls, share, by = c("species", "period"), all.x = TRUE),
+          file.path(tab_dir, "tableS_unanchored.csv"), row.names = FALSE)
 
 write.csv(rates, file.path(tab_dir, "tableS_habitat_spa_all.csv"), row.names = FALSE)
 bal <- do.call(rbind, lapply(names(variants), function(v) {

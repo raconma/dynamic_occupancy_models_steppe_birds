@@ -11,6 +11,7 @@
 #                      matches MITECO INB 2007 in GBIF, fieldwork 1998-2002)
 #   wc_cell_polygons() polygons of the WorldClim 2.5 arc-min cells that define
 #                      the model sites (the "cells" id in occ_wide_dynamic.csv)
+#   cover_by_polygons(), cover_by_raster()  exact cover fractions per cell
 ###############################################################################
 
 UTM30 <- 25830
@@ -70,4 +71,37 @@ wc_cell_polygons <- function(cell_ids, grid = wc_grid()) {
   })
   sf::st_transform(sf::st_sf(cells = cell_ids,
                              geometry = sf::st_sfc(polys, crs = 4326)), UTM30)
+}
+
+# Exact cover fractions of model cells. terra::project(method = "average")
+# onto the WorldClim grid shifts the averaging window and misstates cover by
+# up to ~0.1, so cover is computed per cell polygon instead.
+#   cover_by_polygons(): fraction of each cell inside a set of polygons
+#                        (exact area intersection in UTM 30N)
+#   cover_by_raster():   fraction of each cell whose raster values fall in
+#                        each class set: every raster pixel is assigned to the
+#                        cell containing its centre (terra::rasterize) and
+#                        class membership is averaged per cell (terra::zonal),
+#                        one pass over the cropped raster; `na_values` are
+#                        treated as missing, not as absence
+cover_by_polygons <- function(polys, sites) {
+  u <- sf::st_union(sf::st_transform(sites, UTM30))
+  ov <- suppressWarnings(sf::st_intersection(polys, sf::st_sf(geometry = u)))
+  a <- tapply(as.numeric(sf::st_area(ov)), ov$cells, sum)
+  out <- setNames(rep(0, nrow(polys)), polys$cells)
+  out[names(a)] <- a
+  as.numeric(out) / as.numeric(sf::st_area(polys))
+}
+
+cover_by_raster <- function(polys, r, class_sets, na_values = NULL) {
+  v <- terra::vect(sf::st_transform(polys, terra::crs(r)))
+  rc <- terra::crop(r, terra::ext(v) + 1000)
+  id <- terra::rasterize(v, rc, field = seq_len(nrow(polys)))
+  out <- as.data.frame(lapply(class_sets, function(cls) {
+    m <- rc %in% cls
+    if (!is.null(na_values)) m <- terra::ifel(rc %in% na_values, NA, m)
+    z <- terra::zonal(m, id, fun = "mean", na.rm = TRUE)
+    z[[2]][match(seq_len(nrow(polys)), z[[1]])]
+  }))
+  out
 }

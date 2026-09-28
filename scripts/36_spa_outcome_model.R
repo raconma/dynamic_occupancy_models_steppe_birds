@@ -5,18 +5,16 @@
 # anchored recent transitions, cells with >= 1 detection):
 #
 # (1) Outcome-model (regression-adjustment) estimator. Nearest-neighbour
-#     matching with replacement reuses few controls (18-25 unique controls for
-#     40-66 SPA cells), and resampling can misstate the variance of such
-#     estimators (Abadie & Imbens 2008). Here, for every coefficient draw, a
+#     matching with replacement reuses few controls, and resampling can
+#     misstate the variance of such estimators (Abadie & Imbens 2008). Here,
+#     for every coefficient draw, 50 x 50 km blocks of SPA (>= 50 % cover) and
+#     control (< 10 %) cells with anchored transitions are resampled and a
 #     quasi-Poisson GLM of expected extinctions with an offset for expected
-#     occupied cell-years is fitted to all SPA (>= 50 % cover) and control
-#     (< 10 %) cells:
+#     occupied cell-years is refitted:
 #         E ~ SPA + pseudo-steppe + logit(psi1) + checklists per cell-year
-#     No control is reused, and the GLM standard errors describe the
-#     between-cell variability. The SPA effect is reported as a rate ratio and
-#     as the average difference in extinction rate for SPA cells (predicted
-#     with and without SPA status), drawing the GLM coefficients from their
-#     sampling distribution within each coefficient draw.
+#     No control is reused. The SPA effect is reported as a rate ratio and as
+#     the average difference in extinction rate for SPA cells (predicted with
+#     and without SPA status).
 #
 # (2) Matching without initial occupancy. psi1 is predicted from static
 #     environmental covariates only, but a reviewer may see it as potentially
@@ -36,11 +34,10 @@ source(here("R", "colext_utils.R"))
 source(here("R", "spa_matching.R"))
 set.seed(42)
 
-species <- c("otitar", "tettet", "pteori")
+species <- c("otitar", "tettet", "pteori", "ptealc")
 N_DRAWS <- 1000
 hab <- read.csv(here("results", "core_spa", "cell_habitat.csv"))
 q <- function(x, p) as.numeric(quantile(x, p, na.rm = TRUE))
-summ <- function(x) { x <- x[is.finite(x)]; c(med = median(x), lo = q(x, .025), hi = q(x, .975)) }
 
 rows <- list()
 for (sp in species) {
@@ -50,7 +47,7 @@ for (sp in species) {
   cells <- c(s$tr, s$ctl)
   X <- data.frame(spa = rep(c(1, 0), c(length(s$tr), length(s$ctl))),
                   steppe = s$h$steppe_strict[cells], lpsi = s$lpsi[cells],
-                  visits = s$visits[cells])
+                  visits = s$visits[cells], blk = s$blk[cells])
   draws <- draw_coefs(s$mod, N_DRAWS)
   point_only <- attr(draws, "point_only")
   glm_rr <- glm_diff <- rep(NA_real_, N_DRAWS); n_fail <- 0
@@ -60,16 +57,17 @@ for (sp in species) {
     fb <- forward_backward(colext_rates(draws[k, ], s$D), s$D)
     E <- rowSums((fb$ext * s$both)[, rec])
     O <- rowSums((fb$z1[, 1:(s$n_t - 1)] * s$both)[, rec])
-    # (1) Outcome model on cells with expected occupancy
-    d <- cbind(X, E = E[cells], O = O[cells])
+    # (1) Outcome model on a block resample of cells with expected occupancy
+    d <- cbind(X, E = E[cells], O = O[cells])[block_sample(X$blk), ]
     d <- d[d$O > 1e-6, ]
-    fit <- tryCatch(suppressWarnings(glm(E ~ spa + steppe + lpsi + visits, offset = log(O),
-                                         family = quasipoisson, data = d)),
-                    error = function(e) NULL)
+    fit <- if (length(unique(d$spa)) < 2) NULL else
+      tryCatch(suppressWarnings(glm(E ~ spa + steppe + lpsi + visits, offset = log(O),
+                                    family = quasipoisson, data = d)),
+               error = function(e) NULL)
     if (is.null(fit) || !fit$converged || anyNA(coef(fit))) {
       n_fail <- n_fail + 1
     } else {
-      b <- MASS::mvrnorm(1, coef(fit), vcov(fit))
+      b <- coef(fit)
       glm_rr[k] <- exp(b[["spa"]])
       tt <- d[d$spa == 1, ]
       mm <- model.matrix(~ spa + steppe + lpsi + visits, tt)
@@ -77,7 +75,7 @@ for (sp in species) {
       glm_diff[k] <- (sum(exp(mm %*% b) * tt$O) - sum(exp(mm0 %*% b) * tt$O)) / sum(tt$O)
     }
     # (2) Matching without psi1 (base kept as reference, same resample)
-    bb <- sample(seq_along(s$tr), replace = TRUE)
+    bb <- block_sample(s$blk[s$tr])
     for (nm in names(m)) {
       t_i <- s$tr[bb]; c_i <- m[[nm]][bb]
       r_t <- sum(E[t_i]) / sum(O[t_i]); r_c <- sum(E[c_i]) / sum(O[c_i])
@@ -85,11 +83,11 @@ for (sp in species) {
     }
   }
   add <- function(method, spec, dd, rr, n_unique = NA, smd_psi = NA) {
-    a <- summ(dd); r <- summ(rr)
+    a <- summ_diff(dd); r <- summ_ratio(rr)
     rows[[paste(sp, method, spec)]] <<- data.frame(
       species = sp, point_only = point_only, method = method, spec = spec,
       n_spa = length(s$tr), n_controls = length(s$ctl), n_unique_controls = n_unique,
-      smd_after_lpsi = smd_psi, n_failed = sum(!is.finite(dd)),
+      smd_after_lpsi = smd_psi, n_failed = a[["n_undefined"]],
       diff_med = a[["med"]], diff_lo = a[["lo"]], diff_hi = a[["hi"]],
       ratio_med = r[["med"]], ratio_lo = r[["lo"]], ratio_hi = r[["hi"]])
   }

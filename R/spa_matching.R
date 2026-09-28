@@ -2,19 +2,43 @@
 # spa_matching.R
 #
 # Per-species set-up of the SPA contrast shared by scripts 33 onwards: naive
-# detection histories, anchored transitions, recorded cells, initial
+# detection histories, anchored transitions, cells with anchored transitions, initial
 # occupancy and survey effort, and the nearest-neighbour Mahalanobis matching
 # of SPA cells (>= 50 % cover) to control cells (< 10 %).
 #
-# Script 23 holds its own copy of this logic (it produced the published
-# tables and is kept unchanged); keep the two in sync. Scripts 33 onwards
-# should use these helpers.
+# Script 23 holds its own copy of this logic (with the same anchored-cell
+# restriction, block resampling and summaries); keep the two in sync.
 #
 #   spa_setup()  model design, naive histories, anchored transitions, cell
 #                covariates and SPA / control indices for one species
 #   match_nn()   index of the nearest control for each treated unit
 #   spa_matches() matched control for every SPA cell under each specification
+#   block_sample() positions drawn by resampling spatial blocks
+#   summ_diff(), summ_ratio() draw summaries (as in script 23)
 ###############################################################################
+
+block_sample <- function(blk) {
+  ub <- unique(blk)
+  unlist(lapply(sample(ub, length(ub), replace = TRUE), function(u) which(blk == u)))
+}
+
+summ_diff <- function(d) {
+  ok <- is.finite(d)
+  qd <- function(p) as.numeric(quantile(d[ok], p))
+  c(n_undefined = sum(!ok), med = median(d[ok]), lo = qd(.025), hi = qd(.975),
+    p_pos = mean(d[ok] > 0))
+}
+
+# Ratios keep infinite draws; NA when > 5 % of draws are 0/0
+summ_ratio <- function(r) {
+  nan <- is.na(r)
+  if (mean(nan) > 0.05) return(c(n_undefined = sum(nan), n_inf = sum(is.infinite(r)),
+                                 med = NA, lo = NA, hi = NA))
+  rr <- r[!nan]
+  qq <- function(p) as.numeric(quantile(rr, p, type = 1))
+  c(n_undefined = sum(nan), n_inf = sum(is.infinite(rr)), med = qq(.5), lo = qq(.025),
+    hi = qq(.975))
+}
 
 match_nn <- function(Xt, Xc) {
   S_inv <- solve(cov(rbind(Xt, Xc)))
@@ -39,12 +63,16 @@ spa_setup <- function(sp, variant, hab) {
   both <- surv[, 1:(n_t - 1)] & surv[, 2:n_t]
   det <- rowSums(naive, na.rm = TRUE) > 0
   psi1 <- colext_rates(coef(mod), D)$psi1
+  recent <- 2:(n_t - 1)
+  # Only cells with >= 1 anchored recent transition inform the contrasts
+  anch <- det & rowSums(both[, recent, drop = FALSE]) > 0
   list(mod = mod, D = D, n_t = n_t, h = h, naive = naive, both = both,
-       det = det, recent = 2:(n_t - 1),
+       det = det, anch = anch, recent = recent,
+       blk = paste(floor(h$x / 5e4), floor(h$y / 5e4)),   # 50 x 50 km blocks
        lpsi = qlogis(pmin(pmax(psi1, 1e-6), 1 - 1e-6)),
        visits = rowSums(!is.na(D$y)) / pmax(rowSums(surv), 1),
-       tr = which(det & h$spa_frac >= 0.5),
-       ctl = which(det & h$spa_frac < 0.1))
+       tr = which(anch & h$spa_frac >= 0.5),
+       ctl = which(anch & h$spa_frac < 0.1))
 }
 
 # Matched control for each SPA cell; base, coords and effort as in script 23

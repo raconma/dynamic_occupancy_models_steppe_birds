@@ -8,10 +8,10 @@
 # working figures; this script only changes presentation.
 #
 #   Fig. 1  naive vs detection-corrected dynamics on anchored transitions,
-#           four species (P. alchata extinction marked as not identifiable)
+#           four species
 #           (extinction rate, colonisation rate, extinctions per colonisation,
 #           expected net change)
-#   Fig. 2  maps of expected net change in recorded cells for the three
+#   Fig. 2  maps of expected net change in recorded cells for the four
 #           species with identifiable extinction, with Special Protection
 #           Areas, and partition of the net change by protection and habitat
 #   Fig. 3  (a) marginal/core extinction ratio, (b) SPA minus matched
@@ -20,8 +20,9 @@
 #   Fig. S2 II Atlas squares classified in 2023
 #   Graphical abstract
 #
-# P. alchata is omitted from Figs. 2, 3 and S2, whose quantities depend on
-# its non-identifiable extinction rate; Fig. 1 shows it with that flagged.
+# With the pooled detection histories (script 39) extinction is identifiable
+# in all four species; fits whose variances are not finite (point_only) are
+# drawn as grey intervals without a median.
 #
 # Outputs: results/manuscript_figures/submission/*.pdf, *.tif (600 dpi),
 #          *.png (300 dpi, for embedding in the manuscript file)
@@ -42,7 +43,7 @@ variant_dir <- function(base, v) if (v == "primary") res(base) else res(base, v)
 # Species order follows the text. One colour per species throughout, as in
 # the GCB figures (Okabe-Ito)
 sp_all <- c("otitar", "tettet", "pteori", "ptealc")
-sp_est <- c("otitar", "tettet", "pteori")          # extinction identifiable
+sp_est <- sp_all   # extinction identifiable in all four species (pooled histories)
 sp_short <- c(otitar = "O. tarda", tettet = "T. tetrax", pteori = "P. orientalis",
               ptealc = "P. alchata")
 sp_col <- c(otitar = "#D55E00", tettet = "#CC79A7", pteori = "#009E73", ptealc = "#0072B2")
@@ -105,13 +106,15 @@ cr$sp <- factor(sp_short[cr$species], levels = sp_short[sp_est])
 
 # All four species. P. alchata extinction is not identifiable (posterior
 # spanning several orders of magnitude, median at the boundary), so its
-# corrected extinction and ratio are drawn as a grey interval without a
-# median, and its net change is marked "n.i."
+# corrected rates and ratio are drawn as grey intervals without a median,
+# and its net change is marked "n.i."
 nv <- read.csv(res("naive_vs_corrected_anchored", "summary.csv"))
 nv <- nv[nv$period == "recent" & nv$species %in% sp_all, ]
 nv$sp <- factor(sp_short[nv$species], levels = rev(sp_short[sp_all]))
 nv <- transform(nv, med = corrected_med, lo = corrected_lo, hi = corrected_hi)
-nv$ni <- nv$species == "ptealc" & nv$metric %in% c("eps", "ratio")
+# corrected colonisation of P. alchata also depends on its non-identifiable
+# extinction (posterior events are joint), so it is flagged as well
+nv$ni <- nv$point_only & nv$metric %in% c("eps", "gamma", "ratio")
 net <- cr[cr$class == "det_all", ]
 net$sp <- factor(as.character(net$sp), levels = rev(sp_short[sp_all]))
 net <- transform(net, med = net_med, lo = net_lo, hi = net_hi, ni = FALSE)
@@ -155,8 +158,7 @@ p1a <- rate_panel(nv[nv$metric == "eps", ], "A", "Extinction", "Per occupied cel
 p1b <- rate_panel(nv[nv$metric == "gamma", ], "B", "Colonisation", "Per unoccupied cell-year")
 p1c <- rate_panel(nv[nv$metric == "ratio", ], "C", "Extinctions per colonisation", "Ratio (log scale)",
                   log = TRUE, ref = 1)
-p1d <- rate_panel(net, "D", "Net change", "Expected change (cells)", ref = 0, naive = FALSE,
-                  ni_label = data.frame(x = 0, sp = sp_short[["ptealc"]]))
+p1d <- rate_panel(net, "D", "Net change", "Expected change (cells)", ref = 0, naive = FALSE)
 leg1 <- cowplot::get_plot_component(
   rate_panel(nv[nv$metric == "gamma", ], "A", "", "") +
     guides(shape = guide_legend(override.aes = list(colour = "grey30"))) +
@@ -167,7 +169,7 @@ fig1 <- cowplot::plot_grid(row1, leg1, ncol = 1, rel_heights = c(1, 0.1))
 save_fig(fig1, "Fig1_naive_vs_corrected", 190, 72)
 
 ###############################################################################
-# FIG. 2: where occupied cells are lost, three species, and partition of the
+# FIG. 2: where occupied cells are lost, four species, and partition of the
 # net change by protection and habitat
 ###############################################################################
 
@@ -228,14 +230,15 @@ p2d <- ggplot(part, aes(y = lab, colour = sp, group = sp)) +
   geom_point(aes(x = net_med), size = 1.8, position = pd2) +
   scale_colour_manual(values = sp_col_lab, breaks = unname(sp_short[sp_est]), name = NULL) +
   facet_grid(grp ~ ., scales = "free_y", space = "free_y") +
-  labs(x = "Expected net change (cells)", y = NULL, title = ptitle("D", "Net change by class of cell")) +
+  labs(x = "Expected net change (cells)", y = NULL, title = ptitle("E", "Net change by class of cell")) +
   theme_gcb +
   theme(strip.text.y = element_blank(), legend.text = element_text(face = "italic", margin = margin(r = 8)),
         panel.spacing.y = unit(2, "mm"), legend.margin = margin(0, 0, 0, 0))
 fig2 <- cowplot::plot_grid(
-  cowplot::plot_grid(m2[[1]], m2[[2]], m2[[3]], p2d, nrow = 2),
-  leg_map, ncol = 1, rel_heights = c(1, 0.06))
-save_fig(fig2, "Fig2_net_change_maps", 190, 180)
+  cowplot::plot_grid(m2[[1]], m2[[2]], m2[[3]], nrow = 1),
+  cowplot::plot_grid(m2[[4]], p2d, nrow = 1, rel_widths = c(1, 2)),
+  leg_map, ncol = 1, rel_heights = c(1, 1.15, 0.08))
+save_fig(fig2, "Fig2_net_change_maps", 190, 150)
 
 ###############################################################################
 # FIG. 3: habitat and SPA contrasts
@@ -314,7 +317,7 @@ pS1 <- ggplot() +
 save_fig(pS1, "FigS1_coverage", 190, 150)
 
 ###############################################################################
-# FIG. S2: II Atlas squares classified in 2023 (P. alchata not classified)
+# FIG. S2: II Atlas squares classified in 2023
 ###############################################################################
 
 atlas2$sq <- seq_len(nrow(atlas2))
@@ -337,8 +340,8 @@ pS2 <- ggplot() +
           stroke = 0.2) +
   scale_fill_manual(values = c(Retained = "#56B4E9", Uncertain = "#F0E442", Lost = "#D55E00"),
                     name = "Status in 2023 (II Atlas squares, ≥ 10 surveyed cell-years)") +
-  facet_wrap(~ sp, nrow = 1) + map_coord + map_theme
-save_fig(pS2, "FigS2_atlas_status", 190, 80)
+  facet_wrap(~ sp, nrow = 2) + map_coord + map_theme
+save_fig(pS2, "FigS2_atlas_status", 190, 150)
 
 ###############################################################################
 # GRAPHICAL ABSTRACT (numbers as in the abstract). The bird silhouettes of the
@@ -350,7 +353,7 @@ ga1 <- rate_panel(nv[nv$metric == "ratio" & nv$species %in% sp_est, ], "", "",
                   sp_levels = sp_est) +
   labs(title = "Correcting for detection\nchanges the trajectories")
 ga2 <- ga_map + labs(title = "Great bustard losses: about\nhalf of them inside SPAs")
-eff <- mt[mt$variant == "primary" & mt$spec == "effort", ]
+eff <- mt[mt$variant == "primary" & mt$spec == "base", ]
 eff$sp <- factor(as.character(eff$sp), levels = rev(sp_short[sp_est]))
 ga3 <- ggplot(eff, aes(y = sp, colour = sp)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50", linewidth = 0.3) +
@@ -358,7 +361,7 @@ ga3 <- ggplot(eff, aes(y = sp, colour = sp)) +
   geom_point(aes(x = diff_ext_rate_med), size = 2.4) +
   scale_colour_manual(values = sp_col_lab, guide = "none") +
   labs(x = "Extinction, SPA minus matched cells", y = NULL,
-       title = "SPAs: no lower extinction for bustards;\nsandgrouse reduction not robust") +
+       title = "SPAs: no robust reduction\nin extinction") +
   theme_gcb + italic_y
 ga <- cowplot::plot_grid(ga1, ga2, ga3, nrow = 1, rel_widths = c(1, 1.05, 1))
 save_fig(ga, "Graphical_abstract", 200, 80)

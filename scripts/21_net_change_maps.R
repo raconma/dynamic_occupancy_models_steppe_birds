@@ -37,6 +37,8 @@
 #   results/net_change_maps/{sp}_cells.csv
 #   results/net_change_maps/summary_by_class.csv
 #   results/net_change_maps/validation.csv
+#   results/net_change_maps/share_ext_never_detected.csv  (per-draw share of
+#       whole-grid extinctions in never-recorded cells, 2017-23 and 2018-23)
 #   results/net_change_maps/fig_net_change_recent.png
 #   results/net_change_maps/fig_p_net_loss_recent.png
 #   results/net_change_maps/fig_risk_2024.png
@@ -84,6 +86,7 @@ if (requireNamespace("rnaturalearth", quietly = TRUE)) {
 
 class_rows <- list()
 valid_rows <- list()
+share_rows <- list()
 cell_tabs  <- list()
 
 for (sp in species) {
@@ -98,7 +101,7 @@ for (sp in species) {
   y_csv <- sapply(occ[, grep("^y\\.[0-9]+\\.[0-9]{4}$", names(occ))],
                   function(v) as.numeric(as.logical(v)))
   ok <- !is.na(D$y)
-  stopifnot(all(y_csv[ok] == D$y[ok]))
+  stopifnot(all(y_csv[ok] == D$y[ok]), identical(is.na(y_csv), is.na(D$y)))
   pts <- st_transform(st_as_sf(occ[, c("cells", "longitude", "latitude")],
                                coords = c("longitude", "latitude"), crs = 4326),
                       UTM30)
@@ -141,6 +144,10 @@ for (sp in species) {
 
   # --- Coefficient draws -----------------------------------------------------
   draws <- draw_coefs(mod, N_DRAWS)
+  # Point-only fits (non-finite variances) give zero-width intervals; flagged
+  # in the outputs rather than stopping (P. alchata, extinction not identifiable)
+  point_only <- attr(draws, "point_only")
+  if (point_only) warning(sp, ": coefficients fixed at point estimates; intervals not valid")
 
   ext_full <- col_full <- net_rec <- net_both <- risk <- z1_last <-
     matrix(NA_real_, D$M, N_DRAWS)
@@ -212,6 +219,16 @@ for (sp in species) {
     }
   }
 
+  # --- Share of whole-grid extinctions in never-recorded cells, per draw -----
+  # "full" = 2017-2023 (includes the 2017->18 transition, mostly relaxation of
+  # psi1); "rec" = 2018-2023, the period analysed in the paper
+  for (per in c("full", "rec")) {
+    sh <- tot[, "never_det", paste0("ext_", per)] / tot[, "all", paste0("ext_", per)]
+    share_rows[[paste(sp, per)]] <- data.frame(
+      species = sp, period = per, point_only = point_only, share_med = median(sh),
+      share_lo = q(sh, .025), share_hi = q(sh, .975))
+  }
+
   # --- Validation summaries --------------------------------------------------
   ct <- cell_tabs[[sp]]
   share <- function(v, w) sum(v[w]) / sum(v)
@@ -246,6 +263,8 @@ class_df <- do.call(rbind, class_rows); rownames(class_df) <- NULL
 valid_df <- do.call(rbind, valid_rows); rownames(valid_df) <- NULL
 write.csv(class_df, file.path(out_dir, "summary_by_class.csv"), row.names = FALSE)
 write.csv(valid_df, file.path(out_dir, "validation.csv"), row.names = FALSE)
+write.csv(do.call(rbind, share_rows), file.path(out_dir, "share_ext_never_detected.csv"),
+          row.names = FALSE)
 options(width = 220)
 print(class_df, digits = 3)
 print(valid_df, digits = 3)

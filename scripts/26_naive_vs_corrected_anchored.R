@@ -12,7 +12,15 @@
 #              transitions: gamma = sum(col) / sum(P(unoccupied at t)),
 #              epsilon = sum(ext) / sum(P(occupied at t))
 #   event ratio  extinctions / colonisations (> 1 = net loss)
-# Periods: all transitions (2017-2023) and recent (2018-2023).
+#   net        colonisations - extinctions (expected cells)
+# Periods: all transitions (2017-2023), recent (2018-2023) and, as a
+# sensitivity to thinly surveyed cell-years, recent transitions whose two
+# years both have >= 2 checklists (recent_min2): with p ~ 0.2-0.35 per
+# checklist, a single checklist misses most presences; and recent transitions
+# excluding those that involve 2020 (recent_no2020), when COVID-19
+# restrictions shifted checklists in recorded cells later in the breeding
+# season (script 37), which could confound late-season movements with local
+# extinction because the detection model has no seasonal term.
 # Uncertainty for the corrected values: 1,000 multivariate-normal draws
 # (point_only = TRUE when the fit's variances are not finite; see
 # draw_coefs() in R/colext_utils.R).
@@ -59,31 +67,41 @@ for (sp in species) {
   z0 <- naive[, 1:(n_t - 1)]; z1 <- naive[, 2:n_t]
   both <- !is.na(z0) & !is.na(z1)
   anchored <- both & det            # recycled row-wise over transitions
-  periods <- list(all = 1:(n_t - 1), recent = 2:(n_t - 1))
+  periods <- list(all = 1:(n_t - 1), recent = 2:(n_t - 1), recent_min2 = 2:(n_t - 1),
+                  recent_no2020 = setdiff(2:(n_t - 1), which(2017:2022 %in% 2019:2020)))
+  stopifnot(n_t == 7)   # transitions indexed 2017->18 ... 2022->23
+  # Checklists per cell-year and transitions with >= 2 in both years
+  visits <- sapply(1:n_t, function(t) rowSums(!is.na(D$y[, ((t - 1) * D$J + 1):(t * D$J), drop = FALSE])))
+  min2 <- visits[, 1:(n_t - 1)] >= 2 & visits[, 2:n_t] >= 2
+  mask_of <- function(p) {
+    w <- anchored; w[, -periods[[p]]] <- FALSE
+    if (p == "recent_min2") w <- w & min2
+    w
+  }
 
   cf <- coef(mod)
   draws <- draw_coefs(mod, N_DRAWS)
   point_only <- attr(draws, "point_only")
-  post <- array(NA_real_, c(N_DRAWS, 2, 3),
-                dimnames = list(NULL, names(periods), c("gamma", "eps", "ratio")))
+  post <- array(NA_real_, c(N_DRAWS, length(periods), 4),
+                dimnames = list(NULL, names(periods), c("gamma", "eps", "ratio", "net")))
 
   for (k in seq_len(N_DRAWS)) {
     fb <- forward_backward(colext_rates(draws[k, ], D), D)
     occ_t <- fb$z1[, 1:(n_t - 1)]
     for (p in names(periods)) {
-      w <- anchored; w[, -periods[[p]]] <- FALSE
+      w <- mask_of(p)
       E <- sum(fb$ext[w]); C <- sum(fb$col[w])
-      post[k, p, ] <- c(C / sum(1 - occ_t[w]), E / sum(occ_t[w]), E / C)
+      post[k, p, ] <- c(C / sum(1 - occ_t[w]), E / sum(occ_t[w]), E / C, C - E)
     }
   }
 
   for (p in names(periods)) {
-    w <- anchored; w[, -periods[[p]]] <- FALSE
+    w <- mask_of(p)
     n_col <- sum(w & z0 == 0 & z1 == 1); n_col_opp <- sum(w & z0 == 0)
     n_ext <- sum(w & z0 == 1 & z1 == 0); n_ext_opp <- sum(w & z0 == 1)
     naive_v <- c(gamma = n_col / n_col_opp, eps = n_ext / n_ext_opp,
-                 ratio = n_ext / n_col)
-    for (m in c("gamma", "eps", "ratio")) {
+                 ratio = n_ext / n_col, net = n_col - n_ext)
+    for (m in c("gamma", "eps", "ratio", "net")) {
       d <- post[, p, m]
       rows[[paste(sp, p, m)]] <- data.frame(
         species = sp, variant = variant, period = p, metric = m,
@@ -91,7 +109,7 @@ for (sp in species) {
         corrected_lo = q(d, .025), corrected_hi = q(d, .975),
         p_corrected_gt_naive = mean(d > naive_v[m]),
         n_col_events = n_col, n_col_opp = n_col_opp,
-        n_ext_events = n_ext, n_ext_opp = n_ext_opp,
+        n_ext_events = n_ext, n_ext_opp = n_ext_opp, n_transitions = sum(w),
         point_only = point_only, row.names = NULL)
     }
   }

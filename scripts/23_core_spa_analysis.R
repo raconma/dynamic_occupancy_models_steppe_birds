@@ -18,13 +18,24 @@
 #   extinction rate   = sum(extinctions) / sum(P(occupied at t))
 #   net change        = sum(colonisations) - sum(extinctions)
 #
-# SPA effect: detected cells mostly inside SPAs (cover >= 0.5) are matched
-# with replacement to detected cells essentially outside (cover < 0.1) by
+# SPA effect: cells with >= 1 detection and >= 1 anchored recent transition
+# (the only cells that inform the anchored contrasts) mostly inside SPAs
+# (cover >= 0.5) are matched with replacement to such cells essentially
+# outside (cover < 0.1) by
 # nearest Mahalanobis distance on strict steppe fraction and logit(psi1)
 # (sensitivity: + UTM coordinates; + checklists per surveyed year). The contrast is the difference in
 # extinction rate (SPA - matched controls). Uncertainty: 1,000 draws that
 # combine coefficient uncertainty (multivariate normal) with resampling of
-# treated cells (and their matched controls).
+# 50 x 50 km spatial blocks of treated cells (with their matched controls),
+# because neighbouring cells share birds and management; resampling of
+# single cells is kept as a secondary summary (*_cell columns). Ratio
+# summaries keep infinite draws (controls without expected extinctions) and
+# are set to NA when more than 5 % of draws are undefined (0/0).
+#
+# Cell cover (pseudo-steppe, SPA) is computed exactly per cell polygon
+# (R/spatial_layers.R: cover_by_raster, cover_by_polygons); an earlier
+# version used terra::project(method = "average"), which shifted the
+# averaging window and misstated cover by up to ~0.1.
 #
 # Inputs:
 #   results/{sp}_model_object.rds
@@ -80,40 +91,24 @@ all_cells <- sort(unique(unlist(lapply(occ_list, `[[`, "cells"))))
 
 hab_path <- file.path(hab_dir, "cell_habitat.csv")
 if (!file.exists(hab_path)) {
-  message("Computing CORINE pseudo-steppe and SPA cover for ",
+  message("Computing exact CORINE pseudo-steppe and SPA cover for ",
           length(all_cells), " cells ...")
-  # Aggregating the 100 m layers onto the WorldClim grid with
-  # project(method = "average") gives the cover fraction of every cell in
-  # one pass (per-polygon extraction took > 35 min).
-  grid <- wc_grid()
-  xy_c <- xyFromCell(grid, all_cells)
-  grid <- crop(grid, ext(min(xy_c[, 1]) - 0.1, max(xy_c[, 1]) + 0.1,
-                         min(xy_c[, 2]) - 0.1, max(xy_c[, 2]) + 0.1))
+  polys <- wc_cell_polygons(all_cells)
   clc <- rast(here("data-raw", "data", "corine", "Results",
                    "u2018_clc2018_v2020_20u1_raster100m", "DATA",
                    "U2018_CLC2018_V2020_20u1.tif"))
-  clc <- crop(clc, project(ext(grid), crs(grid), crs(clc)) + 2000)
-  # Raster values 1..44 are CLC classes (value 48 = NoData); lookup as in
-  # build_stepRep.R: 211 = 12, 231 = 18, 242 = 20, 243 = 21, 244 = 22,
-  # 321 = 26, 333 = 32
-  as_mask <- function(vals) {
-    classify(clc, rcl = cbind(0:48, as.integer(0:48 %in% vals)), others = NA)
-  }
-  to_grid <- function(m) project(m, grid, method = "average")
-  strict <- to_grid(as_mask(c(12L, 18L, 26L, 32L)))
-  broad  <- to_grid(as_mask(c(12L, 18L, 26L, 32L, 20L, 21L, 22L)))
-  spa_r  <- rasterize(vect(st_transform(st_as_sf(load_spa_union()), crs(clc))),
-                      clc, field = 1, background = 0)
-  spa_g  <- to_grid(spa_r)
-
-  cell_xy <- xyFromCell(wc_grid(), all_cells)
-  getv <- function(r) terra::extract(r, cell_xy)[, 1]
-  polys <- wc_cell_polygons(all_cells)
+  # Raster values 1..44 are CLC classes (value 48 = NoData, treated as
+  # missing); lookup as in build_stepRep.R: 211 = 12, 231 = 18, 242 = 20,
+  # 243 = 21, 244 = 22, 321 = 26, 333 = 32
+  cv <- cover_by_raster(polys, clc,
+                        list(strict = c(12L, 18L, 26L, 32L),
+                             broad = c(12L, 18L, 26L, 32L, 20L, 21L, 22L)),
+                        na_values = 48L)
   xy <- st_coordinates(st_centroid(polys))
   write.csv(data.frame(cells = all_cells, x = xy[, 1], y = xy[, 2],
                        area_km2 = as.numeric(st_area(polys)) / 1e6,
-                       steppe_strict = getv(strict), steppe_broad = getv(broad),
-                       spa_frac = getv(spa_g)),
+                       steppe_strict = cv$strict, steppe_broad = cv$broad,
+                       spa_frac = cover_by_polygons(polys, load_spa_sites())),
             hab_path, row.names = FALSE)
 }
 hab <- read.csv(hab_path)
@@ -133,6 +128,29 @@ match_nn <- function(Xt, Xc) {
   })
 }
 smd <- function(a, b) (mean(a) - mean(b)) / sqrt((var(a) + var(b)) / 2)
+# 50 x 50 km spatial blocks (UTM 30N) for cluster resampling
+block_of <- function(x, y) paste(floor(x / 5e4), floor(y / 5e4))
+# Positions of `ids` drawn by resampling their blocks with replacement
+block_sample <- function(blk) {
+  ub <- unique(blk)
+  unlist(lapply(sample(ub, length(ub), replace = TRUE), function(u) which(blk == u)))
+}
+# Summaries: differences drop undefined draws (no expected occupancy);
+# ratios keep infinite draws and are NA when > 5 % of draws are 0/0
+summ_diff <- function(d) {
+  ok <- is.finite(d)
+  c(n_undefined = sum(!ok), med = median(d[ok]), lo = q(d[ok], .025),
+    hi = q(d[ok], .975), p_pos = mean(d[ok] > 0))
+}
+summ_ratio <- function(r) {
+  nan <- is.na(r)
+  if (mean(nan) > 0.05) return(c(n_undefined = sum(nan), n_inf = sum(is.infinite(r)),
+                                 med = NA, lo = NA, hi = NA))
+  rr <- r[!nan]
+  qq <- function(p) as.numeric(quantile(rr, p, type = 1))
+  c(n_undefined = sum(nan), n_inf = sum(is.infinite(rr)), med = qq(.5), lo = qq(.025),
+    hi = qq(.975))
+}
 
 rate_rows <- list(); match_rows <- list(); bal_rows <- list()
 contrast_store <- list()   # per-draw cell sums for the core-vs-marginal contrast
@@ -145,7 +163,8 @@ for (sp in species) {
   occ <- occ_list[[sp]][D$keep, ]
   y_csv <- sapply(occ[, grep("^y\\.[0-9]+\\.[0-9]{4}$", names(occ))],
                   function(v) as.numeric(as.logical(v)))
-  stopifnot(all(y_csv[!is.na(D$y)] == D$y[!is.na(D$y)]))
+  # The pooled-history refit (script 38) has its own histories on the same cells
+  if (variant != "pooled") stopifnot(all(y_csv[!is.na(D$y)] == D$y[!is.na(D$y)]))
   h <- hab[match(occ$cells, hab$cells), ]
   stopifnot(!anyNA(h$cells))
 
@@ -158,6 +177,10 @@ for (sp in species) {
   both <- surv[, 1:(n_t - 1)] & surv[, 2:n_t]
   det <- rowSums(naive, na.rm = TRUE) > 0
   recent <- 2:(n_t - 1)
+  # Cells that inform the anchored contrasts: >= 1 transition surveyed in
+  # both years within the recent period
+  anch <- det & rowSums(both[, recent, drop = FALSE]) > 0
+  blk <- block_of(h$x, h$y)
 
   cf <- coef(mod)
   psi1 <- colext_rates(cf, D)$psi1
@@ -183,7 +206,7 @@ for (sp in species) {
   # Matching (fixed across draws). "effort" adds checklists per surveyed year,
   # because SPA cells are surveyed less often and fewer visits give less
   # evidence of absence
-  tr <- which(classes$spa_in); ctl <- which(classes$spa_out)
+  tr <- which(classes$spa_in & anch); ctl <- which(classes$spa_out & anch)
   lpsi <- qlogis(pmin(pmax(psi1, 1e-6), 1 - 1e-6))
   covs <- list(
     base   = cbind(h$steppe_strict, lpsi),
@@ -217,6 +240,7 @@ for (sp in species) {
   match_d <- array(NA_real_, c(N_DRAWS, length(covs), 2),
                    dimnames = list(NULL, names(covs), per))
   match_r <- match_d   # SPA / matched-control ratio, same resamples as match_d
+  match_d_cell <- match_d   # single-cell resampling (secondary)
   det_idx <- which(det)
   E_store <- O_store <- array(NA_real_, c(N_DRAWS, length(det_idx), 2),
                               dimnames = list(NULL, NULL, per))
@@ -238,13 +262,15 @@ for (sp in species) {
         rate_d[k, j, p, ] <- c(sum(cs$E[w]) / sum(cs$O[w]),
                                sum(cs$C[w]) - sum(cs$E[w]))
       }
-      # Bootstrap treated cells (with their matched controls)
-      b <- sample(seq_along(tr), replace = TRUE)
+      # Resample spatial blocks of treated cells (with their matched
+      # controls); single-cell resampling kept as a secondary summary
+      bb <- block_sample(blk[tr]); bc <- sample(seq_along(tr), replace = TRUE)
       for (nm in names(covs)) {
-        t_i <- tr[b]; c_i <- matches[[nm]][b]
-        r_t <- sum(cs$E[t_i]) / sum(cs$O[t_i]); r_c <- sum(cs$E[c_i]) / sum(cs$O[c_i])
+        rate <- function(i) sum(cs$E[i]) / sum(cs$O[i])
+        r_t <- rate(tr[bb]); r_c <- rate(matches[[nm]][bb])
         match_d[k, nm, p] <- r_t - r_c
         match_r[k, nm, p] <- r_t / r_c
+        match_d_cell[k, nm, p] <- rate(tr[bc]) - rate(matches[[nm]][bc])
       }
     }
   }
@@ -258,35 +284,36 @@ for (sp in species) {
     E = E_store, O = O_store, point_only = point_only,
     cell = data.frame(spa_frac = h$spa_frac, steppe_strict = h$steppe_strict,
                       lpsi = lpsi, visits_per_year = effort[, "visits_per_year"],
-                      obs_ext = obs_ext)[det_idx, ],
+                      obs_ext = obs_ext, anch = anch, blk = blk)[det_idx, ],
     groups = lapply(pairs, function(g) list(
-      core = classes[[paste0("core_", g)]][det_idx],
-      rest = classes[[paste0("rest_", g)]][det_idx])))
+      core = (classes[[paste0("core_", g)]] & anch)[det_idx],
+      rest = (classes[[paste0("rest_", g)]] & anch)[det_idx])))
 
   for (j in names(classes)) for (p in per) {
     e <- rate_d[, j, p, "ext_rate"]; n <- rate_d[, j, p, "net"]
     rate_rows[[paste(sp, j, p)]] <- data.frame(
       species = sp, variant = variant, point_only = point_only,
       class = j, period = p, n_cells = sum(classes[[j]]),
+      n_anchored = sum(classes[[j]] & anch),
       ext_rate_med = median(e), ext_rate_lo = q(e, .025), ext_rate_hi = q(e, .975),
       net_med = median(n), net_lo = q(n, .025), net_hi = q(n, .975),
       p_net_loss = mean(n < 0))
   }
   for (nm in names(covs)) for (p in per) {
-    d <- match_d[, nm, p]
+    sd <- summ_diff(match_d[, nm, p]); sr <- summ_ratio(match_r[, nm, p])
+    sc <- summ_diff(match_d_cell[, nm, p])
     match_rows[[paste(sp, nm, p)]] <- data.frame(
       species = sp, variant = variant, point_only = point_only,
       spec = nm, period = p, n_treated = length(tr),
-      n_control_pool = length(ctl), n_unique_controls = length(unique(matches[[nm]])),
-      # Resamples whose treated or control cells carry no expected occupancy
-      # give an undefined rate ratio (0/0) and are dropped
-      n_undefined = sum(!is.finite(d)),
-      diff_ext_rate_med = median(d[is.finite(d)]), diff_lo = q(d[is.finite(d)], .025),
-      diff_hi = q(d[is.finite(d)], .975), p_spa_higher = mean(d[is.finite(d)] > 0),
-      n_ratio_undefined = sum(!is.finite(match_r[, nm, p])),
-      ratio_med = median(match_r[is.finite(match_r[, nm, p]), nm, p]),
-      ratio_lo = q(match_r[is.finite(match_r[, nm, p]), nm, p], .025),
-      ratio_hi = q(match_r[is.finite(match_r[, nm, p]), nm, p], .975))
+      n_treated_recorded = sum(classes$spa_in), n_control_pool = length(ctl),
+      n_unique_controls = length(unique(matches[[nm]])),
+      n_blocks_treated = length(unique(blk[tr])),
+      n_undefined = sd[["n_undefined"]],
+      diff_ext_rate_med = sd[["med"]], diff_lo = sd[["lo"]], diff_hi = sd[["hi"]],
+      p_spa_higher = sd[["p_pos"]],
+      n_ratio_undefined = sr[["n_undefined"]], n_ratio_inf = sr[["n_inf"]],
+      ratio_med = sr[["med"]], ratio_lo = sr[["lo"]], ratio_hi = sr[["hi"]],
+      diff_cell_med = sc[["med"]], diff_cell_lo = sc[["lo"]], diff_cell_hi = sc[["hi"]])
   }
 }
 
@@ -298,29 +325,35 @@ write.csv(match_df, file.path(out_dir, "spa_matched.csv"), row.names = FALSE)
 write.csv(bal_df,   file.path(out_dir, "spa_balance.csv"), row.names = FALSE)
 
 # Core vs marginal contrast with its own uncertainty: per coefficient draw,
-# resample cells with replacement within each habitat class. Run after all
-# species so that the random stream of the outputs above is unchanged.
+# resample 50 x 50 km blocks of the anchored recorded cells (both habitat
+# classes together); resampling cells within each class is kept as a
+# secondary summary. Run after all species so that the random stream of the
+# outputs above is unchanged.
 contrast_rows <- list()
 for (sp in names(contrast_store)) {
   st <- contrast_store[[sp]]
   for (g in names(st$groups)) for (p in dimnames(st$E)[[3]]) {
     ci <- which(st$groups[[g]]$core); ri <- which(st$groups[[g]]$rest)
     if (length(ci) < 2 || length(ri) < 2) next
-    d <- r <- numeric(N_DRAWS)
+    cr <- c(ci, ri); is_core <- rep(c(TRUE, FALSE), c(length(ci), length(ri)))
+    d <- r <- dc <- numeric(N_DRAWS)
     for (k in seq_len(N_DRAWS)) {
-      bc <- sample(ci, replace = TRUE); br <- sample(ri, replace = TRUE)
-      rc <- sum(st$E[k, bc, p]) / sum(st$O[k, bc, p])
-      rr <- sum(st$E[k, br, p]) / sum(st$O[k, br, p])
+      rate <- function(i) sum(st$E[k, i, p]) / sum(st$O[k, i, p])
+      b <- block_sample(st$cell$blk[cr])
+      rc <- rate(cr[b][is_core[b]]); rr <- rate(cr[b][!is_core[b]])
       d[k] <- rr - rc; r[k] <- rr / rc
+      dc[k] <- rate(sample(ri, replace = TRUE)) - rate(sample(ci, replace = TRUE))
     }
-    ok <- is.finite(d) & is.finite(r)
+    sd <- summ_diff(d); sr <- summ_ratio(r); sc <- summ_diff(dc)
     contrast_rows[[paste(sp, g, p)]] <- data.frame(
       species = sp, variant = variant, point_only = st$point_only,
       definition = g, period = p, n_core = length(ci), n_marginal = length(ri),
-      n_undefined = sum(!ok),
-      diff_med = median(d[ok]), diff_lo = q(d[ok], .025), diff_hi = q(d[ok], .975),
-      ratio_med = median(r[ok]), ratio_lo = q(r[ok], .025), ratio_hi = q(r[ok], .975),
-      p_marginal_higher = mean(d[ok] > 0))
+      n_undefined = sd[["n_undefined"]],
+      diff_med = sd[["med"]], diff_lo = sd[["lo"]], diff_hi = sd[["hi"]],
+      n_ratio_undefined = sr[["n_undefined"]], n_ratio_inf = sr[["n_inf"]],
+      ratio_med = sr[["med"]], ratio_lo = sr[["lo"]], ratio_hi = sr[["hi"]],
+      p_marginal_higher = sd[["p_pos"]],
+      diff_cell_med = sc[["med"]], diff_cell_lo = sc[["lo"]], diff_cell_hi = sc[["hi"]])
   }
 }
 contrast_df <- do.call(rbind, contrast_rows); rownames(contrast_df) <- NULL
@@ -329,7 +362,8 @@ write.csv(contrast_df, file.path(out_dir, "core_contrast.csv"), row.names = FALS
 # Sensitivity of the SPA contrast to the SPA cover thresholds (anchored
 # transitions, 2018-2023). The main analysis compares cells >= 50 % inside
 # SPAs with cells < 10 % inside and leaves out intermediate cover; here the
-# treated/control split is varied. Matching and resampling as above. Run
+# treated/control split is varied, among cells with anchored transitions.
+# Matching and block resampling as above. Run
 # after the other outputs so that their random stream is unchanged.
 SPA_DEFS <- list(in50_out10 = c(0.5, 0.1), in50_out50 = c(0.5, 0.5),
                  in30_out30 = c(0.3, 0.3), in10_out10 = c(0.1, 0.1))
@@ -340,7 +374,7 @@ for (sp in names(contrast_store)) {
   rate_of <- function(k, i) sum(E[k, i]) / sum(O[k, i])
   for (dn in names(SPA_DEFS)) {
     thr <- SPA_DEFS[[dn]]
-    tr <- which(cl$spa_frac >= thr[1]); ctl <- which(cl$spa_frac < thr[2])
+    tr <- which(cl$anch & cl$spa_frac >= thr[1]); ctl <- which(cl$anch & cl$spa_frac < thr[2])
     X_all <- list(base = cbind(cl$steppe_strict, cl$lpsi),
                   effort = cbind(cl$steppe_strict, cl$lpsi, cl$visits_per_year))
     raw_in <- sapply(seq_len(N_DRAWS), rate_of, i = tr)
@@ -352,23 +386,24 @@ for (sp in names(contrast_store)) {
       smd_after <- sapply(seq_len(ncol(Xb)), function(j) smd(Xb[tr, j], Xb[m, j]))
       d <- r <- numeric(N_DRAWS)
       for (k in seq_len(N_DRAWS)) {
-        b <- sample(seq_along(tr), replace = TRUE)
+        b <- block_sample(cl$blk[tr])
         r_t <- rate_of(k, tr[b]); r_c <- rate_of(k, m[b])
         d[k] <- r_t - r_c; r[k] <- r_t / r_c
       }
-      ok <- is.finite(d); okr <- is.finite(r)
+      sd <- summ_diff(d); sr <- summ_ratio(r)
       thr_rows[[paste(sp, dn, nm)]] <- data.frame(
         species = sp, variant = variant, point_only = st$point_only,
         definition = dn, spa_in_min = thr[1], spa_out_max = thr[2], spec = nm,
         n_treated = length(tr), n_control_pool = length(ctl),
-        n_unique_controls = length(unique(m)), n_excluded = nrow(cl) - length(tr) - length(ctl),
+        n_unique_controls = length(unique(m)),
+        n_excluded = sum(cl$anch) - length(tr) - length(ctl),
         obs_ext_treated = sum(cl$obs_ext[tr]), obs_ext_control = sum(cl$obs_ext[ctl]),
         rate_in_med = median(raw_in), rate_in_lo = q(raw_in, .025), rate_in_hi = q(raw_in, .975),
         rate_out_med = median(raw_out), rate_out_lo = q(raw_out, .025), rate_out_hi = q(raw_out, .975),
-        n_undefined = sum(!ok), diff_med = median(d[ok]), diff_lo = q(d[ok], .025),
-        diff_hi = q(d[ok], .975), p_spa_higher = mean(d[ok] > 0),
-        n_ratio_undefined = sum(!okr), ratio_med = median(r[okr]),
-        ratio_lo = q(r[okr], .025), ratio_hi = q(r[okr], .975),
+        n_undefined = sd[["n_undefined"]], diff_med = sd[["med"]], diff_lo = sd[["lo"]],
+        diff_hi = sd[["hi"]], p_spa_higher = sd[["p_pos"]],
+        n_ratio_undefined = sr[["n_undefined"]], n_ratio_inf = sr[["n_inf"]],
+        ratio_med = sr[["med"]], ratio_lo = sr[["lo"]], ratio_hi = sr[["hi"]],
         max_abs_smd_after = max(abs(smd_after)))
     }
   }
