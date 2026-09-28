@@ -45,8 +45,9 @@ set.seed(42)  # no stochastic steps
 species <- c("otitar", "ptealc", "pteori", "tettet")
 species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
                    pteori = "P. orientalis", tettet = "T. tetrax")
-variants <- c(primary = "Primary model", trend = "Linear trend in dynamics",
-              steprep_v3 = "Steppe-representativeness detection")
+variants <- c(primary = "Primary model", constant = "Constant colonisation and extinction",
+              trend = "Linear trend in dynamics", no_steprep = "Detection without steppe representativeness",
+              psi_dyn = "Colonisation and extinction on initial-occupancy covariates")
 fig_dir <- here("results", "manuscript_figures")
 tab_dir <- here("results", "manuscript_tables")
 dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
@@ -346,7 +347,7 @@ write.csv(thr, file.path(tab_dir, "tableS_spa_threshold.csv"), row.names = FALSE
 # Coefficients of all submodels of the primary and steppe-representativeness
 # fits (logit scale). SEs from
 # the Hessian; NaN where the estimate sits at a boundary
-coefs <- do.call(rbind, lapply(c("primary", "steprep_v3"), function(v) do.call(rbind, lapply(species, function(sp) {
+coefs <- do.call(rbind, lapply(c("primary", "constant"), function(v) do.call(rbind, lapply(species, function(sp) {
   m <- readRDS(if (v == "primary") res(paste0(sp, "_model_object.rds")) else
                  res("robustness", paste0(sp, "_", v, "_model_object.rds")))
   cf <- coef(m)

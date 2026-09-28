@@ -77,7 +77,12 @@ species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
 N_DRAWS <- 1000
 CORE_THRESHOLDS <- c(0.3, 0.5, 0.7)
 hab_dir <- here("results", "core_spa")
+# block side (m) for spatial resampling; BLOCK_KM environment variable for the
+# block-size sensitivity (default 50 x 50 km)
+BLOCK_M <- as.numeric(Sys.getenv("BLOCK_KM", "50")) * 1000
 out_dir <- if (variant == "primary") hab_dir else file.path(hab_dir, variant)
+# block-size sensitivity: BLOCK_KM=100 Rscript scripts/23_core_spa_analysis.R
+if (BLOCK_M != 5e4) out_dir <- file.path(out_dir, paste0("blk", BLOCK_M / 1000))
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 q <- function(x, p) as.numeric(quantile(x, p, na.rm = TRUE))
 
@@ -129,7 +134,7 @@ match_nn <- function(Xt, Xc) {
 }
 smd <- function(a, b) (mean(a) - mean(b)) / sqrt((var(a) + var(b)) / 2)
 # 50 x 50 km spatial blocks (UTM 30N) for cluster resampling
-block_of <- function(x, y) paste(floor(x / 5e4), floor(y / 5e4))
+block_of <- function(x, y) paste(floor(x / BLOCK_M), floor(y / BLOCK_M))
 # Positions of `ids` drawn by resampling their blocks with replacement
 block_sample <- function(blk) {
   ub <- unique(blk)

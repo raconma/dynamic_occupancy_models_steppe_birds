@@ -22,7 +22,8 @@
 #        data/processed_2023/{sp}/{sp}_occ_wide_dynamic.csv
 #        reports/script_4_v2_inputs/{sp}_occ_wide_dynamic.csv (stepRep inputs)
 #      The single-site originals are kept as *_singlesite.csv.
-#      The tables also carry the day of year of each visit (day_of_year).
+#      The tables also carry the day of year of each visit (day_of_year) and
+#      the proportion of pseudo-steppe within 500 m of it (steprep_visit).
 #   2. the primary model and the stepRep v2 model are refitted on the pooled
 #      histories with the original formulas, site and yearly covariates, and
 #      environmental observation covariates (constant within a year, expanded
@@ -46,6 +47,7 @@ species <- c("otitar", "tettet", "pteori", "ptealc")
 YEARS <- 2017:2023; T_years <- length(YEARS)
 grid <- rast(here("data-raw", "data", "environmental_data", "environmental_data_occ",
                   "variables_spain.grd"), lyrs = 1)
+foc500 <- rast(here("data", "derived", "corine", "focal_strict_500m.tif"))
 bk_dir <- here("results", "_single_site_histories")
 dir.create(bk_dir, showWarnings = FALSE)
 # refits with the original formulas (superseded by the covariate selection
@@ -60,7 +62,7 @@ backup_once <- function(path, bk) {
 }
 ck <- c(y = "y", duration = "duration_minutes", effort = "effort_distance_km",
         observers = "number_observers", time = "time_observations_started",
-        doy = "day_of_year")
+        doy = "day_of_year", steprep = "steprep_visit")
 col_of <- function(var, j, yr) paste0(var, ".", j, ".", yr)
 
 rows <- list()
@@ -73,6 +75,12 @@ for (sp in species) {
                              date_var = "observation_date",
                              site_vars = c("locality_id", "observer_id"))
   rv$cells <- cellFromXY(grid, cbind(rv$longitude, rv$latitude))
+  # within-cell steppe representativeness of each checklist: proportion of
+  # pseudo-steppe (CORINE 2018 codes 211, 231, 321, 333) within 500 m of its
+  # location (raster from build_stepRep.R; outside CORINE coverage = 0)
+  pts <- project(vect(cbind(rv$longitude, rv$latitude), crs = "EPSG:4326"), crs(foc500))
+  rv$steprep_visit <- extract(foc500, pts, ID = FALSE)[[1]]
+  rv$steprep_visit[is.na(rv$steprep_visit)] <- 0
   rv <- rv[order(rv$cells, rv$year, rv$observation_date, rv$checklist_id), ]
   groups <- split(seq_len(nrow(rv)), paste(rv$cells, rv$year))
   groups <- groups[order(names(groups))]
@@ -110,6 +118,7 @@ for (sp in species) {
       mats$observers[i, cols] <- x$number_observers
       mats$time[i, cols] <- x$time_observations_started
       mats$doy[i, cols] <- x$day_of_year
+      mats$steprep[i, cols] <- x$steprep_visit
     }
     # as in the original tables: no detection record without effort data
     mats$y[is.na(mats$time) | is.na(mats$duration) | is.na(mats$observers)] <- NA

@@ -36,6 +36,7 @@ library(MASS)
 library(ggplot2)
 
 source(here("R", "colext_utils.R"))
+source(here("R", "spa_matching.R"))    # block_sample()
 set.seed(42)
 
 # Model variant: "primary" (default) or a robustness refit (scripts 28 and 41),
@@ -47,6 +48,7 @@ species <- c("otitar", "ptealc", "pteori", "tettet")
 species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
                    pteori = "P. orientalis", tettet = "T. tetrax")
 N_DRAWS <- 1000
+hab <- read.csv(here("results", "core_spa", "cell_habitat.csv"))
 out_dir <- here("results", "naive_vs_corrected_anchored")
 if (variant != "primary") out_dir <- file.path(out_dir, variant)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
@@ -79,6 +81,16 @@ for (sp in species) {
     w
   }
 
+  # 50 x 50 km blocks of recorded cells, resampled with each draw so that
+  # intervals also carry sampling variability among cells
+  occ_tab <- read.csv(colext_input_path(sp, variant))[D$keep, ]
+  h <- hab[match(occ_tab$cells, hab$cells), ]
+  stopifnot(!anyNA(h$cells))
+  blk <- paste(floor(h$x / 5e4), floor(h$y / 5e4))
+  rec <- which(det & rowSums(anchored) > 0)   # cells with anchored transitions
+  post_blk <- array(NA_real_, c(N_DRAWS, length(periods), 2),
+                    dimnames = list(NULL, names(periods), c("ratio", "net")))
+
   cf <- coef(mod)
   draws <- draw_coefs(mod, N_DRAWS)
   point_only <- attr(draws, "point_only")
@@ -92,6 +104,9 @@ for (sp in species) {
       w <- mask_of(p)
       E <- sum(fb$ext[w]); C <- sum(fb$col[w])
       post[k, p, ] <- c(C / sum(1 - occ_t[w]), E / sum(occ_t[w]), E / C, C - E)
+      b <- rec[block_sample(blk[rec])]
+      Eb <- sum((fb$ext * w)[b, ]); Cb <- sum((fb$col * w)[b, ])
+      post_blk[k, p, ] <- c(Eb / Cb, Cb - Eb)
     }
   }
 
@@ -108,6 +123,8 @@ for (sp in species) {
         naive = naive_v[m], corrected_med = median(d),
         corrected_lo = q(d, .025), corrected_hi = q(d, .975),
         p_corrected_gt_naive = mean(d > naive_v[m]),
+        blk_lo = if (m %in% c("ratio", "net")) q(post_blk[, p, m], .025) else NA,
+        blk_hi = if (m %in% c("ratio", "net")) q(post_blk[, p, m], .975) else NA,
         n_col_events = n_col, n_col_opp = n_col_opp,
         n_ext_events = n_ext, n_ext_opp = n_ext_opp, n_transitions = sum(w),
         point_only = point_only, row.names = NULL)

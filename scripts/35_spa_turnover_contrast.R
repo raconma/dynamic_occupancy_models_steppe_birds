@@ -16,7 +16,7 @@
 # (and colonisation possibly lower) than in matched cells; if SPAs acted as
 # sources, colonisation of vacant SPA cells would be higher.
 #
-# Model variants: primary, trend (script 28), steprep_v3 (script 41).
+# Model variants: primary (script 41), constant, trend and no_steprep (script 28).
 # Variants whose Hessian gives non-finite SEs are flagged by point_only.
 #
 # Inputs:  results/{sp}_model_object.rds and results/robustness/ (scripts 28 and 41),
@@ -33,7 +33,7 @@ source(here("R", "spa_matching.R"))
 set.seed(42)
 
 species <- c("otitar", "tettet", "pteori", "ptealc")
-variants <- c("primary", "trend", "steprep_v3")
+variants <- c("primary", "constant", "trend", "no_steprep", "psi_dyn")
 N_DRAWS <- 1000
 hab <- read.csv(here("results", "core_spa", "cell_habitat.csv"))
 q <- function(x, p) as.numeric(quantile(x, p, na.rm = TRUE))

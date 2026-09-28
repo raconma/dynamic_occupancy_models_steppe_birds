@@ -45,6 +45,12 @@ for (sp in species) {
   } else {
     message("  Stored bootstrap does not match the current fit; rerunning (",
             N_SIM, " simulations, ", N_CORES, " cores)")
+    # the stored call may build formulas with helpers of the fitting script
+    # (script 41); parboot re-evaluates it on worker processes, so insert the
+    # evaluated formulas
+    fl <- mod@formlist
+    mod@call$psiformula <- fl$psi; mod@call$gammaformula <- fl$col
+    mod@call$epsilonformula <- fl$ext; mod@call$pformula <- fl$det
     gof <- parboot(mod, nsim = N_SIM, parallel = N_CORES > 1, ncores = N_CORES)
     out <- here("results", paste0(sp, "_gof_parboot_current.rds"))
     saveRDS(gof, out)

@@ -48,6 +48,10 @@ match_nn <- function(Xt, Xc) {
 smd <- function(a, b) (mean(a) - mean(b)) / sqrt((var(a) + var(b)) / 2)
 
 # `hab` is results/core_spa/cell_habitat.csv (script 23)
+# Block side for spatial resampling (m); BLOCK_KM environment variable for
+# the block-size sensitivity of script 23
+BLOCK_M <- as.numeric(Sys.getenv("BLOCK_KM", "50")) * 1000
+
 spa_setup <- function(sp, variant, hab) {
   mod <- readRDS(colext_model_path(sp, variant))
   D <- colext_design(mod)
@@ -68,7 +72,7 @@ spa_setup <- function(sp, variant, hab) {
   anch <- det & rowSums(both[, recent, drop = FALSE]) > 0
   list(mod = mod, D = D, n_t = n_t, h = h, naive = naive, both = both,
        det = det, anch = anch, recent = recent,
-       blk = paste(floor(h$x / 5e4), floor(h$y / 5e4)),   # 50 x 50 km blocks
+       blk = paste(floor(h$x / BLOCK_M), floor(h$y / BLOCK_M)),   # 50 x 50 km blocks by default
        lpsi = qlogis(pmin(pmax(psi1, 1e-6), 1 - 1e-6)),
        visits = rowSums(!is.na(D$y)) / pmax(rowSums(surv), 1),
        tr = which(anch & h$spa_frac >= 0.5),

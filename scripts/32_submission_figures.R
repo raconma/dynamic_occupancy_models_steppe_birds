@@ -48,9 +48,10 @@ sp_short <- c(otitar = "O. tarda", tettet = "T. tetrax", pteori = "P. orientalis
               ptealc = "P. alchata")
 sp_col <- c(otitar = "#D55E00", tettet = "#CC79A7", pteori = "#009E73", ptealc = "#0072B2")
 sp_col_lab <- setNames(sp_col, sp_short[names(sp_col)])
-variants <- c(primary = "Primary model", trend = "Linear trend",
-              steprep_v3 = "Steppe-rep. detection")
-vlev <- c("steprep_v3", "trend", "primary")     # bottom to top
+variants <- c(primary = "Primary model", constant = "Constant rates",
+              trend = "Linear trend", no_steprep = "No steppe-rep.",
+              psi_dyn = "Occupancy covariates")
+vlev <- c("psi_dyn", "no_steprep", "trend", "constant", "primary")     # bottom to top
 
 theme_gcb <- theme_minimal(base_size = 8) +
   theme(panel.grid.major.x = element_blank(), panel.grid.minor = element_blank(),
@@ -112,12 +113,14 @@ nv <- read.csv(res("naive_vs_corrected_anchored", "summary.csv"))
 nv <- nv[nv$period == "recent" & nv$species %in% sp_all, ]
 nv$sp <- factor(sp_short[nv$species], levels = rev(sp_short[sp_all]))
 nv <- transform(nv, med = corrected_med, lo = corrected_lo, hi = corrected_hi)
+# ratio and net change: intervals that also resample 50 x 50 km blocks of cells
+use_blk <- nv$metric %in% c("ratio", "net") & !is.na(nv$blk_lo)
+nv$lo[use_blk] <- nv$blk_lo[use_blk]; nv$hi[use_blk] <- nv$blk_hi[use_blk]
 # corrected colonisation of P. alchata also depends on its non-identifiable
 # extinction (posterior events are joint), so it is flagged as well
 nv$ni <- nv$point_only & nv$metric %in% c("eps", "gamma", "ratio")
-net <- cr[cr$class == "det_all", ]
-net$sp <- factor(as.character(net$sp), levels = rev(sp_short[sp_all]))
-net <- transform(net, med = net_med, lo = net_lo, hi = net_hi, ni = FALSE)
+net <- nv[nv$metric == "net", ]        # same draws and block resamples as panel C
+net$ni <- FALSE
 RL1 <- c(0.3, 6)                                   # x limits of the ratio panel
 
 rate_panel <- function(d, letter, text, xlab, log = FALSE, ref = NULL, naive = TRUE, show_y = FALSE,
@@ -204,8 +207,7 @@ map_sp <- function(sp, letter) {
 }
 m2 <- lapply(seq_along(sp_est), function(i) map_sp(sp_est[i], LETTERS[i]))
 ga_map <- m2[[1]] + theme(legend.position = "none")   # unlabelled copy for the graphical abstract
-m2[[1]] <- m2[[1]] + geom_text(data = lab_xy, aes(X, Y, label = lab), size = 2.6, fontface = "bold",
-                               nudge_x = 24000, nudge_y = 20000)
+# (SPA labels removed: estimates per SPA rest on few cells and are not a ranking)
 leg_map <- cowplot::get_plot_component(
   m2[[1]] + guides(shape = guide_legend(override.aes = list(size = 2.5, colour = "grey30"), order = 1),
                    size = guide_legend(override.aes = list(colour = "grey30"), order = 2)),
@@ -352,17 +354,24 @@ ga1 <- rate_panel(nv[nv$metric == "ratio" & nv$species %in% sp_est, ], "", "",
                   "Extinctions per colonisation (log)", log = TRUE, ref = 1, show_y = TRUE,
                   sp_levels = sp_est) +
   labs(title = "Four steppe birds,\ndifferent trajectories")
-ga2 <- ga_map + labs(title = "Over half of the great bustard\nnet loss is inside SPAs")
-eff <- mt[mt$variant == "primary" & mt$spec == "base", ]
-eff$sp <- factor(as.character(eff$sp), levels = rev(sp_short[sp_est]))
-ga3 <- ggplot(eff, aes(y = sp, colour = sp)) +
-  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50", linewidth = 0.3) +
-  errbar(aes(xmin = diff_lo, xmax = diff_hi)) +
-  geom_point(aes(x = diff_ext_rate_med), size = 2.4) +
+ga2 <- ga_map + labs(title = "About half of the great bustard\nnet loss is inside SPAs")
+# SPA effects on colonisation and extinction, model with all controls (script 46)
+eff <- read.csv(res("core_spa", "spa_full_model.csv"))
+eff <- eff[eff$term %in% c("col(spa)", "ext(spa)") & eff$species %in% sp_est, ]
+eff$sp <- factor(sp_short[eff$species], levels = rev(sp_short[sp_est]))
+eff$process <- factor(ifelse(eff$term == "col(spa)", "Colonisation", "Extinction"),
+                      levels = c("Colonisation", "Extinction"))
+ga3 <- ggplot(eff, aes(y = sp, colour = sp, shape = process)) +
+  geom_vline(xintercept = 1, linetype = "dashed", colour = "grey50", linewidth = 0.3) +
+  geom_errorbar(aes(xmin = exp(lo), xmax = pmin(exp(hi), 200)), width = 0.2, linewidth = 0.4,
+                orientation = "y", position = position_dodge(width = 0.55)) +
+  geom_point(aes(x = exp(estimate)), size = 2.2, position = position_dodge(width = 0.55)) +
+  scale_x_log10(limits = c(0.1, 200), breaks = c(0.1, 1, 10, 100), labels = c("0.1", "1", "10", "100")) +
   scale_colour_manual(values = sp_col_lab, guide = "none") +
-  labs(x = "Extinction, SPA minus matched cells", y = NULL,
-       title = "SPAs: no lower extinction\nin any species") +
-  theme_gcb + italic_y
+  scale_shape_manual(values = c(Colonisation = 16, Extinction = 1), name = NULL) +
+  labs(x = "Odds ratio, inside vs outside SPAs (log)", y = NULL,
+       title = "SPAs: more colonisation,\nno less extinction") +
+  theme_gcb + italic_y + theme(legend.position = "bottom")
 ga <- cowplot::plot_grid(ga1, ga2, ga3, nrow = 1, rel_widths = c(1, 1.05, 1))
 save_fig(ga, "Graphical_abstract", 200, 80)
 
