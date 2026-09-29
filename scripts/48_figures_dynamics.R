@@ -1,19 +1,28 @@
 ###############################################################################
 # 48_figures_dynamics.R
 #
-# Two main-text figures of the dynamic results:
-#   Fig. 2  SPA cover and colonisation and extinction: odds ratios (cell fully
-#           inside vs fully outside SPAs). Coloured: model with all controls
-#           (script 46); grey: the other control sets (scripts 43-45), as a
-#           robustness check. Fits with a standard error above 5 are omitted.
-#   Fig. 3  Covariates of colonisation and extinction in the primary models
+# Figures of the dynamic results:
+#   Fig. 2  Covariates of colonisation and extinction in the primary models
 #           (script 41): standardised logit-scale coefficients with 95 % Wald
 #           intervals; intervals beyond the axis are truncated (arrows).
+#   Fig. 3  SPAs judged by occupancy and by dynamics: odds ratios (cell fully
+#           inside vs fully outside SPAs) for initial occupancy, colonisation
+#           and extinction in the fixed SPA model (script 49, psi_spa_t).
+#   Fig. 4  Dynamic versus static prediction of the 2023 detections (script
+#           51): difference in held-out log-likelihood from the static
+#           closed model, all surveyed cells and cells recorded in 2017-2022.
+#   Fig. S4 SPA effects on colonisation and extinction in models without SPA
+#           cover in initial occupancy (scripts 43-46). Coloured: all
+#           controls (script 46); grey: other control sets. Fits with a
+#           standard error above 5 are omitted.
 #
 # Inputs:  results/core_spa/spa_in_dynamics.csv, spa_in_dynamics_checks.csv,
-#          spa_neighbourhood.csv, spa_full_model.csv; results/{sp}_model_object.rds
-# Outputs: results/manuscript_figures/submission/Fig2_spa_dynamics.{png,pdf,tif}
-#          results/manuscript_figures/submission/Fig3_drivers.{png,pdf,tif}
+#          spa_neighbourhood.csv, spa_full_model.csv, spa_psi_check.csv;
+#          results/robustness/temporal_validation_2023.csv;
+#          results/{sp}_model_object.rds
+# Outputs: results/manuscript_figures/submission/
+#          Fig2_drivers, Fig3_spa_static_dynamic, Fig4_temporal_validation,
+#          FigS4_spa_controls (.png, .pdf, .tif)
 ###############################################################################
 
 library(here)
@@ -31,13 +40,14 @@ theme_fig <- theme_classic(base_size = 8) +
   theme(axis.line = element_line(linewidth = 0.3), axis.ticks = element_line(linewidth = 0.3),
         strip.background = element_blank(), strip.text = element_text(face = "bold", size = 8, hjust = 0),
         panel.grid.major.x = element_line(colour = "grey92", linewidth = 0.3),
-        legend.position = "none", plot.margin = margin(4, 6, 4, 4))
+        axis.text = element_text(size = 7), legend.position = "none", plot.margin = margin(4, 6, 4, 4))
+minus <- function(x) sub("^-", "\u2212", format(x, trim = TRUE))   # typographic minus on axes
 save_fig <- function(p, name, w, h) {
   for (ext in c("png", "pdf")) ggsave(file.path(out_dir, paste0(name, ".", ext)), p, width = w, height = h, units = "mm", dpi = 600)
   ggsave(file.path(out_dir, paste0(name, ".tif")), p, width = w, height = h, units = "mm", dpi = 600, compression = "lzw")
 }
 
-# --- Fig. 2: SPA cover and colonisation and extinction -----------------------
+# --- Fig. S4: SPA effects without SPA cover in initial occupancy -------------
 cd <- here("results", "core_spa")
 keep <- c("species", "term", "estimate", "lo", "hi", "max_se", "set")
 a <- read.csv(file.path(cd, "spa_in_dynamics.csv")); a <- a[a$model == "spa", ]; a$set <- "other"
@@ -75,12 +85,12 @@ p2 <- ggplot() +
   facet_wrap(~ process, nrow = 1) +
   labs(x = "Odds ratio, SPA vs unprotected cell", y = NULL) +
   theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"))
-save_fig(p2, "Fig2_spa_dynamics", 140, 70)
+save_fig(p2, "FigS4_spa_controls", 140, 70)
 
-# --- Fig. 3: covariates of colonisation and extinction -----------------------
+# --- Fig. 2: covariates of colonisation and extinction -----------------------
 lab <- c(pseudo_steppe = "Pseudo-steppe", Land_Cover_Type_1_Percent_Class_12 = "Cropland",
          Land_Cover_Type_1_Percent_Class_7 = "Open shrubland", grass_cover = "Herbaceous cover",
-         tree_cover = "Tree cover", bio1 = "Mean temperature", bio2 = "Temperature range",
+         tree_cover = "Tree cover", bio1 = "Mean temperature", bio2 = "Diurnal temperature range",
          topo_aspect = "Aspect")
 rows <- list()
 for (sp in species) {
@@ -113,15 +123,64 @@ p3 <- ggplot(r, aes(y = y, colour = sp)) +
                arrow = arrow(length = unit(1.4, "mm"), type = "closed"), show.legend = FALSE) +
   geom_point(data = r[abs(r$est) <= XL[2], ], aes(x = est), size = 1.8) +
   scale_colour_manual(values = sp_col, labels = sp_lab, breaks = species, name = NULL) +
-  scale_x_continuous(limits = XL, breaks = seq(-6, 6, 3), expand = c(0, 0)) +
+  scale_x_continuous(limits = XL, breaks = seq(-6, 6, 3), labels = minus, expand = c(0, 0)) +
+  coord_cartesian(clip = "off") +
   scale_y_continuous(breaks = seq_along(levels(r$cov)), labels = levels(r$cov),
                      limits = c(0.5, length(levels(r$cov)) + 0.5), expand = c(0, 0)) +
   facet_wrap(~ process, nrow = 1) +
   labs(x = "Standardised effect (logit scale)", y = NULL) +
   theme_fig + theme(legend.position = "bottom", legend.text = element_text(face = "italic"),
-                    legend.key.width = unit(4, "mm"), panel.spacing.x = unit(6, "mm"),
+                    legend.key.width = unit(4, "mm"), panel.spacing.x = unit(9, "mm"),
+                    legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(1, "mm"),
                     panel.grid.major.y = element_line(colour = "grey96", linewidth = 0.3))
-save_fig(p3, "Fig3_drivers", 140, 90)
+save_fig(p3, "Fig2_drivers", 140, 82)
 print(r[r$cut_hi | r$cut_lo, c("species", "process", "covariate", "est", "lo", "hi")])
+
+# --- Fig. 3: SPAs judged by occupancy and by dynamics -------------------------
+q <- read.csv(file.path(cd, "spa_psi_check.csv"))
+q <- q[q$check == "psi_spa_t" & q$term %in% c("psi(spa)", "col(spa)", "ext(spa)"), ]
+q$process <- factor(c("psi(spa)" = "A  Initial occupancy", "col(spa)" = "B  Colonisation",
+                      "ext(spa)" = "C  Extinction")[q$term])
+q$sp <- factor(sp_lab[q$species], levels = rev(sp_lab))
+LIM3 <- c(0.05, 100)
+q$lo_c <- pmax(exp(q$lo), LIM3[1]); q$hi_c <- pmin(exp(q$hi), LIM3[2])
+q$alpha <- ifelse(q$species == "ptealc", 0.35, 1)          # not interpreted (SE rule)
+p4 <- ggplot(q, aes(y = sp, colour = species, alpha = alpha)) +
+  # shade the snapshot panel (occupancy) apart from the dynamic ones
+  geom_rect(data = data.frame(process = factor("A  Initial occupancy", levels = levels(q$process))),
+            aes(xmin = 0, xmax = Inf, ymin = -Inf, ymax = Inf), fill = "grey97", inherit.aes = FALSE) +
+  geom_vline(xintercept = c(0.1, 10, 100), colour = "grey92", linewidth = 0.3) +
+  geom_vline(xintercept = 1, linetype = "dashed", colour = "grey55", linewidth = 0.3) +
+  geom_segment(aes(x = lo_c, xend = hi_c, yend = sp), linewidth = 0.7) +
+  geom_segment(data = q[exp(q$hi) > LIM3[2], ], aes(x = LIM3[2] / 1.6, xend = LIM3[2], yend = sp),
+               linewidth = 0.7, arrow = arrow(length = unit(1.6, "mm"), type = "closed")) +
+  geom_point(aes(x = exp(estimate)), size = 2.2) +
+  scale_colour_manual(values = sp_col) + scale_alpha_identity() +
+  scale_x_log10(limits = LIM3, breaks = c(0.1, 1, 10, 100), labels = c("0.1", "1", "10", "100"), expand = c(0, 0)) +
+  coord_cartesian(clip = "off") +
+  facet_wrap(~ process, nrow = 1) +
+  labs(x = "Odds ratio, SPA vs unprotected cell", y = NULL) +
+  theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(5, "mm"))
+save_fig(p4, "Fig3_spa_static_dynamic", 160, 55)
+
+# --- Fig. 4: dynamic versus static prediction of 2023 -------------------------
+v <- read.csv(here("results", "robustness", "temporal_validation_2023.csv"))
+v <- v[v$model %in% c("dynamic", "static_sdm") & v$cells %in% c("all", "detected_2017_2022"), ]
+v$panel <- factor(ifelse(v$cells == "all", "A  All surveyed cells", "B  Cells recorded in 2017\u20132022"))
+v$sp <- factor(sp_lab[v$species], levels = rev(sp_lab))
+v$y <- as.numeric(v$sp) + ifelse(v$model == "dynamic", 0.12, -0.12)
+v$col <- ifelse(v$model == "dynamic", v$species, "sdm")
+p5 <- ggplot(v, aes(y = y, colour = col)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55", linewidth = 0.3) +
+  geom_segment(aes(x = d_lo, xend = d_hi, yend = y), linewidth = 0.6) +
+  geom_point(aes(x = d_loglik_vs_closed, shape = model), size = 2) +
+  scale_colour_manual(values = c(sp_col, sdm = "grey60")) +
+  scale_shape_manual(values = c(dynamic = 16, static_sdm = 1)) +
+  scale_y_continuous(breaks = seq_along(levels(v$sp)), labels = levels(v$sp), limits = c(0.5, 4.5), expand = c(0, 0)) +
+  scale_x_continuous(labels = minus) +
+  facet_wrap(~ panel, nrow = 1, scales = "free_x") +
+  labs(x = "Difference in log-likelihood of 2023 detections", y = NULL) +
+  theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"))
+save_fig(p5, "Fig4_temporal_validation", 140, 55)
 
 sessionInfo()

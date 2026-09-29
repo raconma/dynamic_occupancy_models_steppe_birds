@@ -133,6 +133,8 @@ rate_panel <- function(d, letter, text, xlab, log = FALSE, ref = NULL, naive = T
   if (naive) p <- p + geom_segment(aes(x = naive, xend = med, yend = sp), colour = "grey65",
                                    linetype = "dotted", linewidth = 0.35)
   p <- p + errbar(aes(xmin = lo, xmax = hi)) +
+    # truncated lower limits: "<" at the axis edge, so the cap is not read as a real limit
+    (if (log && any(est$lo_cut)) geom_point(data = est[est$lo_cut, ], aes(x = RL1[1]), shape = "<", size = 2.2) else NULL) +
     geom_point(aes(x = med, shape = "Detection-corrected"), size = 2.4)
   if (nrow(nid) > 0) {
     p <- p + errbar(data = nid, aes(xmin = lo, xmax = hi), colour = "grey75") +
@@ -205,7 +207,6 @@ map_sp <- function(sp, letter) {
     map_coord + map_theme
 }
 m2 <- lapply(seq_along(sp_est), function(i) map_sp(sp_est[i], LETTERS[i]))
-ga_map <- m2[[1]] + theme(legend.position = "none")   # unlabelled copy for the graphical abstract
 # (SPA labels removed: estimates per SPA rest on few cells and are not a ranking)
 leg_map <- cowplot::get_plot_component(
   m2[[1]] + guides(shape = guide_legend(override.aes = list(size = 2.5, colour = "grey30"), order = 1),
@@ -347,34 +348,55 @@ pS2 <- ggplot() +
 save_fig(pS2, "FigS2_atlas_status", 190, 150)
 
 ###############################################################################
-# GRAPHICAL ABSTRACT (numbers as in the abstract). The bird silhouettes of the
+# GRAPHICAL ABSTRACT (numbers as in the abstract; panel 3 from script 51). The bird silhouettes of the
 # GCB conceptual figure were added by hand and are not drawn here.
 ###############################################################################
 
 ga1 <- rate_panel(nv[nv$metric == "ratio" & nv$species %in% sp_est, ], "", "",
-                  "Extinctions per colonisation (log)", log = TRUE, ref = 1, show_y = TRUE,
-                  sp_levels = sp_est) +
-  labs(title = "Four steppe birds,\ndifferent trajectories")
-ga2 <- ga_map + labs(title = "About half of the great bustard\nnet loss is inside SPAs")
-# SPA effects on colonisation and extinction, model with all controls (script 46)
-eff <- read.csv(res("core_spa", "spa_full_model.csv"))
-eff <- eff[eff$term %in% c("col(spa)", "ext(spa)") & eff$species %in% sp_est, ]
-eff$sp <- factor(sp_short[eff$species], levels = rev(sp_short[sp_est]))
-eff$process <- factor(ifelse(eff$term == "col(spa)", "Colonisation", "Extinction"),
-                      levels = c("Colonisation", "Extinction"))
-ga3 <- ggplot(eff, aes(y = sp, colour = sp, shape = process)) +
-  geom_vline(xintercept = 1, linetype = "dashed", colour = "grey50", linewidth = 0.3) +
-  geom_errorbar(aes(xmin = exp(lo), xmax = pmin(exp(hi), 200)), width = 0.2, linewidth = 0.4,
-                orientation = "y", position = position_dodge(width = 0.55)) +
-  geom_point(aes(x = exp(estimate)), size = 2.2, position = position_dodge(width = 0.55)) +
-  scale_x_log10(limits = c(0.1, 200), breaks = c(0.1, 1, 10, 100), labels = c("0.1", "1", "10", "100")) +
+                  "Extinctions per colonisation", log = TRUE, ref = 1, naive = FALSE,
+                  show_y = TRUE, sp_levels = sp_est) +
+  labs(title = NULL)
+# four small maps (as Fig. 1), species name only, smaller symbols
+ga2 <- cowplot::plot_grid(plotlist = lapply(seq_along(sp_est), function(i)
+  suppressMessages(m2[[i]] + scale_size_area(max_size = 2.2, limits = c(0, 1.1)) +
+    labs(title = sp_short[sp_est[i]]) +
+    theme(legend.position = "none", plot.title = element_text(size = 6.5, face = "italic", hjust = 0.5,
+                                                               margin = margin(b = 1)),
+          plot.margin = margin(1, 1, 1, 1)))), nrow = 2)
+# compact key for the maps: loss, gain, SPA, II Atlas range
+key_df <- data.frame(k = factor(c("Loss", "Gain", "SPA", "II Atlas range"),
+                                levels = c("Loss", "Gain", "SPA", "II Atlas range")), x = 1:4, y = 1)
+ga_key <- cowplot::get_plot_component(
+  ggplot(key_df, aes(x, y, shape = k)) + geom_point() +
+    scale_shape_manual(values = c(Loss = 16, Gain = 1, SPA = 22, `II Atlas range` = 22), name = NULL) +
+    guides(shape = guide_legend(nrow = 1, override.aes = list(
+      size = c(2.2, 2.2, 3, 3), colour = c("grey30", "grey30", col_spa_line, "grey90"),
+      fill = c(NA, NA, col_spa_fill, "grey90"), stroke = c(0.7, 0.7, 0.3, 0.3)))) +
+    theme_void() + theme(legend.position = "bottom", legend.text = element_text(size = 6.5),
+                         legend.key.width = unit(3, "mm"), legend.spacing.x = unit(1, "mm")),
+  "guide-box-bottom", return_all = TRUE)
+ga2 <- cowplot::plot_grid(ga2, ga_key, ncol = 1, rel_heights = c(1, 0.08))
+# dynamic versus static prediction of the 2023 detections (script 51)
+tv <- read.csv(res("robustness", "temporal_validation_2023.csv"))
+tv <- tv[tv$model == "dynamic" & tv$cells == "all" & tv$species %in% sp_est, ]
+tv$sp <- factor(sp_short[tv$species], levels = rev(sp_short[sp_est]))
+ga3 <- ggplot(tv, aes(y = sp, colour = sp)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50", linewidth = 0.3) +
+  geom_errorbar(aes(xmin = d_lo, xmax = d_hi), width = 0, linewidth = 0.4, orientation = "y") +
+  geom_point(aes(x = d_loglik_vs_closed), size = 2.2) +
   scale_colour_manual(values = sp_col_lab, guide = "none") +
-  scale_shape_manual(values = c(Colonisation = 16, Extinction = 1), name = NULL) +
-  labs(x = "Odds ratio, inside vs outside SPAs (log)", y = NULL,
-       title = "SPAs: more colonisation,\nno less extinction") +
-  theme_gcb + italic_y + theme(legend.position = "bottom")
-ga <- cowplot::plot_grid(ga1, ga2, ga3, nrow = 1, rel_widths = c(1, 1.05, 1))
-save_fig(ga, "Graphical_abstract", 200, 80)
+  labs(x = "Gain in 2023 log-likelihood", y = NULL, title = NULL) +
+  theme_gcb + italic_y
+# titles in a separate row so that they align across panels of different aspect
+al <- cowplot::align_plots(ga1, ga3, align = "h", axis = "tb")
+ga_title <- function(t) cowplot::ggdraw() + cowplot::draw_label(t, x = 0.02, hjust = 0, size = 8.5)
+ga <- cowplot::plot_grid(
+  cowplot::plot_grid(ga_title("Four trajectories"),
+                     ga_title("Where cells are lost and gained"),
+                     ga_title("Dynamic vs fixed-state, 2023"), nrow = 1, rel_widths = c(1, 1.15, 1)),
+  cowplot::plot_grid(al[[1]], ga2, al[[2]], nrow = 1, rel_widths = c(1, 1.15, 1)),
+  ncol = 1, rel_heights = c(0.09, 1))
+save_fig(ga, "Graphical_abstract", 150, 60)   # legible at the 13 x 5 cm display size
 
 print(list.files(out_dir))
 sessionInfo()
