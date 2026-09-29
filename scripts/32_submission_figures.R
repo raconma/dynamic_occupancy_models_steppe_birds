@@ -195,13 +195,12 @@ map_sp <- function(sp, letter) {
     geom_sf(data = spain_main, fill = "white", colour = "grey45", linewidth = 0.2) +
     geom_sf(data = atlas_range(sp), fill = "grey90", colour = NA) +
     geom_sf(data = spa_union, fill = col_spa_fill, colour = col_spa_line, linewidth = 0.08) +
-    geom_point(data = small, aes(x, y), shape = 21, size = 0.6, fill = "white", colour = "grey45",
-               stroke = 0.2) +
+    geom_point(data = small, aes(x, y), shape = 16, size = 0.35, colour = "grey55") +
     geom_point(data = big, aes(x, y, size = abs_net, shape = dir), colour = sp_col[sp],
-               stroke = 0.7) +
+               stroke = 0.7, alpha = 0.85) +
     scale_shape_manual(values = c(Loss = 16, Gain = 1), drop = FALSE, name = NULL) +
-    scale_size_area(max_size = 4, limits = c(0, 1.1), breaks = c(0.25, 0.5, 1),
-                    name = "Absolute net change (cells)") +
+    scale_size_area(max_size = 4.5, limits = c(0, 1.1), breaks = c(0.25, 0.5, 1),
+                    name = "Net change (cells)") +
     labs(title = bquote(bold(.(letter)) ~~ italic(.(unname(sp_short[sp]))))) +
     map_coord + map_theme
 }
@@ -210,7 +209,8 @@ ga_map <- m2[[1]] + theme(legend.position = "none")   # unlabelled copy for the 
 # (SPA labels removed: estimates per SPA rest on few cells and are not a ranking)
 leg_map <- cowplot::get_plot_component(
   m2[[1]] + guides(shape = guide_legend(override.aes = list(size = 2.5, colour = "grey30"), order = 1),
-                   size = guide_legend(override.aes = list(colour = "grey30"), order = 2)),
+                   size = guide_legend(override.aes = list(colour = "grey30"), order = 2)) +
+    theme(legend.title = element_text(size = 7.5), legend.text = element_text(size = 7.5)),
   "guide-box-bottom")
 m2 <- lapply(m2, function(p) p + theme(legend.position = "none"))
 
@@ -236,11 +236,12 @@ p2d <- ggplot(part, aes(y = lab, colour = sp, group = sp)) +
   theme_gcb +
   theme(strip.text.y = element_blank(), legend.text = element_text(face = "italic", margin = margin(r = 8)),
         panel.spacing.y = unit(2, "mm"), legend.margin = margin(0, 0, 0, 0))
+# main-text map figure: four species, no partition panel (class-level net
+# changes, with parameter-only intervals, are in Table S6)
 fig2 <- cowplot::plot_grid(
-  cowplot::plot_grid(m2[[1]], m2[[2]], m2[[3]], nrow = 1),
-  cowplot::plot_grid(m2[[4]], p2d, nrow = 1, rel_widths = c(1, 2)),
-  leg_map, ncol = 1, rel_heights = c(1, 1.15, 0.08))
-save_fig(fig2, "Fig2_net_change_maps", 190, 150)
+  cowplot::plot_grid(m2[[1]], m2[[2]], m2[[3]], m2[[4]], nrow = 2),
+  leg_map, ncol = 1, rel_heights = c(1, 0.07))
+save_fig(fig2, "Fig2_net_change_maps", 170, 165)
 
 ###############################################################################
 # FIG. 3: habitat and SPA contrasts
