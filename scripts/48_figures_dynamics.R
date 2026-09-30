@@ -183,22 +183,4 @@ p5 <- ggplot(v, aes(y = y, colour = col)) +
   theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"))
 save_fig(p5, "Fig4_temporal_validation", 140, 55)
 
-# --- Fig. 3 (8,000-word version): snapshot vs dynamics in one figure ----------
-# SPA odds ratios (A-C) above the temporal validation (D-E)
-v2 <- v
-v2$panel <- factor(sub("^B", "E", sub("^A", "D", as.character(v2$panel))),
-                   levels = sub("^B", "E", sub("^A", "D", levels(v$panel))))
-p5b <- p5 %+% v2
-key3 <- cowplot::get_plot_component(
-  ggplot(data.frame(m = factor(c("Dynamic model", "Static habitat model"),
-                               levels = c("Dynamic model", "Static habitat model")), x = 1:2),
-         aes(x, x, shape = m, colour = m)) + geom_point(size = 2) +
-    scale_shape_manual(values = c(16, 1), name = NULL) +
-    scale_colour_manual(values = c("grey20", "grey60"), name = NULL) +
-    theme_void() + theme(legend.text = element_text(size = 7), legend.key.height = unit(4, "mm")),
-  "guide-box-right", return_all = TRUE)
-comb <- cowplot::plot_grid(p4, cowplot::plot_grid(p5b, key3, nrow = 1, rel_widths = c(0.78, 0.22)),
-                           ncol = 1, rel_heights = c(1, 1))
-save_fig(comb, "Fig3_static_vs_dynamic", 160, 112)
-
 sessionInfo()
