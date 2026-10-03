@@ -24,8 +24,8 @@
 # 2023 visit covariates. Scores over surveyed cells: held-out log-likelihood
 # of the 2023 detection histories (sum), AUC and Brier score of the
 # probability of at least one detection in 2023. Differences in
-# log-likelihood from static_closed get 95 % intervals by resampling 50 km
-# blocks of cells (1,000 draws). Also reported by cells detected and not
+# log-likelihood from static_closed, and from static_sdm, get 95 % intervals by
+# resampling 50 km blocks of cells (1,000 draws). Also reported by cells detected and not
 # detected in 2017-2022.
 # Caveat: the formulas were selected on 2017-2023 (script 41), so 2023 is not
 # fully independent of model selection; the psi and detection formulas are
@@ -141,13 +141,15 @@ for (sp in species) {
     by_blk <- split(which(keep), blk[keep])
     boot_idx <- replicate(N_BOOT, unlist(by_blk[sample(length(by_blk), replace = TRUE)]), simplify = FALSE)
     for (m in names(psi)) {
-      s <- score[[m]]; s0 <- score$static_closed
-      d_ll <- s$ll - s0$ll
+      s <- score[[m]]; s0 <- score$static_closed; s1 <- score$static_sdm
+      d_ll <- s$ll - s0$ll; d_sdm <- s$ll - s1$ll
       boot <- sapply(boot_idx, function(i) sum(d_ll[i]))
+      boot_sdm <- sapply(boot_idx, function(i) sum(d_sdm[i]))
       rows[[paste(sp, grp, m)]] <- data.frame(
         species = sp, cells = grp, model = m, n_surveyed = sum(keep), n_detected_2023 = sum(obs_det[keep]),
         loglik = sum(s$ll[keep]), d_loglik_vs_closed = sum(d_ll[keep]),
         d_lo = quantile(boot, 0.025), d_hi = quantile(boot, 0.975),
+        d_loglik_vs_sdm = sum(d_sdm[keep]), d_sdm_lo = quantile(boot_sdm, 0.025), d_sdm_hi = quantile(boot_sdm, 0.975),
         auc = auc(s$pdet[keep], obs_det[keep]), brier = mean((s$pdet[keep] - obs_det[keep])^2),
         mean_psi_2023 = mean(psi[[m]][keep]),
         converged = fits[[m]]@opt$convergence == 0, row.names = NULL)
