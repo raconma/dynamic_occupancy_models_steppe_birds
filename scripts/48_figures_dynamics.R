@@ -2,13 +2,13 @@
 # 48_figures_dynamics.R
 #
 # Figures of the dynamic results:
-#   Fig. 2  Covariates of colonisation and extinction in the primary models
+#   Fig. S5 Covariates of colonisation and extinction in the primary models
 #           (script 41): standardised logit-scale coefficients with 95 % Wald
 #           intervals; intervals beyond the axis are truncated (arrows).
 #   Fig. 3  SPAs judged by occupancy and by dynamics: odds ratios (cell fully
 #           inside vs fully outside SPAs) for initial occupancy, colonisation
 #           and extinction in the fixed SPA model (script 49, psi_spa_t).
-#   Fig. 4  Dynamic versus static prediction of the 2023 detections (script
+#   Fig. 2  Dynamic versus static prediction of the 2023 detections (script
 #           51): difference in held-out log-likelihood from the static
 #           closed model, all surveyed cells and cells recorded in 2017-2022.
 #   Fig. S4 SPA effects on colonisation and extinction in models without SPA
@@ -21,8 +21,8 @@
 #          results/robustness/temporal_validation_2023.csv;
 #          results/{sp}_model_object.rds
 # Outputs: results/manuscript_figures/submission/
-#          Fig2_drivers, Fig3_spa_static_dynamic, Fig4_temporal_validation,
-#          FigS4_spa_controls (.png, .pdf, .tif)
+#          Fig2_temporal_validation, Fig3_spa_static_dynamic, FigS4_spa_controls,
+#          FigS5_drivers (.png, .pdf, .tif)
 ###############################################################################
 
 library(here)
@@ -87,7 +87,7 @@ p2 <- ggplot() +
   theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"))
 save_fig(p2, "FigS4_spa_controls", 140, 70)
 
-# --- Fig. 2: covariates of colonisation and extinction -----------------------
+# --- Fig. S5: covariates of colonisation and extinction ----------------------
 lab <- c(pseudo_steppe = "Pseudo-steppe", Land_Cover_Type_1_Percent_Class_12 = "Cropland",
          Land_Cover_Type_1_Percent_Class_7 = "Open shrubland", grass_cover = "Herbaceous cover",
          tree_cover = "Tree cover", bio1 = "Mean temperature", bio2 = "Diurnal temperature range",
@@ -122,6 +122,9 @@ p3 <- ggplot(r, aes(y = y, colour = sp)) +
   geom_segment(data = r[r$cut_lo, ], aes(x = XL[1] + 0.6, xend = XL[1], yend = y), linewidth = 0.5,
                arrow = arrow(length = unit(1.4, "mm"), type = "closed"), show.legend = FALSE) +
   geom_point(data = r[abs(r$est) <= XL[2], ], aes(x = est), size = 1.8) +
+  # estimates beyond the axis: pale marker at the edge, not interpreted (cf. Fig. 3)
+  geom_point(data = r[abs(r$est) > XL[2], ], aes(x = sign(est) * (XL[2] - 0.25)), size = 1.8, alpha = 0.35,
+             show.legend = FALSE) +
   scale_colour_manual(values = sp_col, labels = sp_lab, breaks = species, name = NULL) +
   scale_x_continuous(limits = XL, breaks = seq(-6, 6, 3), labels = minus, expand = c(0, 0)) +
   coord_cartesian(clip = "off") +
@@ -133,7 +136,7 @@ p3 <- ggplot(r, aes(y = y, colour = sp)) +
                     legend.key.width = unit(4, "mm"), panel.spacing.x = unit(9, "mm"),
                     legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(1, "mm"),
                     panel.grid.major.y = element_line(colour = "grey96", linewidth = 0.3))
-save_fig(p3, "Fig2_drivers", 140, 82)
+save_fig(p3, "FigS5_drivers", 140, 82)
 print(r[r$cut_hi | r$cut_lo, c("species", "process", "covariate", "est", "lo", "hi")])
 
 # --- Fig. 3: SPAs judged by occupancy and by dynamics -------------------------
@@ -155,6 +158,9 @@ p4 <- ggplot(q, aes(y = sp, colour = species, alpha = alpha)) +
   geom_segment(data = q[exp(q$hi) > LIM3[2], ], aes(x = LIM3[2] / 1.6, xend = LIM3[2], yend = sp),
                linewidth = 0.7, arrow = arrow(length = unit(1.6, "mm"), type = "closed")) +
   geom_point(aes(x = exp(estimate)), size = 2.2) +
+  geom_text(data = data.frame(process = factor("C  Extinction", levels = levels(q$process)), x = 0.055, y = 0.62,
+                              lab = "\u2190 lower extinction inside SPAs"),
+            aes(x = x, y = y, label = lab), hjust = 0, size = 2.3, colour = "grey40", inherit.aes = FALSE) +
   scale_colour_manual(values = sp_col) + scale_alpha_identity() +
   scale_x_log10(limits = LIM3, breaks = c(0.1, 1, 10, 100), labels = c("0.1", "1", "10", "100"), expand = c(0, 0)) +
   coord_cartesian(clip = "off") +
@@ -163,24 +169,35 @@ p4 <- ggplot(q, aes(y = sp, colour = species, alpha = alpha)) +
   theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(5, "mm"))
 save_fig(p4, "Fig3_spa_static_dynamic", 160, 55)
 
-# --- Fig. 4: dynamic versus static prediction of 2023 -------------------------
+# --- Fig. 2: dynamic versus static prediction of 2023 -------------------------
+# gain of the dynamic model over the two static references: a persistence map
+# (fixed-state model, filled) and a habitat-only model (open)
 v <- read.csv(here("results", "robustness", "temporal_validation_2023.csv"))
-v <- v[v$model %in% c("dynamic", "static_sdm") & v$cells %in% c("all", "detected_2017_2022"), ]
-v$panel <- factor(ifelse(v$cells == "all", "A  All surveyed cells", "B  Cells recorded in 2017\u20132022"))
+v <- v[v$model == "dynamic" & v$cells %in% c("all", "detected_2017_2022"), ]
+v <- rbind(transform(v, ref = "Persistence map", est = d_loglik_vs_closed, lo = d_lo, hi = d_hi),
+           transform(v, ref = "Habitat-only model", est = d_loglik_vs_sdm, lo = d_sdm_lo, hi = d_sdm_hi))
+v$ref <- factor(v$ref, levels = c("Persistence map", "Habitat-only model"))
+ann4 <- data.frame(panel = factor("A  All surveyed cells", levels = c("A  All surveyed cells", "B  Cells with records in 2017\u20132022")),
+                   x = 128, y = 0.62, lab = "dynamic model better \u2192")
+v$panel <- factor(ifelse(v$cells == "all", "A  All surveyed cells", "B  Cells with records in 2017\u20132022"))
 v$sp <- factor(sp_lab[v$species], levels = rev(sp_lab))
-v$y <- as.numeric(v$sp) + ifelse(v$model == "dynamic", 0.12, -0.12)
-v$col <- ifelse(v$model == "dynamic", v$species, "sdm")
-p5 <- ggplot(v, aes(y = y, colour = col)) +
+v$y <- as.numeric(v$sp) + ifelse(v$ref == "Persistence map", 0.14, -0.14)
+p5 <- ggplot(v, aes(y = y, colour = species)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55", linewidth = 0.3) +
-  geom_segment(aes(x = d_lo, xend = d_hi, yend = y), linewidth = 0.6) +
-  geom_point(aes(x = d_loglik_vs_closed, shape = model), size = 2) +
-  scale_colour_manual(values = c(sp_col, sdm = "grey60")) +
-  scale_shape_manual(values = c(dynamic = 16, static_sdm = 1)) +
+  geom_segment(aes(x = lo, xend = hi, yend = y, linetype = ref), linewidth = 0.6) +
+  geom_point(aes(x = est, shape = ref, fill = after_scale(ifelse(shape == 21, "white", colour))), size = 2.1, stroke = 0.7) +
+  scale_colour_manual(values = sp_col, guide = "none") +
+  geom_text(data = ann4, aes(x = x, y = y, label = lab), hjust = 1, size = 2.3, colour = "grey40", inherit.aes = FALSE) +
+  scale_shape_manual(values = c(`Persistence map` = 16, `Habitat-only model` = 21), name = "Static reference") +
+  scale_linetype_manual(values = c(`Persistence map` = "solid", `Habitat-only model` = "22"), name = "Static reference") +
   scale_y_continuous(breaks = seq_along(levels(v$sp)), labels = levels(v$sp), limits = c(0.5, 4.5), expand = c(0, 0)) +
-  scale_x_continuous(labels = minus) +
-  facet_wrap(~ panel, nrow = 1, scales = "free_x") +
-  labs(x = "Difference in log-likelihood of 2023 detections", y = NULL) +
-  theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"))
-save_fig(p5, "Fig4_temporal_validation", 140, 55)
+  scale_x_continuous(limits = c(-20, 130), breaks = seq(0, 120, 40), labels = minus) +
+  facet_wrap(~ panel, nrow = 1) +
+  labs(x = "Log-likelihood of the 2023 detections, dynamic minus static model", y = NULL) +
+  theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"),
+                    legend.position = "bottom", legend.key.width = unit(8, "mm"), legend.margin = margin(0, 0, 0, 0),
+                    legend.box.spacing = unit(1, "mm")) +
+  guides(shape = guide_legend(override.aes = list(colour = "grey30", fill = c("grey30", "white"))))
+save_fig(p5, "Fig2_temporal_validation", 140, 62)
 
 sessionInfo()

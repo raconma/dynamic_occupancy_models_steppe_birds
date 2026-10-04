@@ -121,11 +121,11 @@ nv$lo[use_blk] <- nv$blk_lo[use_blk]; nv$hi[use_blk] <- nv$blk_hi[use_blk]
 nv$ni <- nv$point_only & nv$metric %in% c("eps", "gamma", "ratio")
 net <- nv[nv$metric == "net", ]        # same draws and block resamples as panel C
 net$ni <- FALSE
-RL1 <- c(0.3, 6)                                   # x limits of the ratio panel
+RL1 <- c(0.2, 8)                                   # x limits of the ratio panel
 
 rate_panel <- function(d, letter, text, xlab, log = FALSE, ref = NULL, naive = TRUE, show_y = FALSE,
                        ni_label = NULL, sp_levels = sp_all) {
-  if (log) d <- transform(d, lo_cut = lo < RL1[1], lo = pmax(lo, RL1[1]), hi = pmin(hi, RL1[2]))
+  if (log) d <- transform(d, lo_cut = lo < RL1[1], hi_cut = hi > RL1[2], lo = pmax(lo, RL1[1]), hi = pmin(hi, RL1[2]))
   est <- d[!d$ni, ]; nid <- d[d$ni, ]
   p <- ggplot(est, aes(y = sp, colour = sp))
   if (!is.null(ref)) p <- p + geom_vline(xintercept = ref, colour = "grey50", linetype = "dashed",
@@ -135,6 +135,7 @@ rate_panel <- function(d, letter, text, xlab, log = FALSE, ref = NULL, naive = T
   p <- p + errbar(aes(xmin = lo, xmax = hi)) +
     # truncated lower limits: "<" at the axis edge, so the cap is not read as a real limit
     (if (log && any(est$lo_cut)) geom_point(data = est[est$lo_cut, ], aes(x = RL1[1]), shape = "<", size = 2.2) else NULL) +
+    (if (log && any(est$hi_cut)) geom_point(data = est[est$hi_cut, ], aes(x = RL1[2]), shape = ">", size = 2.2) else NULL) +
     geom_point(aes(x = med, shape = "Detection-corrected"), size = 2.4)
   if (nrow(nid) > 0) {
     p <- p + errbar(data = nid, aes(xmin = lo, xmax = hi), colour = "grey75") +
@@ -153,7 +154,7 @@ rate_panel <- function(d, letter, text, xlab, log = FALSE, ref = NULL, naive = T
     scale_y_discrete(limits = rev(unname(sp_short[sp_levels]))) +
     labs(x = xlab, y = NULL, title = ptitle(letter, text)) + theme_gcb + italic_y +
     theme(legend.position = "none")
-  if (log) p <- p + scale_x_log10(limits = RL1, breaks = c(0.5, 1, 2, 4))
+  if (log) p <- p + scale_x_log10(limits = RL1, breaks = c(0.25, 0.5, 1, 2, 4, 8), labels = c("0.25", "0.5", "1", "2", "4", "8"))
   if (!show_y) p <- p + theme(axis.text.y = element_blank())
   p
 }
@@ -214,6 +215,17 @@ leg_map <- cowplot::get_plot_component(
     theme(legend.title = element_text(size = 7.5), legend.text = element_text(size = 7.5)),
   "guide-box-bottom")
 m2 <- lapply(m2, function(p) p + theme(legend.position = "none"))
+# key for the background layers of the maps (SPA, II Atlas range), reused in the graphical abstract
+bg_key <- function(size_txt = 7.5) cowplot::get_plot_component(
+  ggplot(data.frame(k = factor(c("SPA", "II Atlas range"), levels = c("SPA", "II Atlas range")), x = 1:2, y = 1),
+         aes(x, y, shape = k)) + geom_point() +
+    scale_shape_manual(values = c(SPA = 22, `II Atlas range` = 22), name = NULL) +
+    guides(shape = guide_legend(nrow = 1, override.aes = list(
+      size = c(3, 3), colour = c(col_spa_line, "grey90"), fill = c(col_spa_fill, "grey90"), stroke = c(0.3, 0.3)))) +
+    theme_void() + theme(legend.position = "bottom", legend.text = element_text(size = size_txt),
+                         legend.key.width = unit(3, "mm"), legend.spacing.x = unit(1, "mm")),
+  "guide-box-bottom", return_all = TRUE)
+leg_map <- cowplot::plot_grid(leg_map, bg_key(), nrow = 1, rel_widths = c(1, 0.45))
 
 cls <- c(det_all = "All recorded cells", spa_in = "SPA cells", spa_out = "Unprotected cells",
          core_strict0.5 = "Core (≥ 50 %)", rest_strict0.5 = "Marginal (< 50 %)",
@@ -378,22 +390,23 @@ ga_key <- cowplot::get_plot_component(
 ga2 <- cowplot::plot_grid(ga2, ga_key, ncol = 1, rel_heights = c(1, 0.08))
 # dynamic versus static prediction of the 2023 detections (script 51)
 tv <- read.csv(res("robustness", "temporal_validation_2023.csv"))
-tv <- tv[tv$model == "dynamic" & tv$cells == "all" & tv$species %in% sp_est, ]
+tv <- tv[tv$model == "dynamic" & tv$cells == "detected_2017_2022" & tv$species %in% sp_est, ]
 tv$sp <- factor(sp_short[tv$species], levels = rev(sp_short[sp_est]))
 ga3 <- ggplot(tv, aes(y = sp, colour = sp)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50", linewidth = 0.3) +
   geom_errorbar(aes(xmin = d_lo, xmax = d_hi), width = 0, linewidth = 0.4, orientation = "y") +
   geom_point(aes(x = d_loglik_vs_closed), size = 2.2) +
   scale_colour_manual(values = sp_col_lab, guide = "none") +
-  labs(x = "Gain in 2023 log-likelihood", y = NULL, title = NULL) +
+  labs(x = "Gain over a persistence\nmap (cells with records)", y = NULL, title = NULL) +
+  theme(plot.margin = margin(4, 10, 4, 4)) +
   theme_gcb + italic_y
 # titles in a separate row so that they align across panels of different aspect
 al <- cowplot::align_plots(ga1, ga3, align = "h", axis = "tb")
-ga_title <- function(t) cowplot::ggdraw() + cowplot::draw_label(t, x = 0.02, hjust = 0, size = 8.5)
+ga_title <- function(t) cowplot::ggdraw() + cowplot::draw_label(t, x = 0.02, hjust = 0, size = 7.5)
 ga <- cowplot::plot_grid(
-  cowplot::plot_grid(ga_title("Four trajectories"),
-                     ga_title("Where cells are lost and gained"),
-                     ga_title("Dynamic vs fixed-state, 2023"), nrow = 1, rel_widths = c(1, 1.15, 1)),
+  cowplot::plot_grid(ga_title("Great bustards are losing cells"),
+                     ga_title("Losses and gains a snapshot hides"),
+                     ga_title("Where a persistence map fails"), nrow = 1, rel_widths = c(1, 1.15, 1)),
   cowplot::plot_grid(al[[1]], ga2, al[[2]], nrow = 1, rel_widths = c(1, 1.15, 1)),
   ncol = 1, rel_heights = c(0.09, 1))
 save_fig(ga, "Graphical_abstract", 150, 60)   # legible at the 13 x 5 cm display size
