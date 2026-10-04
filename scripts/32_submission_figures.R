@@ -93,6 +93,7 @@ map_theme <- theme_void(base_size = 8) +
         strip.text = element_text(face = "italic", size = 8.5, margin = margin(2, 0, 2, 0)),
         plot.background = element_rect(fill = "white", colour = NA))
 col_spa_fill <- "#DDEBDD"; col_spa_line <- "#7FA67F"
+col_range <- "#E6DCC3"                              # II Atlas range on the net-change maps
 
 atlas2 <- load_atlas2()
 atlas_col <- c(otitar = "OTITAR", ptealc = "PTEALC", pteori = "PTEORI", tettet = "TETTET")
@@ -196,8 +197,7 @@ map_sp <- function(sp, letter) {
   big <- big[order(-big$abs_net), ]
   ggplot() +
     geom_sf(data = spain_main, fill = "white", colour = "grey45", linewidth = 0.2) +
-    geom_sf(data = atlas_range(sp), fill = "grey90", colour = NA) +
-    geom_sf(data = spa_union, fill = col_spa_fill, colour = col_spa_line, linewidth = 0.08) +
+    geom_sf(data = atlas_range(sp), fill = col_range, colour = NA) +
     geom_point(data = small, aes(x, y), shape = 16, size = 0.35, colour = "grey55") +
     geom_point(data = big, aes(x, y, size = abs_net, shape = dir), colour = sp_col[sp],
                stroke = 0.7, alpha = 0.85) +
@@ -217,15 +217,15 @@ leg_map <- cowplot::get_plot_component(
 m2 <- lapply(m2, function(p) p + theme(legend.position = "none"))
 # key for the background layers of the maps (SPA, II Atlas range), reused in the graphical abstract
 bg_key <- function(size_txt = 7.5) cowplot::get_plot_component(
-  ggplot(data.frame(k = factor(c("SPA", "II Atlas range"), levels = c("SPA", "II Atlas range")), x = 1:2, y = 1),
+  ggplot(data.frame(k = factor("II Atlas range"), x = 1, y = 1),
          aes(x, y, shape = k)) + geom_point() +
-    scale_shape_manual(values = c(SPA = 22, `II Atlas range` = 22), name = NULL) +
+    scale_shape_manual(values = c(`II Atlas range` = 22), name = NULL) +
     guides(shape = guide_legend(nrow = 1, override.aes = list(
-      size = c(3, 3), colour = c(col_spa_line, "grey90"), fill = c(col_spa_fill, "grey90"), stroke = c(0.3, 0.3)))) +
+      size = 3, colour = col_range, fill = col_range, stroke = 0.3))) +
     theme_void() + theme(legend.position = "bottom", legend.text = element_text(size = size_txt),
                          legend.key.width = unit(3, "mm"), legend.spacing.x = unit(1, "mm")),
   "guide-box-bottom", return_all = TRUE)
-leg_map <- cowplot::plot_grid(leg_map, bg_key(), nrow = 1, rel_widths = c(1, 0.45))
+leg_map <- cowplot::plot_grid(leg_map, bg_key(), nrow = 1, rel_widths = c(1, 0.3))
 
 cls <- c(det_all = "All recorded cells", spa_in = "SPA cells", spa_out = "Unprotected cells",
          core_strict0.5 = "Core (≥ 50 %)", rest_strict0.5 = "Marginal (< 50 %)",
@@ -376,14 +376,14 @@ ga2 <- cowplot::plot_grid(plotlist = lapply(seq_along(sp_est), function(i)
                                                                margin = margin(b = 1)),
           plot.margin = margin(1, 1, 1, 1)))), nrow = 2)
 # compact key for the maps: loss, gain, SPA, II Atlas range
-key_df <- data.frame(k = factor(c("Loss", "Gain", "SPA", "II Atlas range"),
-                                levels = c("Loss", "Gain", "SPA", "II Atlas range")), x = 1:4, y = 1)
+key_df <- data.frame(k = factor(c("Loss", "Gain", "II Atlas range"),
+                                levels = c("Loss", "Gain", "II Atlas range")), x = 1:3, y = 1)
 ga_key <- cowplot::get_plot_component(
   ggplot(key_df, aes(x, y, shape = k)) + geom_point() +
-    scale_shape_manual(values = c(Loss = 16, Gain = 1, SPA = 22, `II Atlas range` = 22), name = NULL) +
+    scale_shape_manual(values = c(Loss = 16, Gain = 1, `II Atlas range` = 22), name = NULL) +
     guides(shape = guide_legend(nrow = 1, override.aes = list(
-      size = c(2.2, 2.2, 3, 3), colour = c("grey30", "grey30", col_spa_line, "grey90"),
-      fill = c(NA, NA, col_spa_fill, "grey90"), stroke = c(0.7, 0.7, 0.3, 0.3)))) +
+      size = c(2.2, 2.2, 3), colour = c("grey30", "grey30", col_range),
+      fill = c(NA, NA, col_range), stroke = c(0.7, 0.7, 0.3)))) +
     theme_void() + theme(legend.position = "bottom", legend.text = element_text(size = 6.5),
                          legend.key.width = unit(3, "mm"), legend.spacing.x = unit(1, "mm")),
   "guide-box-bottom", return_all = TRUE)
