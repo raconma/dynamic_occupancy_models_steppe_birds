@@ -2,10 +2,11 @@
 # 48_figures_dynamics.R
 #
 # Figures of the dynamic results:
-#   Fig. S5 Covariates of colonisation and extinction in the primary models
-#           (script 41): standardised logit-scale coefficients with 95 % Wald
-#           intervals; intervals beyond the axis are truncated (arrows).
-#   Fig. 3  SPAs judged by occupancy and by dynamics: odds ratios (cell fully
+#   Fig. 3  Covariates of initial occupancy, colonisation and extinction in
+#           the primary models (script 41): standardised logit-scale
+#           coefficients with 95 % Wald intervals; intervals beyond the axis
+#           are truncated (arrows), estimates beyond it drawn pale at the edge.
+#   Fig. 4  SPAs judged by occupancy and by dynamics: odds ratios (cell fully
 #           inside vs fully outside SPAs) for initial occupancy, colonisation
 #           and extinction in the fixed SPA model (script 49, psi_spa_t).
 #   Fig. 2  Dynamic versus static prediction of the 2023 detections (script
@@ -21,8 +22,8 @@
 #          results/robustness/temporal_validation_2023.csv;
 #          results/{sp}_model_object.rds
 # Outputs: results/manuscript_figures/submission/
-#          Fig2_temporal_validation, Fig3_spa_static_dynamic, FigS4_spa_controls,
-#          FigS5_drivers (.png, .pdf, .tif)
+#          Fig2_temporal_validation, Fig3_responses, Fig4_spa_static_dynamic,
+#          FigS4_spa_controls (.png, .pdf, .tif)
 ###############################################################################
 
 library(here)
@@ -87,7 +88,7 @@ p2 <- ggplot() +
   theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"))
 save_fig(p2, "FigS4_spa_controls", 140, 70)
 
-# --- Fig. S5: covariates of colonisation and extinction ----------------------
+# --- Fig. 3: covariates of initial occupancy, colonisation and extinction ----
 lab <- c(pseudo_steppe = "Pseudo-steppe", Land_Cover_Type_1_Percent_Class_12 = "Cropland",
          Land_Cover_Type_1_Percent_Class_7 = "Open shrubland", grass_cover = "Herbaceous cover",
          tree_cover = "Tree cover", bio1 = "Mean temperature", bio2 = "Diurnal temperature range",
@@ -96,23 +97,22 @@ rows <- list()
 for (sp in species) {
   m <- readRDS(here("results", paste0(sp, "_model_object.rds")))
   cf <- coef(m); se <- sqrt(diag(vcov(m)))
-  i <- grepl("^(col|ext)[(]", names(cf)) & !grepl("Int", names(cf))
-  rows[[sp]] <- data.frame(species = sp, process = substr(names(cf)[i], 1, 3),
+  i <- grepl("^(psi|col|ext)[(]", names(cf)) & !grepl("Int", names(cf))
+  rows[[sp]] <- data.frame(species = sp, process = sub("[(].*", "", names(cf)[i]),
                            covariate = sub("^[a-z]+[(](.*)[)]$", "\\1", names(cf)[i]),
                            est = cf[i], lo = cf[i] - 1.96 * se[i], hi = cf[i] + 1.96 * se[i])
 }
 r <- do.call(rbind, rows)
-r$process <- factor(ifelse(r$process == "col", "A  Colonisation", "B  Extinction"))
+r$proc <- factor(c(psi = "A  Initial occupancy", col = "B  Colonisation", ext = "C  Extinction")[r$process])
 r$cov <- factor(lab[r$covariate], levels = rev(lab))
 r$sp <- factor(r$species, levels = species)
-XL <- c(-6, 6)
-r$lo_c <- pmax(r$lo, XL[1]); r$hi_c <- pmin(r$hi, XL[2]); r$est_c <- pmin(pmax(r$est, XL[1]), XL[2])
+XL <- c(-7, 7)
+r$lo_c <- pmax(r$lo, XL[1]); r$hi_c <- pmin(r$hi, XL[2]); r$beyond <- abs(r$est) > XL[2]
 r$cut_hi <- r$hi > XL[2]; r$cut_lo <- r$lo < XL[1]
-# manual vertical offsets: species present in a row are spread around it,
-# O. tarda on top (as in the legend)
-r <- r[order(r$process, r$cov, match(r$species, species)), ]
-r$y <- as.numeric(r$cov) + ave(match(r$species, species), r$process, r$cov, FUN = function(k) {
-  n <- length(k); if (n == 1) 0 else seq(0.22, -0.22, length.out = n) * min(1, (n - 1) / 2)
+# manual vertical offsets: species present in a row are spread around it, O. tarda on top
+r <- r[order(r$proc, r$cov, match(r$species, species)), ]
+r$y <- as.numeric(r$cov) + ave(match(r$species, species), r$proc, r$cov, FUN = function(k) {
+  n <- length(k); if (n == 1) 0 else seq(0.24, -0.24, length.out = n) * min(1, (n - 1) / 2)
 })
 p3 <- ggplot(r, aes(y = y, colour = sp)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55", linewidth = 0.3) +
@@ -121,25 +121,25 @@ p3 <- ggplot(r, aes(y = y, colour = sp)) +
                arrow = arrow(length = unit(1.4, "mm"), type = "closed"), show.legend = FALSE) +
   geom_segment(data = r[r$cut_lo, ], aes(x = XL[1] + 0.6, xend = XL[1], yend = y), linewidth = 0.5,
                arrow = arrow(length = unit(1.4, "mm"), type = "closed"), show.legend = FALSE) +
-  geom_point(data = r[abs(r$est) <= XL[2], ], aes(x = est), size = 1.8) +
-  # estimates beyond the axis: pale marker at the edge, not interpreted (cf. Fig. 3)
-  geom_point(data = r[abs(r$est) > XL[2], ], aes(x = sign(est) * (XL[2] - 0.25)), size = 1.8, alpha = 0.35,
+  geom_point(data = r[!r$beyond, ], aes(x = est), size = 1.8) +
+  # estimates beyond the axis: pale marker at the edge, not interpreted (cf. Fig. 4)
+  geom_point(data = r[r$beyond, ], aes(x = sign(est) * (XL[2] - 0.25)), size = 1.8, alpha = 0.35,
              show.legend = FALSE) +
   scale_colour_manual(values = sp_col, labels = sp_lab, breaks = species, name = NULL) +
   scale_x_continuous(limits = XL, breaks = seq(-6, 6, 3), labels = minus, expand = c(0, 0)) +
-  coord_cartesian(clip = "off") +
   scale_y_continuous(breaks = seq_along(levels(r$cov)), labels = levels(r$cov),
                      limits = c(0.5, length(levels(r$cov)) + 0.5), expand = c(0, 0)) +
-  facet_wrap(~ process, nrow = 1) +
+  coord_cartesian(clip = "off") +
+  facet_wrap(~ proc, nrow = 1) +
   labs(x = "Standardised effect (logit scale)", y = NULL) +
   theme_fig + theme(legend.position = "bottom", legend.text = element_text(face = "italic"),
-                    legend.key.width = unit(4, "mm"), panel.spacing.x = unit(9, "mm"),
+                    legend.key.width = unit(4, "mm"), panel.spacing.x = unit(7, "mm"),
                     legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(1, "mm"),
                     panel.grid.major.y = element_line(colour = "grey96", linewidth = 0.3))
-save_fig(p3, "FigS5_drivers", 140, 82)
-print(r[r$cut_hi | r$cut_lo, c("species", "process", "covariate", "est", "lo", "hi")])
+save_fig(p3, "Fig3_responses", 170, 85)
+print(r[r$beyond, c("species", "process", "covariate", "est")])
 
-# --- Fig. 3: SPAs judged by occupancy and by dynamics -------------------------
+# --- Fig. 4: SPAs judged by occupancy and by dynamics -------------------------
 q <- read.csv(file.path(cd, "spa_psi_check.csv"))
 q <- q[q$check == "psi_spa_t" & q$term %in% c("psi(spa)", "col(spa)", "ext(spa)"), ]
 q$process <- factor(c("psi(spa)" = "A  Initial occupancy", "col(spa)" = "B  Colonisation",
@@ -167,7 +167,7 @@ p4 <- ggplot(q, aes(y = sp, colour = species, alpha = alpha)) +
   facet_wrap(~ process, nrow = 1) +
   labs(x = "Odds ratio, SPA vs unprotected cell", y = NULL) +
   theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(5, "mm"))
-save_fig(p4, "Fig3_spa_static_dynamic", 160, 55)
+save_fig(p4, "Fig4_spa_static_dynamic", 160, 55)
 
 # --- Fig. 2: dynamic versus static prediction of 2023 -------------------------
 # gain of the dynamic model over the two static references: a persistence map
