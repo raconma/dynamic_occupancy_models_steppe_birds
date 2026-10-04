@@ -13,11 +13,16 @@
 #                 t + 1 can respond to the outcome)
 #   from2018      as psi_spa_t, fitted to 2018-2023 (2017 dropped: initial
 #                 occupancy estimated for 2018)
+#   psi_spa_t_nodet  as psi_spa_t without SPA cover in detection (does the
+#                 colonisation contrast depend on that term?)
+# Env CHECKS and SPECIES (comma-separated) restrict the run; a restricted run
+# writes spa_psi_check_subset.csv and leaves the full table untouched.
 # Also reports predicted annual colonisation probability for a typical cell
 # (covariates at their mean) fully outside and fully inside SPAs.
 #
 # Inputs:  as scripts 45-46
-# Outputs: results/core_spa/spa_psi_check.csv
+# Outputs: results/core_spa/spa_psi_check.csv (spa_psi_check_subset.csv for a
+#          restricted run)
 ###############################################################################
 
 library(here)
@@ -27,6 +32,7 @@ library(terra)
 set.seed(42)
 
 species <- c("otitar", "tettet", "pteori", "ptealc")
+if (nzchar(Sys.getenv("SPECIES"))) species <- strsplit(Sys.getenv("SPECIES"), ",")[[1]]
 YEARS <- 2017:2023; T_years <- length(YEARS)
 hab <- read.csv(here("results", "core_spa", "cell_habitat.csv"))
 grid <- rast(here("data-raw", "data", "environmental_data", "environmental_data_occ",
@@ -77,7 +83,9 @@ for (sp in species) {
   checks <- list(
     psi_spa   = list(umf = umf7, ctrl = c("effort_t", "effort_next", "x_c", "y_c", "nb_psi1", "dist_det")),
     psi_spa_t = list(umf = umf7, ctrl = c("effort_t", "x_c", "y_c", "nb_psi1", "dist_det")),
-    from2018  = list(umf = umf6, ctrl = c("effort_t", "x_c", "y_c", "nb_psi1", "dist_det")))
+    from2018  = list(umf = umf6, ctrl = c("effort_t", "x_c", "y_c", "nb_psi1", "dist_det")),
+    psi_spa_t_nodet = list(umf = umf7, ctrl = c("effort_t", "x_c", "y_c", "nb_psi1", "dist_det"), det = FALSE))
+  if (nzchar(Sys.getenv("CHECKS"))) checks <- checks[strsplit(Sys.getenv("CHECKS"), ",")[[1]]]
   for (ck in names(checks)) {
     s <- checks[[ck]]
     base_col <- c(union(rhs(fl$col), "pseudo_steppe"), s$ctrl); base_ext <- union(rhs(fl$ext), "pseudo_steppe")
@@ -86,7 +94,8 @@ for (sp in species) {
       col <- c(base_col, if (with_spa) "spa"); ext <- c(base_ext, if (with_spa) "spa")
       fits[[as.character(with_spa)]] <- tryCatch(
         colext(psiformula = form(psi_terms), gammaformula = form(col), epsilonformula = form(ext),
-               pformula = form(det_terms), data = s$umf, control = list(maxit = 3000)),
+               pformula = form(if (isFALSE(s$det)) rhs(fl$det) else det_terms), data = s$umf,
+               control = list(maxit = 3000)),
         error = function(e) { message("  ", ck, " failed: ", conditionMessage(e)); NULL })
     }
     f1 <- fits[["TRUE"]]; f0 <- fits[["FALSE"]]
@@ -108,7 +117,9 @@ for (sp in species) {
   }
 }
 out <- do.call(rbind, rows); rownames(out) <- NULL
-write.csv(out, here("results", "core_spa", "spa_psi_check.csv"), row.names = FALSE)
+subset_run <- nzchar(Sys.getenv("CHECKS")) || nzchar(Sys.getenv("SPECIES"))
+write.csv(out, here("results", "core_spa", if (subset_run) "spa_psi_check_subset.csv" else "spa_psi_check.csv"),
+          row.names = FALSE)
 print(out, digits = 3)
 
 sessionInfo()

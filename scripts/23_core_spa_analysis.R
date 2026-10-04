@@ -72,6 +72,7 @@ variant <- commandArgs(trailingOnly = TRUE)[1]
 if (is.na(variant)) variant <- "primary"
 
 species <- c("otitar", "ptealc", "pteori", "tettet")
+if (nzchar(Sys.getenv("SPECIES"))) species <- strsplit(Sys.getenv("SPECIES"), ",")[[1]]   # restricted run
 species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
                    pteori = "P. orientalis", tettet = "T. tetrax")
 N_DRAWS <- 1000

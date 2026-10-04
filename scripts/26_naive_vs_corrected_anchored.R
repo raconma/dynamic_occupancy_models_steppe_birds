@@ -21,6 +21,10 @@
 # restrictions shifted checklists in recorded cells later in the breeding
 # season (script 37), which could confound late-season movements with local
 # extinction because the detection model has no seasonal term.
+# With env STABLE=1 the script instead compares recent transitions with the
+# subset whose two years differ less than twofold in checklists
+# (recent_stable; robustness plan E) and writes summary_stable_effort.csv,
+# leaving summary.csv untouched.
 # Uncertainty for the corrected values: 1,000 multivariate-normal draws
 # (point_only = TRUE when the fit's variances are not finite; see
 # draw_coefs() in R/colext_utils.R).
@@ -45,9 +49,11 @@ variant <- commandArgs(trailingOnly = TRUE)[1]
 if (is.na(variant)) variant <- "primary"
 
 species <- c("otitar", "ptealc", "pteori", "tettet")
+if (nzchar(Sys.getenv("SPECIES"))) species <- strsplit(Sys.getenv("SPECIES"), ",")[[1]]   # restricted run
 species_names <- c(otitar = "O. tarda", ptealc = "P. alchata",
                    pteori = "P. orientalis", tettet = "T. tetrax")
 N_DRAWS <- 1000
+STABLE <- Sys.getenv("STABLE") == "1"
 hab <- read.csv(here("results", "core_spa", "cell_habitat.csv"))
 out_dir <- here("results", "naive_vs_corrected_anchored")
 if (variant != "primary") out_dir <- file.path(out_dir, variant)
@@ -75,9 +81,13 @@ for (sp in species) {
   # Checklists per cell-year and transitions with >= 2 in both years
   visits <- sapply(1:n_t, function(t) rowSums(!is.na(D$y[, ((t - 1) * D$J + 1):(t * D$J), drop = FALSE])))
   min2 <- visits[, 1:(n_t - 1)] >= 2 & visits[, 2:n_t] >= 2
+  v0 <- visits[, 1:(n_t - 1)]; v1 <- visits[, 2:n_t]
+  stable <- pmax(v0, v1) < 2 * pmin(v0, v1)      # less than twofold change in checklists
+  if (STABLE) periods <- list(recent = 2:(n_t - 1), recent_stable = 2:(n_t - 1))
   mask_of <- function(p) {
     w <- anchored; w[, -periods[[p]]] <- FALSE
     if (p == "recent_min2") w <- w & min2
+    if (p == "recent_stable") w <- w & stable
     w
   }
 
@@ -133,7 +143,8 @@ for (sp in species) {
 }
 
 res <- do.call(rbind, rows); rownames(res) <- NULL
-write.csv(res, file.path(out_dir, "summary.csv"), row.names = FALSE)
+write.csv(res, file.path(out_dir, if (STABLE) "summary_stable_effort.csv" else "summary.csv"), row.names = FALSE)
+if (STABLE) { print(res[res$metric %in% c("ratio", "net"), ], digits = 3); quit(save = "no") }
 options(width = 200)
 print(res, digits = 3)
 
