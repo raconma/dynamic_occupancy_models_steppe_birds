@@ -31,6 +31,9 @@
 # Inputs:  results/{sp}_model_object.rds, cell_habitat.csv
 # Outputs: results/robustness/rolling_validation.csv
 #          results/robustness/rolling_validation_scores.csv (AUC, Brier)
+#          results/robustness/rolling_validation_cells.csv (per cell and test year)
+#          results/robustness/rolling_validation_redetection.csv (observed and
+#          predicted share of cells with earlier records recorded again)
 ###############################################################################
 
 library(here)
@@ -128,11 +131,13 @@ for (sp in species) {
     obs_det <- rowSums(y_te == 1, na.rm = TRUE) > 0
     at_bound <- sapply(psi_raw, function(v) sum(surveyed & ((obs_det & v < 1e-6) | (!obs_det & v > 1 - 1e-6))))
     if (any(at_bound > 0)) message("  cells where the bound was used: ", paste(names(at_bound), at_bound, collapse = ", "))
+    pdet_mat <- matrix(NA_real_, M, length(psi), dimnames = list(NULL, names(psi)))
     ll <- sapply(names(psi), function(m) {
       p <- matrix(predict(fits[[m]], type = "det", newdata = oc_te)$Predicted, M, J, byrow = TRUE)
       p[is.na(y_te)] <- NA
       lik_occ <- apply(p^y_te * (1 - p)^(1 - y_te), 1, prod, na.rm = TRUE)
       pdet <- psi[[m]] * (1 - apply(1 - p, 1, prod, na.rm = TRUE))
+      pdet_mat[, m] <<- pdet
       for (grp in c("all", "recorded")) {
         keep <- surveyed & (grp == "all" | det_tr)
         score_rows[[paste(sp, T_te, m, grp)]] <<- data.frame(
@@ -146,11 +151,31 @@ for (sp in species) {
     bad <- colSums(!is.finite(ll[keep, , drop = FALSE]))
     if (any(bad > 0)) message("  non-finite log-likelihood (cells per model): ", paste(names(bad), bad, collapse = ", "))
     stopifnot(all(is.finite(ll[keep, ])))
+    colnames(pdet_mat) <- paste0("pdet_", colnames(pdet_mat))
     cell_rows[[paste(sp, T_te)]] <- data.frame(species = sp, test_year = YEARS[T_te], cell = which(keep),
-                                               blk = blk[keep], recorded = det_tr[keep], ll[keep, , drop = FALSE])
+                                               blk = blk[keep], recorded = det_tr[keep], obs_det = obs_det[keep],
+                                               ll[keep, , drop = FALSE], pdet_mat[keep, , drop = FALSE])
   }
 }
 cells <- do.call(rbind, cell_rows); rownames(cells) <- NULL
+write.csv(cells, file.path(out_dir, "rolling_validation_cells.csv"), row.names = FALSE)
+
+# Re-detection in cells with earlier records: observed share of cells with a
+# record in the test year (block-bootstrap interval) against the share each
+# model predicts (mean probability of at least one detection), pooled over
+# the test years
+redet <- list()
+for (sp in species) {
+  d0 <- cells[cells$species == sp & cells$recorded, ]
+  by_blk <- split(seq_len(nrow(d0)), d0$blk)
+  b <- replicate(N_BOOT, mean(d0$obs_det[unlist(by_blk[sample(length(by_blk), replace = TRUE)])]))
+  redet[[sp]] <- data.frame(species = sp, n_cell_years = nrow(d0), observed = mean(d0$obs_det),
+                            obs_lo = quantile(b, 0.025), obs_hi = quantile(b, 0.975),
+                            t(colMeans(d0[, grep("^pdet_", names(d0))])), row.names = NULL)
+}
+redet <- do.call(rbind, redet)
+write.csv(redet, file.path(out_dir, "rolling_validation_redetection.csv"), row.names = FALSE)
+print(redet, digits = 3)
 
 # contrasts per test year and pooled, block bootstrap over cells
 rows <- list()

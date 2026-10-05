@@ -15,6 +15,9 @@
 #                 occupancy estimated for 2018)
 #   psi_spa_t_nodet  as psi_spa_t without SPA cover in detection (does the
 #                 colonisation contrast depend on that term?)
+# Env PREDICT=1 also writes spa_probabilities.csv (initial occupancy and annual
+# extinction averaged over recorded cells with SPA cover set to 0 and to 1;
+# Fig. 4).
 # Env CHECKS and SPECIES (comma-separated) restrict the run; a restricted run
 # writes spa_psi_check_subset.csv and leaves the full table untouched.
 # Also reports predicted annual colonisation probability for a typical cell
@@ -28,6 +31,7 @@
 library(here)
 library(unmarked)
 library(terra)
+source(here("R", "colext_utils.R"))   # design()
 
 set.seed(42)
 
@@ -41,7 +45,8 @@ rhs <- function(f) attr(terms(f), "term.labels")
 form <- function(x) reformulate(if (length(x)) x else "1")
 sc01 <- function(v) (v - mean(v, na.rm = TRUE)) / sd(v, na.rm = TRUE)
 
-rows <- list()
+rows <- list(); prob_rows <- list()
+PREDICT <- Sys.getenv("PREDICT") == "1"   # write probabilities inside vs outside SPAs (Fig. 4)
 for (sp in species) {
   message("=== ", sp)
   mod <- readRDS(here("results", paste0(sp, "_model_object.rds")))
@@ -104,6 +109,34 @@ for (sp in species) {
     se <- tryCatch(suppressWarnings(sqrt(diag(vcov(f1)))),
                    error = function(e) setNames(rep(NA_real_, length(cf)), names(cf)))
     g0 <- plogis(cf[["col(Int)"]]); g1 <- plogis(cf[["col(Int)"]] + cf[["col(spa)"]])
+    if (PREDICT && ck == "psi_spa_t") {
+      # initial occupancy and annual extinction averaged over the cells with
+      # >= 1 detection (extinction over their 2017-2022 transitions), with SPA
+      # cover set to 0 and to 1 in every cell; 95 % intervals from 1,000
+      # multivariate-normal coefficient draws
+      det_any <- which(rowSums(getY(s$umf) == 1, na.rm = TRUE) > 0)
+      scv <- siteCovs(s$umf); ysv <- yearlySiteCovs(s$umf)
+      n_tr <- s$umf@numPrimary - 1
+      nd_psi <- scv[det_any, , drop = FALSE]
+      yr_rows <- as.vector(t(outer((det_any - 1) * s$umf@numPrimary, seq_len(n_tr), "+")))
+      nd_ext <- cbind(scv[rep(det_any, each = n_tr), , drop = FALSE], ysv[yr_rows, , drop = FALSE])
+      rownames(nd_psi) <- NULL; rownames(nd_ext) <- NULL   # design() indexes rows by name
+      draws <- MASS::mvrnorm(1000, cf, vcov(f1))
+      for (ty in c("psi", "ext")) {
+        nd <- if (ty == "psi") nd_psi else nd_ext
+        form_ty <- if (ty == "psi") f1@formlist$psi else f1@formlist$ext
+        idx <- grep(paste0("^", ty, "\\("), names(cf))
+        avg <- function(v, b) { nd$spa <- v; X <- design(form_ty, nd); colMeans(plogis(X %*% t(b))) }
+        pt <- sapply(0:1, function(v) avg(v, matrix(cf[idx], 1)))
+        dr <- sapply(0:1, function(v) avg(v, draws[, idx, drop = FALSE]))
+        prob_rows[[paste(sp, ty)]] <- data.frame(
+          species = sp, quantity = c(psi = "initial_occupancy", ext = "extinction")[[ty]],
+          where = c("outside", "inside"), estimate = pt,
+          lo = apply(dr, 2, quantile, 0.025), hi = apply(dr, 2, quantile, 0.975),
+          diff = pt[2] - pt[1], diff_lo = quantile(dr[, 2] - dr[, 1], 0.025),
+          diff_hi = quantile(dr[, 2] - dr[, 1], 0.975), n_cells = length(det_any), row.names = NULL)
+      }
+    }
     for (term in c("psi(spa)", "col(spa)", "ext(spa)", "p(spa_det)")) {
       if (!term %in% names(cf)) next
       rows[[paste(sp, ck, term)]] <- data.frame(
@@ -116,6 +149,7 @@ for (sp in species) {
     print(do.call(rbind, rows[grepl(paste0("^", sp, " ", ck, " "), names(rows))]), digits = 3)
   }
 }
+if (PREDICT) write.csv(do.call(rbind, prob_rows), here("results", "core_spa", "spa_probabilities.csv"), row.names = FALSE)
 out <- do.call(rbind, rows); rownames(out) <- NULL
 subset_run <- nzchar(Sys.getenv("CHECKS")) || nzchar(Sys.getenv("SPECIES"))
 write.csv(out, here("results", "core_spa", if (subset_run) "spa_psi_check_subset.csv" else "spa_psi_check.csv"),

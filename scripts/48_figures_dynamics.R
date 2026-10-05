@@ -6,24 +6,26 @@
 #           the primary models (script 41): standardised logit-scale
 #           coefficients with 95 % Wald intervals; intervals beyond the axis
 #           are truncated (arrows), estimates beyond it drawn pale at the edge.
-#   Fig. 4  SPAs judged by occupancy and by dynamics: odds ratios (cell fully
-#           inside vs fully outside SPAs) for initial occupancy, colonisation
-#           and extinction in the fixed SPA model (script 49, psi_spa_t).
-#   Fig. 2  Dynamic versus static prediction with a rolling origin (script
-#           54): difference in held-out log-likelihood from four static
-#           references, summed over the test years 2021-2023.
+#   Fig. 4  SPAs judged by occupancy and by dynamics: initial occupancy and
+#           annual extinction averaged over recorded cells with SPA cover set
+#           to 0 and 1 (script 49, PREDICT=1; primary SPA model).
+#   Fig. 2  Dynamic model against a map updated yearly, rolling origin
+#           (script 54): mean gain in held-out log-likelihood per test year
+#           (2021-2023) and the three test years.
+#   Fig. S5 The same against all four static references, summed over the
+#           test years.
 #   Fig. S4 SPA effects on colonisation and extinction in models without SPA
 #           cover in initial occupancy (scripts 43-46). Coloured: all
 #           controls (script 46); grey: other control sets. Fits with a
 #           standard error above 5 are omitted.
 #
 # Inputs:  results/core_spa/spa_in_dynamics.csv, spa_in_dynamics_checks.csv,
-#          spa_neighbourhood.csv, spa_full_model.csv, spa_psi_check.csv;
+#          spa_neighbourhood.csv, spa_full_model.csv, spa_probabilities.csv;
 #          results/robustness/rolling_validation.csv;
 #          results/{sp}_model_object.rds
 # Outputs: results/manuscript_figures/submission/
 #          Fig2_temporal_validation, Fig3_responses, Fig4_spa_static_dynamic,
-#          FigS4_spa_controls (.png, .pdf, .tif)
+#          FigS4_spa_controls, FigS5_rolling_all_references (.png, .pdf, .tif)
 ###############################################################################
 
 library(here)
@@ -140,34 +142,37 @@ save_fig(p3, "Fig3_responses", 170, 85)
 print(r[r$beyond, c("species", "process", "covariate", "est")])
 
 # --- Fig. 4: SPAs judged by occupancy and by dynamics -------------------------
-q <- read.csv(file.path(cd, "spa_psi_check.csv"))
-q <- q[q$check == "psi_spa_t" & q$term %in% c("psi(spa)", "col(spa)", "ext(spa)"), ]
-q$process <- factor(c("psi(spa)" = "A  Initial occupancy", "col(spa)" = "B  Colonisation",
-                      "ext(spa)" = "C  Extinction")[q$term])
-q$sp <- factor(sp_lab[q$species], levels = rev(sp_lab))
-LIM3 <- c(0.05, 100)
-q$lo_c <- pmax(exp(q$lo), LIM3[1]); q$hi_c <- pmin(exp(q$hi), LIM3[2])
-q$alpha <- ifelse(q$species == "ptealc", 0.35, 1)          # not interpreted (SE rule)
-p4 <- ggplot(q, aes(y = sp, colour = species, alpha = alpha)) +
-  # shade the snapshot panel (occupancy) apart from the dynamic ones
-  geom_rect(data = data.frame(process = factor("A  Initial occupancy", levels = levels(q$process))),
-            aes(xmin = 0, xmax = Inf, ymin = -Inf, ymax = Inf), fill = "grey97", inherit.aes = FALSE) +
-  geom_vline(xintercept = c(0.1, 10, 100), colour = "grey92", linewidth = 0.3) +
-  geom_vline(xintercept = 1, linetype = "dashed", colour = "grey55", linewidth = 0.3) +
-  geom_segment(aes(x = lo_c, xend = hi_c, yend = sp), linewidth = 0.7) +
-  geom_segment(data = q[exp(q$hi) > LIM3[2], ], aes(x = LIM3[2] / 1.6, xend = LIM3[2], yend = sp),
-               linewidth = 0.7, arrow = arrow(length = unit(1.6, "mm"), type = "closed")) +
-  geom_point(aes(x = exp(estimate)), size = 2.2) +
-  geom_text(data = data.frame(process = factor("C  Extinction", levels = levels(q$process)), x = 0.055, y = 0.62,
-                              lab = "\u2190 lower extinction inside SPAs"),
-            aes(x = x, y = y, label = lab), hjust = 0, size = 2.3, colour = "grey40", inherit.aes = FALSE) +
-  scale_colour_manual(values = sp_col) + scale_alpha_identity() +
-  scale_x_log10(limits = LIM3, breaks = c(0.1, 1, 10, 100), labels = c("0.1", "1", "10", "100"), expand = c(0, 0)) +
-  coord_cartesian(clip = "off") +
-  facet_wrap(~ process, nrow = 1) +
-  labs(x = "Odds ratio, SPA vs unprotected cell", y = NULL) +
-  theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(5, "mm"))
-save_fig(p4, "Fig4_spa_static_dynamic", 160, 55)
+# initial occupancy and annual extinction averaged over recorded cells with SPA
+# cover set to 0 (outside) and 1 (inside), primary SPA model (script 49,
+# PREDICT=1); P. alchata omitted (SPA model not interpreted)
+q <- read.csv(file.path(cd, "spa_probabilities.csv"))
+q$panel <- factor(ifelse(q$quantity == "initial_occupancy", "A  Initial occupancy (snapshot)",
+                         "B  Annual local extinction (dynamics)"))
+q$sp <- factor(sp_lab[q$species], levels = rev(sp_lab[c("otitar", "tettet", "pteori")]))
+q$where <- factor(q$where, levels = c("outside", "inside"), labels = c("Outside SPAs", "Inside SPAs"))
+q$y <- as.numeric(q$sp) + ifelse(q$where == "Outside SPAs", 0.13, -0.13)
+shade <- data.frame(panel = factor("A  Initial occupancy (snapshot)", levels = levels(q$panel)))
+pct <- function(x) paste0(round(100 * x), " %")
+p4 <- ggplot(q, aes(y = y, colour = species)) +
+  geom_rect(data = shade, aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf), fill = "grey97", inherit.aes = FALSE) +
+  geom_vline(xintercept = c(0.2, 0.4, 0.6), colour = "grey92", linewidth = 0.3) +
+  geom_segment(data = reshape(q[, c("species", "panel", "sp", "where", "estimate")], idvar = c("species", "panel", "sp"),
+                              timevar = "where", direction = "wide"),
+               aes(x = `estimate.Outside SPAs`, xend = `estimate.Inside SPAs`,
+                   y = as.numeric(sp) + 0.13, yend = as.numeric(sp) - 0.13, colour = species),
+               linewidth = 0.35, alpha = 0.6) +
+  geom_segment(aes(x = lo, xend = hi, yend = y), linewidth = 0.5) +
+  geom_point(aes(x = estimate, shape = where), size = 2.2, stroke = 0.7, fill = "white") +
+  scale_colour_manual(values = sp_col, guide = "none") +
+  scale_shape_manual(values = c(`Outside SPAs` = 21, `Inside SPAs` = 16), name = NULL) +
+  scale_x_continuous(labels = pct, limits = c(0, 0.62), breaks = seq(0, 0.6, 0.2), expand = c(0, 0)) +
+  scale_y_continuous(breaks = 1:3, labels = levels(q$sp), limits = c(0.5, 3.5), expand = c(0, 0)) +
+  facet_wrap(~ panel, nrow = 1) +
+  labs(x = "Probability for a recorded cell", y = NULL) +
+  theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"),
+                    legend.position = "bottom", legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(1, "mm")) +
+  guides(shape = guide_legend(override.aes = list(colour = "grey30")))
+save_fig(p4, "Fig4_spa_static_dynamic", 150, 62)
 
 # --- Fig. 2: dynamic versus static prediction, rolling origin ----------------
 # gain of the dynamic model over four static references, summed over the test
@@ -200,6 +205,36 @@ p5 <- ggplot(v, aes(y = y, colour = species)) +
                     legend.position = "bottom", legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(1, "mm"),
                     panel.grid.major.y = element_line(colour = "grey96", linewidth = 0.3)) +
   guides(shape = guide_legend(nrow = 1, override.aes = list(colour = "grey30", size = 2)))
-save_fig(p5, "Fig2_temporal_validation", 150, 70)
+save_fig(p5, "FigS5_rolling_all_references", 150, 70)
+
+# --- Fig. 2: dynamic model against a map updated yearly ------------------------
+# mean gain per test year (pooled sum / 3, with its block-bootstrap interval)
+# and the three test years as small points
+v2 <- read.csv(here("results", "robustness", "rolling_validation.csv"))
+v2 <- v2[v2$reference == "S2", ]
+v2$panel <- factor(ifelse(v2$cells == "all", "A  All surveyed cells", "B  Cells with earlier records"))
+v2$sp <- factor(sp_lab[v2$species], levels = rev(sp_lab))
+pool <- v2[v2$test_year == "pooled", ]; pool[, c("d_loglik", "lo", "hi")] <- pool[, c("d_loglik", "lo", "hi")] / 3
+yrs <- v2[v2$test_year != "pooled", ]
+yrs$y <- as.numeric(yrs$sp) - 0.22 + 0.11 * (as.integer(yrs$test_year) - 2021)
+ann3 <- data.frame(panel = factor("B  Cells with earlier records", levels = levels(v2$panel)), x = 118, y = 0.62,
+                   lab = "dynamic model better \u2192")
+p6 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55", linewidth = 0.3) +
+  geom_point(data = yrs, aes(x = d_loglik, y = y, colour = species), size = 1, alpha = 0.45) +
+  geom_segment(data = pool, aes(x = lo, xend = hi, y = as.numeric(sp) + 0.12, yend = as.numeric(sp) + 0.12, colour = species),
+               linewidth = 0.6) +
+  geom_point(data = pool, aes(x = d_loglik, y = as.numeric(sp) + 0.12, colour = species), size = 2.3) +
+  geom_text(data = ann3, aes(x = x, y = y, label = lab), hjust = 1, size = 2.3, colour = "grey40") +
+  scale_colour_manual(values = sp_col, guide = "none") +
+  scale_y_continuous(breaks = seq_along(levels(v2$sp)), labels = levels(v2$sp), limits = c(0.5, 4.5), expand = c(0, 0)) +
+  scale_x_continuous(limits = c(-35, 120), breaks = seq(-25, 100, 25), labels = minus) +
+  coord_cartesian(clip = "off") +
+  facet_wrap(~ panel, nrow = 1) +
+  labs(x = "Gain in log-likelihood per test year, dynamic model over a map updated yearly", y = NULL) +
+  theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"),
+                    panel.grid.major.y = element_line(colour = "grey96", linewidth = 0.3))
+save_fig(p6, "Fig2_temporal_validation", 140, 58)
+print(pool[, c("species", "cells", "d_loglik", "lo", "hi")]); print(range(yrs$d_loglik))
 
 sessionInfo()
