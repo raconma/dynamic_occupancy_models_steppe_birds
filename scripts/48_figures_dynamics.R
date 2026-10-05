@@ -9,9 +9,9 @@
 #   Fig. 4  SPAs judged by occupancy and by dynamics: odds ratios (cell fully
 #           inside vs fully outside SPAs) for initial occupancy, colonisation
 #           and extinction in the fixed SPA model (script 49, psi_spa_t).
-#   Fig. 2  Dynamic versus static prediction of the 2023 detections (script
-#           51): difference in held-out log-likelihood from the static
-#           closed model, all surveyed cells and cells recorded in 2017-2022.
+#   Fig. 2  Dynamic versus static prediction with a rolling origin (script
+#           54): difference in held-out log-likelihood from four static
+#           references, summed over the test years 2021-2023.
 #   Fig. S4 SPA effects on colonisation and extinction in models without SPA
 #           cover in initial occupancy (scripts 43-46). Coloured: all
 #           controls (script 46); grey: other control sets. Fits with a
@@ -19,7 +19,7 @@
 #
 # Inputs:  results/core_spa/spa_in_dynamics.csv, spa_in_dynamics_checks.csv,
 #          spa_neighbourhood.csv, spa_full_model.csv, spa_psi_check.csv;
-#          results/robustness/temporal_validation_2023.csv;
+#          results/robustness/rolling_validation.csv;
 #          results/{sp}_model_object.rds
 # Outputs: results/manuscript_figures/submission/
 #          Fig2_temporal_validation, Fig3_responses, Fig4_spa_static_dynamic,
@@ -169,35 +169,37 @@ p4 <- ggplot(q, aes(y = sp, colour = species, alpha = alpha)) +
   theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(5, "mm"))
 save_fig(p4, "Fig4_spa_static_dynamic", 160, 55)
 
-# --- Fig. 2: dynamic versus static prediction of 2023 -------------------------
-# gain of the dynamic model over the two static references: a persistence map
-# (fixed-state model, filled) and a habitat-only model (open)
-v <- read.csv(here("results", "robustness", "temporal_validation_2023.csv"))
-v <- v[v$model == "dynamic" & v$cells %in% c("all", "detected_2017_2022"), ]
-v <- rbind(transform(v, ref = "Persistence map", est = d_loglik_vs_closed, lo = d_lo, hi = d_hi),
-           transform(v, ref = "Habitat-only model", est = d_loglik_vs_sdm, lo = d_sdm_lo, hi = d_sdm_hi))
-v$ref <- factor(v$ref, levels = c("Persistence map", "Habitat-only model"))
-ann4 <- data.frame(panel = factor("A  All surveyed cells", levels = c("A  All surveyed cells", "B  Cells with records in 2017\u20132022")),
-                   x = 128, y = 0.62, lab = "dynamic model better \u2192")
-v$panel <- factor(ifelse(v$cells == "all", "A  All surveyed cells", "B  Cells with records in 2017\u20132022"))
+# --- Fig. 2: dynamic versus static prediction, rolling origin ----------------
+# gain of the dynamic model over four static references, summed over the test
+# years 2021-2023 (script 54); filled symbols, maps that use detections
+v <- read.csv(here("results", "robustness", "rolling_validation.csv"))
+v <- v[v$test_year == "pooled", ]
+ref_lab <- c(S1 = "Persistence map", S2 = "Map updated yearly", S3 = "Three-year atlas",
+             S4 = "Habitat-only model")
+v$ref <- factor(ref_lab[v$reference], levels = ref_lab)
+v$panel <- factor(ifelse(v$cells == "all", "A  All surveyed cells", "B  Cells with earlier records"))
 v$sp <- factor(sp_lab[v$species], levels = rev(sp_lab))
-v$y <- as.numeric(v$sp) + ifelse(v$ref == "Persistence map", 0.14, -0.14)
+v$y <- as.numeric(v$sp) + c(0.27, 0.09, -0.09, -0.27)[as.integer(v$ref)]
+XL2 <- c(-80, 345)
+v$lo_c <- pmax(v$lo, XL2[1]); v$hi_c <- pmin(v$hi, XL2[2])
+ann2 <- data.frame(panel = factor("B  Cells with earlier records", levels = levels(v$panel)), x = XL2[2] - 5, y = 0.58,
+                   lab = "dynamic model better \u2192")
 p5 <- ggplot(v, aes(y = y, colour = species)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55", linewidth = 0.3) +
-  geom_segment(aes(x = lo, xend = hi, yend = y, linetype = ref), linewidth = 0.6) +
-  geom_point(aes(x = est, shape = ref, fill = after_scale(ifelse(shape == 21, "white", colour))), size = 2.1, stroke = 0.7) +
+  geom_segment(aes(x = lo_c, xend = hi_c, yend = y), linewidth = 0.5) +
+  geom_point(aes(x = d_loglik, shape = ref), size = 1.9, stroke = 0.6, fill = "white") +
+  geom_text(data = ann2, aes(x = x, y = y, label = lab), hjust = 1, size = 2.3, colour = "grey40", inherit.aes = FALSE) +
   scale_colour_manual(values = sp_col, guide = "none") +
-  geom_text(data = ann4, aes(x = x, y = y, label = lab), hjust = 1, size = 2.3, colour = "grey40", inherit.aes = FALSE) +
-  scale_shape_manual(values = c(`Persistence map` = 16, `Habitat-only model` = 21), name = "Static reference") +
-  scale_linetype_manual(values = c(`Persistence map` = "solid", `Habitat-only model` = "22"), name = "Static reference") +
+  scale_shape_manual(values = c(16, 17, 15, 21), name = NULL) +
   scale_y_continuous(breaks = seq_along(levels(v$sp)), labels = levels(v$sp), limits = c(0.5, 4.5), expand = c(0, 0)) +
-  scale_x_continuous(limits = c(-20, 130), breaks = seq(0, 120, 40), labels = minus) +
+  scale_x_continuous(limits = XL2, breaks = seq(0, 300, 100), labels = minus) +
+  coord_cartesian(clip = "off") +
   facet_wrap(~ panel, nrow = 1) +
-  labs(x = "Log-likelihood of the 2023 detections, dynamic minus static model", y = NULL) +
+  labs(x = "Log-likelihood of the 2021\u20132023 detections, dynamic minus static model", y = NULL) +
   theme_fig + theme(axis.text.y = element_text(face = "italic", size = 8), panel.spacing.x = unit(6, "mm"),
-                    legend.position = "bottom", legend.key.width = unit(8, "mm"), legend.margin = margin(0, 0, 0, 0),
-                    legend.box.spacing = unit(1, "mm")) +
-  guides(shape = guide_legend(override.aes = list(colour = "grey30", fill = c("grey30", "white"))))
-save_fig(p5, "Fig2_temporal_validation", 140, 62)
+                    legend.position = "bottom", legend.margin = margin(0, 0, 0, 0), legend.box.spacing = unit(1, "mm"),
+                    panel.grid.major.y = element_line(colour = "grey96", linewidth = 0.3)) +
+  guides(shape = guide_legend(nrow = 1, override.aes = list(colour = "grey30", size = 2)))
+save_fig(p5, "Fig2_temporal_validation", 150, 70)
 
 sessionInfo()
