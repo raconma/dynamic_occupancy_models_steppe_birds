@@ -360,7 +360,7 @@ pS2 <- ggplot() +
 save_fig(pS2, "FigS2_atlas_status", 190, 150)
 
 ###############################################################################
-# GRAPHICAL ABSTRACT (numbers as in the abstract; panel 3 from script 51). The bird silhouettes of the
+# GRAPHICAL ABSTRACT (numbers as in the abstract; panel 3 from script 54). The bird silhouettes of the
 # GCB conceptual figure were added by hand and are not drawn here.
 ###############################################################################
 
@@ -388,16 +388,17 @@ ga_key <- cowplot::get_plot_component(
                          legend.key.width = unit(3, "mm"), legend.spacing.x = unit(1, "mm")),
   "guide-box-bottom", return_all = TRUE)
 ga2 <- cowplot::plot_grid(ga2, ga_key, ncol = 1, rel_heights = c(1, 0.08))
-# dynamic versus static prediction of the 2023 detections (script 51)
-tv <- read.csv(res("robustness", "temporal_validation_2023.csv"))
-tv <- tv[tv$model == "dynamic" & tv$cells == "detected_2017_2022" & tv$species %in% sp_est, ]
+# dynamic model against a map updated yearly, cells with earlier records,
+# summed over the rolling-origin test years 2021-2023 (script 54)
+tv <- read.csv(res("robustness", "rolling_validation.csv"))
+tv <- tv[tv$reference == "S2" & tv$cells == "recorded" & tv$test_year == "pooled" & tv$species %in% sp_est, ]
 tv$sp <- factor(sp_short[tv$species], levels = rev(sp_short[sp_est]))
 ga3 <- ggplot(tv, aes(y = sp, colour = sp)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50", linewidth = 0.3) +
-  geom_errorbar(aes(xmin = d_lo, xmax = d_hi), width = 0, linewidth = 0.4, orientation = "y") +
-  geom_point(aes(x = d_loglik_vs_closed), size = 2.2) +
+  geom_errorbar(aes(xmin = lo, xmax = hi), width = 0, linewidth = 0.4, orientation = "y") +
+  geom_point(aes(x = d_loglik), size = 2.2) +
   scale_colour_manual(values = sp_col_lab, guide = "none") +
-  labs(x = "Gain over a persistence\nmap (cells with records)", y = NULL, title = NULL) +
+  labs(x = "Gain over a map updated\nyearly (cells with records)", y = NULL, title = NULL) +
   theme(plot.margin = margin(4, 10, 4, 4)) +
   theme_gcb + italic_y
 # titles in a separate row so that they align across panels of different aspect
@@ -406,7 +407,7 @@ ga_title <- function(t) cowplot::ggdraw() + cowplot::draw_label(t, x = 0.02, hju
 ga <- cowplot::plot_grid(
   cowplot::plot_grid(ga_title("Great bustards are losing cells"),
                      ga_title("Losses and gains a snapshot hides"),
-                     ga_title("Where a persistence map fails"), nrow = 1, rel_widths = c(1, 1.15, 1)),
+                     ga_title("Where even a yearly map fails"), nrow = 1, rel_widths = c(1, 1.15, 1)),
   cowplot::plot_grid(al[[1]], ga2, al[[2]], nrow = 1, rel_widths = c(1, 1.15, 1)),
   ncol = 1, rel_heights = c(0.09, 1))
 save_fig(ga, "Graphical_abstract", 150, 60)   # legible at the 13 x 5 cm display size
