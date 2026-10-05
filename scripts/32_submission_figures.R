@@ -93,7 +93,7 @@ map_theme <- theme_void(base_size = 8) +
         strip.text = element_text(face = "italic", size = 8.5, margin = margin(2, 0, 2, 0)),
         plot.background = element_rect(fill = "white", colour = NA))
 col_spa_fill <- "#DDEBDD"; col_spa_line <- "#7FA67F"
-col_range <- "#E6DCC3"                              # II Atlas range on the net-change maps
+col_range <- "#D9C48F"                              # II Atlas range on the net-change maps
 
 atlas2 <- load_atlas2()
 atlas_col <- c(otitar = "OTITAR", ptealc = "PTEALC", pteori = "PTEORI", tettet = "TETTET")
@@ -365,7 +365,7 @@ save_fig(pS2, "FigS2_atlas_status", 190, 150)
 ###############################################################################
 
 ga1 <- rate_panel(nv[nv$metric == "ratio" & nv$species %in% sp_est, ], "", "",
-                  "Extinctions per colonisation", log = TRUE, ref = 1, naive = FALSE,
+                  "Ratio, 2018\u20132023 (log)", log = TRUE, ref = 1, naive = FALSE,
                   show_y = TRUE, sp_levels = sp_est) +
   labs(title = NULL)
 # four small maps (as Fig. 1), species name only, smaller symbols
@@ -398,16 +398,16 @@ ga3 <- ggplot(tv, aes(y = sp, colour = sp)) +
   geom_errorbar(aes(xmin = lo, xmax = hi), width = 0, linewidth = 0.4, orientation = "y") +
   geom_point(aes(x = d_loglik), size = 2.2) +
   scale_colour_manual(values = sp_col_lab, guide = "none") +
-  labs(x = "Gain over a map updated\nyearly (cells with records)", y = NULL, title = NULL) +
+  labs(x = "\u0394 log-likelihood, 2021\u20132023\n(cells with earlier records)", y = NULL, title = NULL) +
   theme(plot.margin = margin(4, 10, 4, 4)) +
   theme_gcb + italic_y
 # titles in a separate row so that they align across panels of different aspect
 al <- cowplot::align_plots(ga1, ga3, align = "h", axis = "tb")
 ga_title <- function(t) cowplot::ggdraw() + cowplot::draw_label(t, x = 0.02, hjust = 0, size = 7.5)
 ga <- cowplot::plot_grid(
-  cowplot::plot_grid(ga_title("Great bustards are losing cells"),
-                     ga_title("Losses and gains a snapshot hides"),
-                     ga_title("Where even a yearly map fails"), nrow = 1, rel_widths = c(1, 1.15, 1)),
+  cowplot::plot_grid(ga_title("Extinctions per colonisation"),
+                     ga_title("Net change in occupied cells"),
+                     ga_title("Gain over an annually updated map"), nrow = 1, rel_widths = c(1, 1.15, 1)),
   cowplot::plot_grid(al[[1]], ga2, al[[2]], nrow = 1, rel_widths = c(1, 1.15, 1)),
   ncol = 1, rel_heights = c(0.09, 1))
 save_fig(ga, "Graphical_abstract", 150, 60)   # legible at the 13 x 5 cm display size
