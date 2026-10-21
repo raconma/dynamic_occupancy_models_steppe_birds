@@ -544,21 +544,17 @@ for (sp in species_codes) {
 
   set.seed(123)  # reproducible simulations
 
-  predict_data <- occ_wide_clean %>%
-    drop_na(paste0("NDVI_", YEARS))
+  sim_rows <- complete.cases(occ_wide_clean[, paste0("NDVI_", YEARS)])
+  predict_data <- occ_wide_clean[sim_rows, ]
 
   S <- nrow(predict_data)
   T_sim <- occ_umf@numPrimary
 
   # --- Initial occupancy (psi_1) ---
-  psi_data <- predict_data[, cfg$psi_vars, drop = FALSE]
-  for (v in cfg$psi_vars) {
-    if (v %in% names(scaling_params)) {
-      psi_data[[v]] <- scale_with_params(
-        psi_data[[v]], scaling_params[[v]]$center, scaling_params[[v]]$scale
-      )
-    }
-  }
+  # psi covariates in occ_wide_dynamic.csv are already standardised in
+  # step 2; re-applying scaling_params double-scaled them. Reuse the
+  # training-scale siteCovs instead (see script 4, Bug 4).
+  psi_data <- as.data.frame(siteCovs)[sim_rows, cfg$psi_vars, drop = FALSE]
   psi1 <- predict(Mod.final, type = "psi",
                    newdata = as.data.frame(psi_data))$Predicted
 

@@ -309,18 +309,13 @@ for (sp in species_codes) {
   if (inherits(w_samps, "mcmc.list")) w_samps <- do.call(rbind, w_samps)
   w_mean <- colMeans(w_samps)
 
-  # Handle dimension mismatch: w may be for J sites
-  n_w <- length(w_mean)
-  n_coords <- nrow(dat$coords_lonlat)
-  if (n_w != n_coords) {
-    cat("    WARNING:", sp, "- w has", n_w, "values but", n_coords,
-        "coords. Using min.\n")
-    n_use <- min(n_w, n_coords)
-    w_mean <- w_mean[1:n_use]
-    coords_use <- dat$coords_lonlat[1:n_use, ]
-  } else {
-    coords_use <- dat$coords_lonlat
+  # Site vectors and coordinates must align one-to-one; truncating to the
+  # shorter one would silently shift every site after a dropped row
+  if (length(w_mean) != nrow(dat$coords_lonlat)) {
+    stop(sp, ": w has ", length(w_mean), " values but there are ",
+         nrow(dat$coords_lonlat), " coordinates")
   }
+  coords_use <- dat$coords_lonlat
 
   range_info <- compute_eff_range(fit)
 
@@ -757,10 +752,8 @@ for (sp in species_codes) {
 
   coords_use <- dat$coords_lonlat
   if (length(col_mean) != nrow(coords_use)) {
-    n_use <- min(length(col_mean), nrow(coords_use))
-    col_mean <- col_mean[1:n_use]
-    ext_mean <- ext_mean[1:n_use]
-    coords_use <- coords_use[1:n_use, ]
+    stop(sp, ": ", length(col_mean), " sites but ", nrow(coords_use),
+         " coordinates")
   }
 
   map_df <- data.frame(
@@ -841,9 +834,8 @@ for (sp in species_codes) {
 
   coords_use <- dat$coords_lonlat
   if (length(delta_psi) != nrow(coords_use)) {
-    n_use <- min(length(delta_psi), nrow(coords_use))
-    delta_psi <- delta_psi[1:n_use]
-    coords_use <- coords_use[1:n_use, ]
+    stop(sp, ": ", length(delta_psi), " sites but ", nrow(coords_use),
+         " coordinates")
   }
 
   dpsi_lim <- max(abs(quantile(delta_psi, c(0.01, 0.99))))
